@@ -2,7 +2,7 @@
 
 A professional academic reference manager with AI-powered document Q&A.
 
-**Live App:** https://pourmousavi.github.io/scholarlib
+**Live App:** https://pourmousavi.com/ScholarLib
 
 ## Features
 
