@@ -1,0 +1,23 @@
+name = "scholarlib-api"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# KV Namespaces - Replace with your actual KV namespace IDs
+# Create these in Cloudflare dashboard: Workers & Pages > KV > Create namespace
+# Then run: wrangler kv:namespace list to get the IDs
+
+[[kv_namespaces]]
+binding = "SHARES"
+id = "PASTE_SHARES_KV_ID_HERE"
+
+[[kv_namespaces]]
+binding = "ACCESS"
+id = "PASTE_ACCESS_KV_ID_HERE"
+
+[[kv_namespaces]]
+binding = "LOGS"
+id = "PASTE_LOGS_KV_ID_HERE"
+
+[vars]
+# Update with your actual domains
+ALLOWED_ORIGINS = "https://pourmousavi.github.io,http://localhost:5173,https://pourmousavi.com"
