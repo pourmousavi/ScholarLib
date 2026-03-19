@@ -1,6 +1,5 @@
 import { useUIStore } from '../../store/uiStore'
 import FolderTree from '../library/FolderTree'
-import { Input } from '../ui'
 import styles from './Sidebar.module.css'
 
 export default function Sidebar() {
