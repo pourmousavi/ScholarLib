@@ -1,0 +1,93 @@
+.viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #141820;
+}
+
+.container {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6);
+  scroll-behavior: smooth;
+}
+
+.pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.pageWrapper {
+  position: relative;
+  background: white;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-pdf);
+  max-width: 680px;
+}
+
+.page {
+  display: block;
+  border-radius: var(--radius-sm);
+}
+
+.pageLoading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-sm);
+}
+
+.placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.placeholderText {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.loadingText {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.errorIcon {
+  font-size: 32px;
+  color: var(--error);
+}
+
+.errorText {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: var(--error);
+  text-align: center;
+  max-width: 300px;
+}

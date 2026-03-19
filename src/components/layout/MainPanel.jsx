@@ -1,6 +1,10 @@
 import { useUIStore } from '../../store/uiStore'
 import { useLibraryStore } from '../../store/libraryStore'
+import PDFViewer from '../viewer/PDFViewer'
 import styles from './MainPanel.module.css'
+
+// Test PDF URL for development (public domain PDF)
+const TEST_PDF_URL = 'https://www.w3.org/WAI/WCAG21/Techniques/pdf/img/table-word.pdf'
 
 export default function MainPanel() {
   const activePanel = useUIStore((s) => s.activePanel)
@@ -19,6 +23,14 @@ export default function MainPanel() {
     { id: 'ai', label: 'AI Chat' },
     { id: 'notes', label: 'Notes' }
   ]
+
+  // For now, use test PDF URL. In Stage 06, this will be Box streaming URL
+  const pdfUrl = selectedDoc ? TEST_PDF_URL : null
+
+  const handleTextExtracted = (text) => {
+    // Will be used in Stage 11 for indexing
+    console.log('Extracted text length:', text.length)
+  }
 
   return (
     <div className={styles.panel}>
@@ -56,9 +68,11 @@ export default function MainPanel() {
       {/* Panel content */}
       <div className={styles.content}>
         {activePanel === 'pdf' && (
-          <div className={styles.placeholder}>
-            PDF Viewer (Stage 05)
-          </div>
+          <PDFViewer
+            url={pdfUrl}
+            docId={selectedDocId}
+            onTextExtracted={handleTextExtracted}
+          />
         )}
         {activePanel === 'ai' && (
           <div className={styles.placeholder}>
