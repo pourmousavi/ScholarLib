@@ -1,0 +1,76 @@
+.shell {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  transition: margin-left var(--transition-std), opacity var(--transition-std);
+}
+
+.sidebar.collapsed {
+  margin-left: calc(-1 * var(--sidebar-width));
+  opacity: 0;
+  pointer-events: none;
+}
+
+.docList {
+  width: var(--doclist-width);
+  flex-shrink: 0;
+  background: var(--bg-base);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  transition: margin-left var(--transition-std), opacity var(--transition-std);
+}
+
+.docList.collapsed {
+  margin-left: calc(-1 * var(--doclist-width));
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mainPanel {
+  flex: 1;
+  min-width: 400px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Mobile drawer mode */
+@media (max-width: 899px) {
+  .docList:not(.collapsed) {
+    position: fixed;
+    left: var(--sidebar-width);
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+    margin-left: 0;
+    box-shadow: var(--shadow-modal);
+  }
+}
+
+@media (max-width: 639px) {
+  .sidebar:not(.collapsed) {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 150;
+    margin-left: 0;
+    box-shadow: var(--shadow-modal);
+  }
+
+  .docList:not(.collapsed) {
+    left: 0;
+  }
+}
