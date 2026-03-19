@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-// Mock folder data matching LIBRARY_SCHEMA.md FolderNode structure
+// Mock folder data for development/offline mode
 const mockFolders = [
   {
     id: 'f_root1',
@@ -88,7 +88,6 @@ const mockFolders = [
   }
 ]
 
-// Mock document data matching LIBRARY_SCHEMA.md DocumentRecord structure
 const mockDocuments = {
   'd_doc1': {
     id: 'd_doc1',
@@ -205,24 +204,64 @@ const mockDocuments = {
   }
 }
 
-// Helper to count documents in a folder (including children)
-function countDocsInFolder(folderId, folders, documents) {
-  let count = Object.values(documents).filter(d => d.folder_id === folderId).length
-  const folder = folders.find(f => f.id === folderId)
-  if (folder?.children) {
-    for (const childId of folder.children) {
-      count += countDocsInFolder(childId, folders, documents)
-    }
-  }
-  return count
-}
-
 export const useLibraryStore = create((set, get) => ({
+  // Library data
   folders: mockFolders,
   documents: mockDocuments,
-  selectedFolderId: 'f_bess1',
+  libraryVersion: null,
+  lastModified: null,
+
+  // UI state
+  selectedFolderId: null,
   selectedDocId: null,
-  expandedFolders: ['f_root1', 'f_bess1', 'f_root2'],
+  expandedFolders: [],
+
+  // Set library data from storage
+  setLibraryData: (library) => {
+    const folders = library.folders || []
+    const documents = library.documents || {}
+
+    // Auto-expand root folders
+    const rootFolderIds = folders
+      .filter(f => f.parent_id === null)
+      .map(f => f.id)
+
+    // Select first root folder if none selected
+    const firstRootId = rootFolderIds[0] || null
+
+    set({
+      folders,
+      documents,
+      libraryVersion: library.version,
+      lastModified: library.last_modified,
+      expandedFolders: rootFolderIds,
+      selectedFolderId: firstRootId,
+      selectedDocId: null,
+    })
+  },
+
+  // Clear library (for logout)
+  clearLibrary: () => {
+    set({
+      folders: [],
+      documents: {},
+      libraryVersion: null,
+      lastModified: null,
+      selectedFolderId: null,
+      selectedDocId: null,
+      expandedFolders: [],
+    })
+  },
+
+  // Use mock data (for development without storage)
+  useMockData: () => {
+    set({
+      folders: mockFolders,
+      documents: mockDocuments,
+      expandedFolders: ['f_root1', 'f_bess1', 'f_root2'],
+      selectedFolderId: 'f_bess1',
+    })
+  },
 
   setSelectedFolderId: (id) => set({ selectedFolderId: id, selectedDocId: null }),
   setSelectedDocId: (id) => set({ selectedDocId: id }),
@@ -236,39 +275,39 @@ export const useLibraryStore = create((set, get) => ({
     }
   }),
 
-  getRootFolders: () => {
-    return get().folders.filter(f => f.parent_id === null).sort((a, b) => a.sort_order - b.sort_order)
-  },
+  // Add document to store (after saving to storage)
+  addDocument: (doc) => set((state) => ({
+    documents: { ...state.documents, [doc.id]: doc }
+  })),
 
-  getChildFolders: (parentId) => {
-    return get().folders.filter(f => f.parent_id === parentId).sort((a, b) => a.sort_order - b.sort_order)
-  },
-
-  getFolderById: (id) => {
-    return get().folders.find(f => f.id === id)
-  },
-
-  getDocCountForFolder: (folderId) => {
-    return countDocsInFolder(folderId, get().folders, get().documents)
-  },
-
-  getDocsForFolder: (folderId) => {
-    return Object.values(get().documents).filter(d => d.folder_id === folderId)
-  },
-
-  getSelectedDoc: () => {
-    const { selectedDocId, documents } = get()
-    return selectedDocId ? documents[selectedDocId] : null
-  },
-
-  getBreadcrumb: (folderId) => {
-    const { folders } = get()
-    const path = []
-    let current = folders.find(f => f.id === folderId)
-    while (current) {
-      path.unshift(current)
-      current = current.parent_id ? folders.find(f => f.id === current.parent_id) : null
+  // Update document in store
+  updateDocument: (docId, updates) => set((state) => ({
+    documents: {
+      ...state.documents,
+      [docId]: { ...state.documents[docId], ...updates }
     }
-    return path
-  }
+  })),
+
+  // Remove document from store
+  removeDocument: (docId) => set((state) => {
+    const { [docId]: removed, ...rest } = state.documents
+    return { documents: rest }
+  }),
+
+  // Add folder to store
+  addFolder: (folder) => set((state) => ({
+    folders: [...state.folders, folder]
+  })),
+
+  // Update folder in store
+  updateFolder: (folderId, updates) => set((state) => ({
+    folders: state.folders.map(f =>
+      f.id === folderId ? { ...f, ...updates } : f
+    )
+  })),
+
+  // Remove folder from store
+  removeFolder: (folderId) => set((state) => ({
+    folders: state.folders.filter(f => f.id !== folderId)
+  })),
 }))
