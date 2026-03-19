@@ -3,11 +3,14 @@ import { useUIStore } from '../../store/uiStore'
 import Sidebar from './Sidebar'
 import DocList from '../library/DocList'
 import MainPanel from './MainPanel'
+import { SettingsModal } from '../settings'
 import styles from './AppShell.module.css'
 
 export default function AppShell() {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const docListCollapsed = useUIStore((s) => s.docListCollapsed)
+  const showModal = useUIStore((s) => s.showModal)
+  const setShowModal = useUIStore((s) => s.setShowModal)
   const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed)
   const setDocListCollapsed = useUIStore((s) => s.setDocListCollapsed)
 
@@ -33,16 +36,23 @@ export default function AppShell() {
   }, [setSidebarCollapsed, setDocListCollapsed])
 
   return (
-    <div className={styles.shell}>
-      <div className={`${styles.sidebar} ${sidebarCollapsed ? styles.collapsed : ''}`}>
-        <Sidebar />
+    <>
+      <div className={styles.shell}>
+        <div className={`${styles.sidebar} ${sidebarCollapsed ? styles.collapsed : ''}`}>
+          <Sidebar />
+        </div>
+        <div className={`${styles.docList} ${docListCollapsed ? styles.collapsed : ''}`}>
+          <DocList />
+        </div>
+        <div className={styles.mainPanel}>
+          <MainPanel />
+        </div>
       </div>
-      <div className={`${styles.docList} ${docListCollapsed ? styles.collapsed : ''}`}>
-        <DocList />
-      </div>
-      <div className={styles.mainPanel}>
-        <MainPanel />
-      </div>
-    </div>
+
+      {/* Modals */}
+      {showModal === 'settings' && (
+        <SettingsModal onClose={() => setShowModal(null)} />
+      )}
+    </>
   )
 }
