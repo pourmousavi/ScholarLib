@@ -9,7 +9,10 @@ export default function MainPanel() {
   const toggleDocList = useUIStore((s) => s.toggleDocList)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const docListCollapsed = useUIStore((s) => s.docListCollapsed)
-  const selectedDoc = useLibraryStore((s) => s.getSelectedDoc())
+
+  const selectedDocId = useLibraryStore((s) => s.selectedDocId)
+  const documents = useLibraryStore((s) => s.documents)
+  const selectedDoc = selectedDocId ? documents[selectedDocId] : null
 
   const panels = [
     { id: 'pdf', label: 'PDF' },

@@ -2,7 +2,10 @@ import { useLibraryStore } from '../../store/libraryStore'
 import styles from './FolderTree.module.css'
 
 export default function FolderTree() {
-  const rootFolders = useLibraryStore((s) => s.getRootFolders())
+  const folders = useLibraryStore((s) => s.folders)
+  const rootFolders = folders
+    .filter(f => f.parent_id === null)
+    .sort((a, b) => a.sort_order - b.sort_order)
 
   return (
     <div className={styles.tree}>
@@ -15,18 +18,22 @@ export default function FolderTree() {
 }
 
 function FolderNode({ folder, depth }) {
+  const folders = useLibraryStore((s) => s.folders)
+  const documents = useLibraryStore((s) => s.documents)
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
   const expandedFolders = useLibraryStore((s) => s.expandedFolders)
   const setSelectedFolderId = useLibraryStore((s) => s.setSelectedFolderId)
   const toggleFolderExpanded = useLibraryStore((s) => s.toggleFolderExpanded)
-  const getChildFolders = useLibraryStore((s) => s.getChildFolders)
-  const getDocCountForFolder = useLibraryStore((s) => s.getDocCountForFolder)
 
   const isSelected = selectedFolderId === folder.id
   const isExpanded = expandedFolders.includes(folder.id)
   const hasChildren = folder.children && folder.children.length > 0
-  const childFolders = hasChildren ? getChildFolders(folder.id) : []
-  const docCount = getDocCountForFolder(folder.id)
+
+  const childFolders = hasChildren
+    ? folders.filter(f => f.parent_id === folder.id).sort((a, b) => a.sort_order - b.sort_order)
+    : []
+
+  const docCount = Object.values(documents).filter(d => d.folder_id === folder.id).length
 
   const handleClick = () => {
     setSelectedFolderId(folder.id)

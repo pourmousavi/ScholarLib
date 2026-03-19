@@ -2,14 +2,20 @@ import { useLibraryStore } from '../../store/libraryStore'
 import styles from './DocList.module.css'
 
 export default function DocList() {
+  const folders = useLibraryStore((s) => s.folders)
+  const documents = useLibraryStore((s) => s.documents)
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
-  const getFolderById = useLibraryStore((s) => s.getFolderById)
-  const getBreadcrumb = useLibraryStore((s) => s.getBreadcrumb)
-  const getDocsForFolder = useLibraryStore((s) => s.getDocsForFolder)
 
-  const folder = getFolderById(selectedFolderId)
-  const breadcrumb = getBreadcrumb(selectedFolderId)
-  const docs = getDocsForFolder(selectedFolderId)
+  const folder = folders.find(f => f.id === selectedFolderId)
+  const docs = Object.values(documents).filter(d => d.folder_id === selectedFolderId)
+
+  // Build breadcrumb
+  const breadcrumb = []
+  let current = folder
+  while (current) {
+    breadcrumb.unshift(current)
+    current = current.parent_id ? folders.find(f => f.id === current.parent_id) : null
+  }
 
   if (!folder) {
     return (
