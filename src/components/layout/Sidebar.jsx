@@ -1,12 +1,14 @@
 import { useEffect } from 'react'
 import { useUIStore } from '../../store/uiStore'
 import { useAIStore } from '../../store/aiStore'
+import { usePWAInstall } from '../../hooks/usePWAInstall'
 import { ollamaService } from '../../services/ai/OllamaService'
 import FolderTree from '../library/FolderTree'
 import styles from './Sidebar.module.css'
 
 export default function Sidebar() {
   const setShowModal = useUIStore((s) => s.setShowModal)
+  const { canInstall, install } = usePWAInstall()
 
   const provider = useAIStore((s) => s.provider)
   const model = useAIStore((s) => s.model)
@@ -55,6 +57,16 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className={styles.footer}>
+        {canInstall && (
+          <button
+            className={styles.installBtn}
+            onClick={install}
+            title="Install ScholarLib as an app"
+          >
+            <span className={styles.installIcon}>⬇</span>
+            Install App
+          </button>
+        )}
         <div className={styles.actions}>
           <button
             className={styles.actionBtn}

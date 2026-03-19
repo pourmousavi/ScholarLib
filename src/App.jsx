@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import AppShell from './components/layout/AppShell'
 import StorageSetup from './components/layout/StorageSetup'
-import { ToastContainer, Spinner } from './components/ui'
+import { ToastContainer, Spinner, OfflineBanner, IOSInstallPrompt } from './components/ui'
 import { useToastStore, useToast } from './hooks/useToast'
+import { useOnlineStatus } from './hooks/useOnlineStatus'
+import { usePWAInstall } from './hooks/usePWAInstall'
 import { useStorageStore } from './store/storageStore'
 import { useLibraryStore } from './store/libraryStore'
 import { LibraryService } from './services/library/LibraryService'
@@ -22,6 +24,9 @@ function ToastProvider({ children }) {
 function AppContent() {
   const [isInitializing, setIsInitializing] = useState(true)
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false)
+
+  const { isOffline } = useOnlineStatus()
+  const { showIOSPrompt, dismissIOSPrompt } = usePWAInstall()
 
   const initialize = useStorageStore((s) => s.initialize)
   const handleCallback = useStorageStore((s) => s.handleCallback)
@@ -140,7 +145,13 @@ function AppContent() {
     )
   }
 
-  return <AppShell />
+  return (
+    <>
+      {isOffline && <OfflineBanner />}
+      <AppShell />
+      {showIOSPrompt && <IOSInstallPrompt onDismiss={dismissIOSPrompt} />}
+    </>
+  )
 }
 
 export default function App() {

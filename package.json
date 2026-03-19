@@ -23,7 +23,10 @@
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "canvas": "^3.2.1",
     "vite": "^6.0.7",
-    "vite-plugin-static-copy": "^3.3.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "vite-plugin-static-copy": "^3.3.0",
+    "workbox-window": "^7.4.0"
   }
 }
