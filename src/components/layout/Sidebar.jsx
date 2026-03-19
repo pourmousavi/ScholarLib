@@ -1,9 +1,31 @@
+import { useEffect } from 'react'
 import { useUIStore } from '../../store/uiStore'
+import { useAIStore } from '../../store/aiStore'
+import { ollamaService } from '../../services/ai/OllamaService'
 import FolderTree from '../library/FolderTree'
 import styles from './Sidebar.module.css'
 
 export default function Sidebar() {
   const setShowModal = useUIStore((s) => s.setShowModal)
+
+  const provider = useAIStore((s) => s.provider)
+  const model = useAIStore((s) => s.model)
+  const isAvailable = useAIStore((s) => s.isAvailable)
+  const setAvailable = useAIStore((s) => s.setAvailable)
+  const setChecking = useAIStore((s) => s.setChecking)
+
+  // Check Ollama availability on mount
+  useEffect(() => {
+    const checkOllama = async () => {
+      if (provider === 'ollama') {
+        setChecking(true)
+        const available = await ollamaService.isAvailable()
+        setAvailable(available)
+      }
+    }
+
+    checkOllama()
+  }, [provider, setAvailable, setChecking])
 
   return (
     <div className={styles.sidebar}>
@@ -57,8 +79,12 @@ export default function Sidebar() {
           </button>
         </div>
         <div className={styles.aiStatus}>
-          <span className={styles.aiDot} />
-          <span className={styles.aiText}>Ollama · llama3.2 · local</span>
+          <span className={`${styles.aiDot} ${isAvailable ? styles.available : ''}`} />
+          <span className={styles.aiText}>
+            {isAvailable
+              ? `${provider} · ${model} · local`
+              : `${provider} · offline`}
+          </span>
         </div>
       </div>
     </div>

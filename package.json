@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.82",
     "axios": "^1.13.6",
     "jspdf": "^4.2.1",
     "nanoid": "^5.0.9",

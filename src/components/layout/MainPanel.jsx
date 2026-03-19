@@ -2,6 +2,7 @@ import { useUIStore } from '../../store/uiStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import PDFViewer from '../viewer/PDFViewer'
 import { NotesPanel } from '../notes'
+import { ChatPanel } from '../ai'
 import styles from './MainPanel.module.css'
 
 // Test PDF URL for development (Mozilla's PDF.js sample - CORS enabled)
@@ -76,9 +77,7 @@ export default function MainPanel() {
           />
         )}
         {activePanel === 'ai' && (
-          <div className={styles.placeholder}>
-            AI Chat (Stage 09)
-          </div>
+          <ChatPanel />
         )}
         {activePanel === 'notes' && (
           <NotesPanel />
