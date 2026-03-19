@@ -1,0 +1,28 @@
+.tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  letter-spacing: 0.04em;
+}
+
+.remove {
+  opacity: 0.5;
+  cursor: pointer;
+  font-size: 9px;
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+  line-height: 1;
+}
+
+.remove:hover {
+  opacity: 1;
+}

@@ -1,0 +1,35 @@
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.indexed {
+  background: var(--success);
+}
+
+.pending {
+  background: var(--warning);
+}
+
+.processing {
+  background: var(--accent);
+  animation: pulse 1s infinite;
+}
+
+.none {
+  background: var(--text-muted);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
