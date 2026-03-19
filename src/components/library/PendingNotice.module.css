@@ -35,3 +35,38 @@
 .action:hover {
   background: rgba(245, 158, 11, 0.1);
 }
+
+/* Indexing state */
+.notice.indexing {
+  background: var(--accent-dim);
+  border-top: 1px solid var(--accent-border);
+}
+
+.notice.indexing .text {
+  color: var(--accent);
+}
+
+.notice.indexing .icon {
+  color: var(--accent);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.progressBar {
+  width: 60px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}

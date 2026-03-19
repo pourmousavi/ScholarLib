@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAIStore } from '../../store/aiStore'
 import { useLibraryStore } from '../../store/libraryStore'
+import { useStorageStore } from '../../store/storageStore'
 import { aiService } from '../../services/ai/AIService'
 import { ollamaService } from '../../services/ai/OllamaService'
 import { claudeService } from '../../services/ai/ClaudeService'
 import { openaiService } from '../../services/ai/OpenAIService'
+import { indexService } from '../../services/indexing/IndexService'
 import { Btn } from '../ui'
 import ScopeSelector from './ScopeSelector'
 import styles from './ChatPanel.module.css'
@@ -49,8 +51,12 @@ export default function ChatPanel() {
   const clearError = useAIStore((s) => s.clearError)
 
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
+  const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
   const documents = useLibraryStore((s) => s.documents)
   const selectedDoc = selectedDocId ? documents[selectedDocId] : null
+
+  const adapter = useStorageStore((s) => s.adapter)
+  const isDemoMode = useStorageStore((s) => s.isDemoMode)
 
   const isCloudProvider = provider === 'claude' || provider === 'openai'
   const availableModels = aiService.getAvailableModels()
@@ -119,19 +125,35 @@ export default function ChatPanel() {
     // Add user message
     addMessage({ role: 'user', content: trimmedInput })
 
-    // Build messages array with system prompt
-    const systemPrompt = aiService.buildSystemPrompt(scope, [])
-    const chatMessages = [
-      { role: 'system', content: systemPrompt },
-      ...messages.map(m => ({ role: m.role, content: m.content })),
-      { role: 'user', content: trimmedInput }
-    ]
-
     // Start streaming
     setStreaming(true)
     setStreamingContent('')
 
     try {
+      // Search for relevant chunks (RAG)
+      let retrievedChunks = []
+      if (adapter && !isDemoMode) {
+        try {
+          const searchScope = {
+            type: scope.type,
+            docId: selectedDocId,
+            folderId: selectedFolderId
+          }
+          retrievedChunks = await indexService.search(trimmedInput, searchScope, adapter, 6)
+        } catch (err) {
+          console.log('RAG search skipped:', err.message)
+          // Continue without RAG if search fails
+        }
+      }
+
+      // Build messages array with system prompt including retrieved context
+      const systemPrompt = aiService.buildSystemPrompt(scope, retrievedChunks)
+      const chatMessages = [
+        { role: 'system', content: systemPrompt },
+        ...messages.map(m => ({ role: m.role, content: m.content })),
+        { role: 'user', content: trimmedInput }
+      ]
+
       // Add placeholder for assistant message
       addMessage({ role: 'assistant', content: '' })
 
@@ -150,7 +172,7 @@ export default function ChatPanel() {
     } finally {
       setStreaming(false)
     }
-  }, [input, isStreaming, messages, scope, selectedModel, addMessage, setStreaming, setStreamingContent, appendStreamingContent, updateLastMessage, clearError, setError])
+  }, [input, isStreaming, messages, scope, selectedModel, selectedDocId, selectedFolderId, adapter, isDemoMode, addMessage, setStreaming, setStreamingContent, appendStreamingContent, updateLastMessage, clearError, setError])
 
   // Handle model selection
   const handleModelSelect = (modelId) => {

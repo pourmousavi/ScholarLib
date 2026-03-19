@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
+import { useIndexStore } from '../../store/indexStore'
 import { LibraryService } from '../../services/library/LibraryService'
+import { indexService } from '../../services/indexing/IndexService'
 import { useToast } from '../../hooks/useToast'
 import DocCard from './DocCard'
 import PendingNotice from './PendingNotice'
@@ -26,6 +28,15 @@ export default function DocList() {
 
   const adapter = useStorageStore((s) => s.adapter)
   const isConnected = useStorageStore((s) => s.isConnected)
+  const isDemoMode = useStorageStore((s) => s.isDemoMode)
+
+  const isIndexing = useIndexStore((s) => s.isIndexing)
+  const currentDocId = useIndexStore((s) => s.currentDocId)
+  const indexProgress = useIndexStore((s) => s.progress)
+  const startIndexing = useIndexStore((s) => s.startIndexing)
+  const setProgress = useIndexStore((s) => s.setProgress)
+  const completeIndexing = useIndexStore((s) => s.completeIndexing)
+  const failIndexing = useIndexStore((s) => s.failIndexing)
 
   const { showToast } = useToast()
 
@@ -63,9 +74,52 @@ export default function DocList() {
     current = current.parent_id ? folders.find(f => f.id === current.parent_id) : null
   }
 
-  const handleIndexNow = () => {
-    // Will be implemented in Stage 11
-    console.log('Index now clicked')
+  const handleIndexNow = async () => {
+    if (!adapter || !isConnected || isDemoMode) {
+      showToast({ message: 'Storage connection required for indexing', type: 'warning' })
+      return
+    }
+
+    if (isIndexing) {
+      showToast({ message: 'Indexing already in progress', type: 'info' })
+      return
+    }
+
+    // Get pending documents
+    const pendingDocs = allDocs.filter(
+      d => d.index_status?.status === 'pending' || d.index_status?.status === 'processing' || !d.index_status?.status
+    )
+
+    if (pendingDocs.length === 0) {
+      showToast({ message: 'No documents to index', type: 'info' })
+      return
+    }
+
+    // Index first pending document
+    const doc = pendingDocs[0]
+    startIndexing(doc.id)
+
+    try {
+      // For now, use a test PDF URL since we're in demo mode
+      // In production, this would be the Box streaming URL
+      const pdfURL = 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf'
+
+      await indexService.indexDocument(doc.id, pdfURL, adapter, (progress) => {
+        setProgress(progress)
+      })
+
+      completeIndexing(doc.id)
+      showToast({ message: `Indexed "${doc.metadata?.title || doc.filename}"`, type: 'success' })
+
+      // If more pending, show message
+      if (pendingDocs.length > 1) {
+        showToast({ message: `${pendingDocs.length - 1} more documents pending`, type: 'info' })
+      }
+    } catch (error) {
+      console.error('Indexing failed:', error)
+      failIndexing(doc.id, error)
+      showToast({ message: error.message || 'Indexing failed', type: 'error' })
+    }
   }
 
   const handleUploadComplete = async ({ file, metadata, folderId }) => {
