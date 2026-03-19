@@ -1,0 +1,86 @@
+.zone {
+  border: 2px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: var(--bg-hover);
+  min-height: 120px;
+}
+
+.zone:hover {
+  border-color: var(--accent-border);
+  background: var(--bg-selected);
+}
+
+.zone.dragging {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.icon {
+  font-size: 32px;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.primary {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.secondary {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.processing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.status {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.error {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--error-bg);
+  border-radius: var(--radius-sm);
+  color: var(--error);
+  font-size: 12px;
+}
+
+.compactBtn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.compactBtn:hover {
+  background: var(--accent-dim);
+}

@@ -1,0 +1,218 @@
+import { useState, useRef, useCallback } from 'react'
+import * as pdfjsLib from 'pdfjs-dist'
+import { Spinner } from '../ui'
+import { MetadataExtractor } from '../../services/metadata/MetadataExtractor'
+import MetadataModal from './MetadataModal'
+import styles from './UploadZone.module.css'
+
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}pdf.worker.min.mjs`
+
+const MAX_FILE_SIZE = 200 * 1024 * 1024 // 200MB
+
+export default function UploadZone({
+  folderId,
+  onUploadComplete,
+  onClose,
+  compact = false
+}) {
+  const [isDragging, setIsDragging] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [processingStatus, setProcessingStatus] = useState('')
+  const [error, setError] = useState(null)
+  const [file, setFile] = useState(null)
+  const [extractedText, setExtractedText] = useState('')
+  const [metadata, setMetadata] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+
+  const inputRef = useRef(null)
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }, [])
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) {
+      processFile(files[0])
+    }
+  }, [])
+
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files)
+    if (files.length > 0) {
+      processFile(files[0])
+    }
+  }
+
+  const handleClick = () => {
+    inputRef.current?.click()
+  }
+
+  const processFile = async (selectedFile) => {
+    setError(null)
+
+    // Validate file type
+    if (!selectedFile.name.toLowerCase().endsWith('.pdf')) {
+      setError('Please select a PDF file')
+      return
+    }
+
+    // Validate file size
+    if (selectedFile.size > MAX_FILE_SIZE) {
+      setError('File is too large (max 200MB)')
+      return
+    }
+
+    setFile(selectedFile)
+    setIsProcessing(true)
+
+    try {
+      // Step 1: Read file
+      setProcessingStatus('Reading PDF...')
+      const arrayBuffer = await selectedFile.arrayBuffer()
+
+      // Step 2: Extract text
+      setProcessingStatus('Extracting text...')
+      const text = await extractTextFromPDF(arrayBuffer)
+      setExtractedText(text)
+
+      // Step 3: Extract metadata
+      setProcessingStatus('Looking up metadata...')
+      const extractedMetadata = await MetadataExtractor.extractMetadata(
+        text,
+        selectedFile.name,
+        null // AI service - will be added in Stage 09
+      )
+
+      setMetadata(extractedMetadata)
+      setShowModal(true)
+    } catch (err) {
+      console.error('Processing error:', err)
+      setError(err.message || 'Failed to process PDF')
+    } finally {
+      setIsProcessing(false)
+      setProcessingStatus('')
+    }
+  }
+
+  const extractTextFromPDF = async (arrayBuffer) => {
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+    const textParts = []
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i)
+      const content = await page.getTextContent()
+      const pageText = content.items.map(item => item.str).join(' ')
+      textParts.push(pageText)
+    }
+
+    return textParts.join('\n\n')
+  }
+
+  const handleSave = async (finalMetadata) => {
+    if (onUploadComplete) {
+      await onUploadComplete({
+        file,
+        metadata: finalMetadata,
+        folderId,
+        extractedText
+      })
+    }
+    setShowModal(false)
+    setFile(null)
+    setMetadata(null)
+    if (onClose) onClose()
+  }
+
+  const handleCancel = () => {
+    setShowModal(false)
+    setFile(null)
+    setMetadata(null)
+  }
+
+  if (compact) {
+    return (
+      <>
+        <button className={styles.compactBtn} onClick={handleClick}>
+          + Add PDF
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pdf"
+          onChange={handleFileSelect}
+          style={{ display: 'none' }}
+        />
+        {showModal && metadata && (
+          <MetadataModal
+            metadata={metadata}
+            filename={file?.name}
+            onSave={handleSave}
+            onCancel={handleCancel}
+          />
+        )}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <div
+        className={`${styles.zone} ${isDragging ? styles.dragging : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={handleClick}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pdf"
+          onChange={handleFileSelect}
+          style={{ display: 'none' }}
+        />
+
+        {isProcessing ? (
+          <div className={styles.processing}>
+            <Spinner size={24} />
+            <span className={styles.status}>{processingStatus}</span>
+          </div>
+        ) : (
+          <>
+            <div className={styles.icon}>📄</div>
+            <div className={styles.text}>
+              <span className={styles.primary}>Drop PDF here or click to browse</span>
+              <span className={styles.secondary}>Max 200MB per file</span>
+            </div>
+          </>
+        )}
+
+        {error && (
+          <div className={styles.error}>{error}</div>
+        )}
+      </div>
+
+      {showModal && metadata && (
+        <MetadataModal
+          metadata={metadata}
+          filename={file?.name}
+          onSave={handleSave}
+          onCancel={handleCancel}
+        />
+      )}
+    </>
+  )
+}

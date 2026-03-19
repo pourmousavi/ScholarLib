@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
+import { useStorageStore } from '../../store/storageStore'
+import { LibraryService } from '../../services/library/LibraryService'
+import { useToast } from '../../hooks/useToast'
 import DocCard from './DocCard'
 import PendingNotice from './PendingNotice'
+import UploadZone from '../metadata/UploadZone'
 import styles from './DocList.module.css'
 
 const FILTERS = [
@@ -13,9 +17,17 @@ const FILTERS = [
 
 export default function DocList() {
   const [activeFilter, setActiveFilter] = useState('all')
+  const [showUpload, setShowUpload] = useState(false)
+
   const folders = useLibraryStore((s) => s.folders)
   const documents = useLibraryStore((s) => s.documents)
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
+  const addDocument = useLibraryStore((s) => s.addDocument)
+
+  const adapter = useStorageStore((s) => s.adapter)
+  const isConnected = useStorageStore((s) => s.isConnected)
+
+  const { showToast } = useToast()
 
   const folder = folders.find(f => f.id === selectedFolderId)
 
@@ -56,6 +68,43 @@ export default function DocList() {
     console.log('Index now clicked')
   }
 
+  const handleUploadComplete = async ({ file, metadata, folderId }) => {
+    if (!adapter || !isConnected) {
+      showToast({ message: 'Storage not connected', type: 'error' })
+      return
+    }
+
+    try {
+      // Build library object from current state
+      const library = {
+        folders,
+        documents,
+        version: '1.0',
+        last_modified: new Date().toISOString()
+      }
+
+      // Add document via LibraryService
+      const doc = await LibraryService.addDocument(adapter, library, {
+        folder_id: folderId,
+        filename: file.name,
+        metadata: {
+          ...metadata,
+          extraction_date: new Date().toISOString()
+        },
+        tags: metadata.keywords || []
+      }, file)
+
+      // Update local store
+      addDocument(doc)
+
+      showToast({ message: `Added "${metadata.title || file.name}"`, type: 'success' })
+      setShowUpload(false)
+    } catch (error) {
+      console.error('Upload failed:', error)
+      showToast({ message: error.message || 'Failed to upload document', type: 'error' })
+    }
+  }
+
   if (!folder) {
     return (
       <div className={styles.docList}>
@@ -80,9 +129,25 @@ export default function DocList() {
         </div>
         <div className={styles.headerMeta}>
           <span className={styles.docCount}>{allDocs.length} documents</span>
-          <button className={styles.addBtn}>+ Add</button>
+          <button
+            className={styles.addBtn}
+            onClick={() => setShowUpload(!showUpload)}
+          >
+            {showUpload ? '✕ Cancel' : '+ Add'}
+          </button>
         </div>
       </div>
+
+      {/* Upload zone */}
+      {showUpload && (
+        <div className={styles.uploadSection}>
+          <UploadZone
+            folderId={selectedFolderId}
+            onUploadComplete={handleUploadComplete}
+            onClose={() => setShowUpload(false)}
+          />
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div className={styles.filters}>
