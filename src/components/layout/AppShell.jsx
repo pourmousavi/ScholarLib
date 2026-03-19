@@ -1,10 +1,12 @@
 import { useEffect } from 'react'
 import { useUIStore } from '../../store/uiStore'
+import { useAIStore } from '../../store/aiStore'
 import Sidebar from './Sidebar'
 import DocList from '../library/DocList'
 import MainPanel from './MainPanel'
 import { SettingsModal } from '../settings'
 import { ShareModal, ActivityDashboard, MoveFolderPicker } from '../sharing'
+import { ChatHistoryModal } from '../ai'
 import styles from './AppShell.module.css'
 
 export default function AppShell() {
@@ -14,6 +16,14 @@ export default function AppShell() {
   const setShowModal = useUIStore((s) => s.setShowModal)
   const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed)
   const setDocListCollapsed = useUIStore((s) => s.setDocListCollapsed)
+  const setActivePanel = useUIStore((s) => s.setActivePanel)
+
+  const loadConversation = useAIStore((s) => s.loadConversation)
+
+  const handleLoadConversation = (conversation) => {
+    loadConversation(conversation)
+    setActivePanel('ai')
+  }
 
   // Handle responsive breakpoints
   useEffect(() => {
@@ -62,6 +72,12 @@ export default function AppShell() {
       )}
       {showModal === 'move' && (
         <MoveFolderPicker onClose={() => setShowModal(null)} />
+      )}
+      {showModal === 'history' && (
+        <ChatHistoryModal
+          onClose={() => setShowModal(null)}
+          onLoadConversation={handleLoadConversation}
+        />
       )}
     </>
   )

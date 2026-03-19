@@ -7,6 +7,7 @@ import { ollamaService } from '../../services/ai/OllamaService'
 import { claudeService } from '../../services/ai/ClaudeService'
 import { openaiService } from '../../services/ai/OpenAIService'
 import { indexService } from '../../services/indexing/IndexService'
+import { chatHistoryService } from '../../services/ai/ChatHistoryService'
 import { Btn } from '../ui'
 import ScopeSelector from './ScopeSelector'
 import styles from './ChatPanel.module.css'
@@ -40,6 +41,9 @@ export default function ChatPanel() {
   const scope = useAIStore((s) => s.scope)
   const error = useAIStore((s) => s.error)
 
+  const currentConversationId = useAIStore((s) => s.currentConversationId)
+  const conversationTitle = useAIStore((s) => s.conversationTitle)
+
   const addMessage = useAIStore((s) => s.addMessage)
   const setStreaming = useAIStore((s) => s.setStreaming)
   const setStreamingContent = useAIStore((s) => s.setStreamingContent)
@@ -49,6 +53,8 @@ export default function ChatPanel() {
   const setModel = useAIStore((s) => s.setModel)
   const setError = useAIStore((s) => s.setError)
   const clearError = useAIStore((s) => s.clearError)
+  const setCurrentConversation = useAIStore((s) => s.setCurrentConversation)
+  const startNewConversation = useAIStore((s) => s.startNewConversation)
 
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
@@ -122,8 +128,30 @@ export default function ChatPanel() {
     clearError()
     setInput('')
 
+    // Create conversation if needed
+    let convId = currentConversationId
+    if (!convId && !isDemoMode && adapter) {
+      try {
+        const conv = await chatHistoryService.createConversation(
+          adapter,
+          scope,
+          selectedModel || model,
+          provider
+        )
+        convId = conv.id
+        setCurrentConversation(conv.id, conv.title)
+      } catch (err) {
+        console.log('Failed to create conversation:', err)
+      }
+    }
+
     // Add user message
     addMessage({ role: 'user', content: trimmedInput })
+
+    // Save user message to history
+    if (convId && !isDemoMode && adapter) {
+      chatHistoryService.addMessage(adapter, convId, { role: 'user', content: trimmedInput })
+    }
 
     // Start streaming
     setStreaming(true)
@@ -165,6 +193,18 @@ export default function ChatPanel() {
         updateLastMessage(fullContent)
       }
 
+      // Save assistant message to history
+      if (convId && !isDemoMode && adapter) {
+        await chatHistoryService.addMessage(adapter, convId, { role: 'assistant', content: fullContent })
+
+        // Auto-title after first AI response
+        if (messages.length === 0) {
+          const title = chatHistoryService.autoTitle(fullContent)
+          await chatHistoryService.updateTitle(adapter, convId, title)
+          setCurrentConversation(convId, title)
+        }
+      }
+
       setStreamingContent('')
     } catch (err) {
       console.error('Chat error:', err)
@@ -172,7 +212,7 @@ export default function ChatPanel() {
     } finally {
       setStreaming(false)
     }
-  }, [input, isStreaming, messages, scope, selectedModel, selectedDocId, selectedFolderId, adapter, isDemoMode, addMessage, setStreaming, setStreamingContent, appendStreamingContent, updateLastMessage, clearError, setError])
+  }, [input, isStreaming, messages, scope, selectedModel, model, provider, selectedDocId, selectedFolderId, adapter, isDemoMode, currentConversationId, addMessage, setStreaming, setStreamingContent, appendStreamingContent, updateLastMessage, clearError, setError, setCurrentConversation])
 
   // Handle model selection
   const handleModelSelect = (modelId) => {
@@ -381,8 +421,22 @@ export default function ChatPanel() {
       {/* Header */}
       <div className={styles.header}>
         <ScopeSelector />
-        {renderStatus()}
+        <div className={styles.headerActions}>
+          {messages.length > 0 && (
+            <button
+              className={styles.newChatBtn}
+              onClick={startNewConversation}
+              title="New conversation"
+            >
+              +
+            </button>
+          )}
+          {renderStatus()}
+        </div>
       </div>
+      {conversationTitle && (
+        <div className={styles.conversationTitle}>{conversationTitle}</div>
+      )}
 
       {/* Messages */}
       <div className={styles.messages} ref={messagesRef}>

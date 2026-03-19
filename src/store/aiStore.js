@@ -21,6 +21,10 @@ export const useAIStore = create((set, get) => ({
   streamingContent: '',
   error: null,
 
+  // Conversation tracking (for history)
+  currentConversationId: null,
+  conversationTitle: null,
+
   // Scope for RAG (Stage 11)
   scope: {
     type: 'document', // document | folder | library
@@ -89,12 +93,43 @@ export const useAIStore = create((set, get) => ({
 
   clearMessages: () => set({ messages: [], streamingContent: '' }),
 
+  // Conversation actions
+  setCurrentConversation: (id, title = null) => set({
+    currentConversationId: id,
+    conversationTitle: title
+  }),
+
+  setConversationTitle: (title) => set({ conversationTitle: title }),
+
+  loadConversation: (conversation) => set({
+    currentConversationId: conversation.id,
+    conversationTitle: conversation.title,
+    messages: conversation.messages || [],
+    scope: conversation.scope || {
+      type: 'document',
+      docId: null,
+      folderId: null,
+      description: 'current document',
+      docCount: 1
+    }
+  }),
+
+  startNewConversation: () => set({
+    currentConversationId: null,
+    conversationTitle: null,
+    messages: [],
+    streamingContent: '',
+    error: null
+  }),
+
   // Clear all state
   reset: () => set({
     messages: [],
     isStreaming: false,
     streamingContent: '',
     error: null,
+    currentConversationId: null,
+    conversationTitle: null,
     scope: {
       type: 'document',
       docId: null,
