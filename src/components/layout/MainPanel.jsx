@@ -1,6 +1,7 @@
 import { useUIStore } from '../../store/uiStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import PDFViewer from '../viewer/PDFViewer'
+import { NotesPanel } from '../notes'
 import styles from './MainPanel.module.css'
 
 // Test PDF URL for development (Mozilla's PDF.js sample - CORS enabled)
@@ -80,9 +81,7 @@ export default function MainPanel() {
           </div>
         )}
         {activePanel === 'notes' && (
-          <div className={styles.placeholder}>
-            Notes Editor (Stage 08)
-          </div>
+          <NotesPanel />
         )}
       </div>
     </div>
