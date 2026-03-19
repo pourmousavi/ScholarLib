@@ -3,8 +3,8 @@ import { useLibraryStore } from '../../store/libraryStore'
 import PDFViewer from '../viewer/PDFViewer'
 import styles from './MainPanel.module.css'
 
-// Test PDF URL for development (public domain PDF)
-const TEST_PDF_URL = 'https://www.w3.org/WAI/WCAG21/Techniques/pdf/img/table-word.pdf'
+// Test PDF URL for development (Mozilla's PDF.js sample - CORS enabled)
+const TEST_PDF_URL = 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf'
 
 export default function MainPanel() {
   const activePanel = useUIStore((s) => s.activePanel)
