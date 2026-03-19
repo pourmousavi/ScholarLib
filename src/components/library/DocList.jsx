@@ -1,13 +1,47 @@
+import { useState } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
+import DocCard from './DocCard'
+import PendingNotice from './PendingNotice'
 import styles from './DocList.module.css'
 
+const FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'unread', label: 'Unread' },
+  { id: 'starred', label: 'Starred' },
+  { id: 'pending', label: 'Pending' }
+]
+
 export default function DocList() {
+  const [activeFilter, setActiveFilter] = useState('all')
   const folders = useLibraryStore((s) => s.folders)
   const documents = useLibraryStore((s) => s.documents)
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
 
   const folder = folders.find(f => f.id === selectedFolderId)
-  const docs = Object.values(documents).filter(d => d.folder_id === selectedFolderId)
+
+  // Get all docs for the selected folder
+  const allDocs = Object.values(documents)
+    .filter(d => d.folder_id === selectedFolderId)
+    .sort((a, b) => new Date(b.added_at) - new Date(a.added_at))
+
+  // Apply filter
+  const filteredDocs = allDocs.filter(doc => {
+    switch (activeFilter) {
+      case 'unread':
+        return !doc.user_data?.read
+      case 'starred':
+        return doc.user_data?.starred
+      case 'pending':
+        return doc.index_status?.status === 'pending' || doc.index_status?.status === 'processing'
+      default:
+        return true
+    }
+  })
+
+  // Count pending docs
+  const pendingCount = allDocs.filter(
+    d => d.index_status?.status === 'pending' || d.index_status?.status === 'processing'
+  ).length
 
   // Build breadcrumb
   const breadcrumb = []
@@ -15,6 +49,11 @@ export default function DocList() {
   while (current) {
     breadcrumb.unshift(current)
     current = current.parent_id ? folders.find(f => f.id === current.parent_id) : null
+  }
+
+  const handleIndexNow = () => {
+    // Will be implemented in Stage 11
+    console.log('Index now clicked')
   }
 
   if (!folder) {
@@ -40,29 +79,41 @@ export default function DocList() {
           ))}
         </div>
         <div className={styles.headerMeta}>
-          <span className={styles.docCount}>{docs.length} documents</span>
+          <span className={styles.docCount}>{allDocs.length} documents</span>
           <button className={styles.addBtn}>+ Add</button>
         </div>
       </div>
 
-      {/* Filter tabs - placeholder */}
+      {/* Filter tabs */}
       <div className={styles.filters}>
-        <button className={`${styles.filter} ${styles.active}`}>All</button>
-        <button className={styles.filter}>Unread</button>
-        <button className={styles.filter}>Starred</button>
-        <button className={styles.filter}>Pending</button>
+        {FILTERS.map((filter) => (
+          <button
+            key={filter.id}
+            className={`${styles.filter} ${activeFilter === filter.id ? styles.active : ''}`}
+            onClick={() => setActiveFilter(filter.id)}
+          >
+            {filter.label}
+          </button>
+        ))}
       </div>
 
-      {/* Document list - placeholder */}
+      {/* Document list */}
       <div className={styles.list}>
-        {docs.length === 0 ? (
-          <div className={styles.empty}>No documents in this folder</div>
-        ) : (
-          <div className={styles.placeholder}>
-            {docs.length} documents (cards built in Stage 04)
+        {filteredDocs.length === 0 ? (
+          <div className={styles.emptyList}>
+            {activeFilter === 'all'
+              ? 'No documents in this folder'
+              : `No ${activeFilter} documents`}
           </div>
+        ) : (
+          filteredDocs.map((doc) => (
+            <DocCard key={doc.id} doc={doc} />
+          ))
         )}
       </div>
+
+      {/* Pending notice */}
+      <PendingNotice count={pendingCount} onIndexNow={handleIndexNow} />
     </div>
   )
 }
