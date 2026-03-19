@@ -1,3 +1,5 @@
 export { aiService } from './AIService'
 export { ollamaService } from './OllamaService'
 export { webllmService } from './WebLLMService'
+export { claudeService } from './ClaudeService'
+export { openaiService } from './OpenAIService'

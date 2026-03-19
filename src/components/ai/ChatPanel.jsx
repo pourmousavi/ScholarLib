@@ -3,6 +3,8 @@ import { useAIStore } from '../../store/aiStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import { aiService } from '../../services/ai/AIService'
 import { ollamaService } from '../../services/ai/OllamaService'
+import { claudeService } from '../../services/ai/ClaudeService'
+import { openaiService } from '../../services/ai/OpenAIService'
 import { Btn } from '../ui'
 import ScopeSelector from './ScopeSelector'
 import styles from './ChatPanel.module.css'
@@ -19,9 +21,12 @@ export default function ChatPanel() {
   const [showDownload, setShowDownload] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [downloadStatus, setDownloadStatus] = useState('')
+  const [selectedModel, setSelectedModel] = useState(null)
+  const [showModelSelector, setShowModelSelector] = useState(false)
 
   const messagesRef = useRef(null)
   const inputRef = useRef(null)
+  const modelSelectorRef = useRef(null)
 
   const provider = useAIStore((s) => s.provider)
   const model = useAIStore((s) => s.model)
@@ -39,6 +44,7 @@ export default function ChatPanel() {
   const appendStreamingContent = useAIStore((s) => s.appendStreamingContent)
   const updateLastMessage = useAIStore((s) => s.updateLastMessage)
   const setAvailable = useAIStore((s) => s.setAvailable)
+  const setModel = useAIStore((s) => s.setModel)
   const setError = useAIStore((s) => s.setError)
   const clearError = useAIStore((s) => s.clearError)
 
@@ -46,20 +52,40 @@ export default function ChatPanel() {
   const documents = useLibraryStore((s) => s.documents)
   const selectedDoc = selectedDocId ? documents[selectedDocId] : null
 
-  // Check Ollama availability on mount
+  const isCloudProvider = provider === 'claude' || provider === 'openai'
+  const availableModels = aiService.getAvailableModels()
+
+  // Check provider availability on mount and provider change
   useEffect(() => {
     const checkAvailability = async () => {
       if (provider === 'ollama') {
         const available = await ollamaService.isAvailable()
         setAvailable(available)
+      } else if (provider === 'claude') {
+        setAvailable(claudeService.isConfigured())
+      } else if (provider === 'openai') {
+        setAvailable(openaiService.isConfigured())
       }
     }
 
     checkAvailability()
-    // Check every 30 seconds
+    // Check every 30 seconds for local providers
     const interval = setInterval(checkAvailability, 30000)
     return () => clearInterval(interval)
   }, [provider, setAvailable])
+
+  // Close model selector when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (modelSelectorRef.current && !modelSelectorRef.current.contains(e.target)) {
+        setShowModelSelector(false)
+      }
+    }
+    if (showModelSelector) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showModelSelector])
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -67,6 +93,20 @@ export default function ChatPanel() {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight
     }
   }, [messages, streamingContent])
+
+  // Get cost estimate for current input
+  const getCostEstimate = useCallback(() => {
+    if (!isCloudProvider || !input.trim()) return null
+
+    const systemPrompt = aiService.buildSystemPrompt(scope, [])
+    const allMessages = [
+      { role: 'system', content: systemPrompt },
+      ...messages.map(m => ({ role: m.role, content: m.content })),
+      { role: 'user', content: input }
+    ]
+
+    return aiService.estimateCost(allMessages)
+  }, [input, messages, scope, isCloudProvider])
 
   // Handle sending a message
   const handleSend = useCallback(async () => {
@@ -96,7 +136,8 @@ export default function ChatPanel() {
       addMessage({ role: 'assistant', content: '' })
 
       let fullContent = ''
-      for await (const chunk of aiService.streamChat(chatMessages)) {
+      const options = selectedModel ? { model: selectedModel } : {}
+      for await (const chunk of aiService.streamChat(chatMessages, options)) {
         fullContent += chunk
         appendStreamingContent(chunk)
         updateLastMessage(fullContent)
@@ -106,12 +147,17 @@ export default function ChatPanel() {
     } catch (err) {
       console.error('Chat error:', err)
       setError(err.message || 'Failed to get AI response')
-      // Remove the empty assistant message on error
-      // (In a real app, we'd handle this more gracefully)
     } finally {
       setStreaming(false)
     }
-  }, [input, isStreaming, messages, scope, addMessage, setStreaming, setStreamingContent, appendStreamingContent, updateLastMessage, clearError, setError])
+  }, [input, isStreaming, messages, scope, selectedModel, addMessage, setStreaming, setStreamingContent, appendStreamingContent, updateLastMessage, clearError, setError])
+
+  // Handle model selection
+  const handleModelSelect = (modelId) => {
+    setSelectedModel(modelId)
+    setModel(modelId)
+    setShowModelSelector(false)
+  }
 
   // Handle Enter key
   const handleKeyDown = (e) => {
@@ -149,6 +195,20 @@ export default function ChatPanel() {
   // Get user initial for avatar
   const userInitial = 'U'
 
+  // Get display name for current model
+  const getModelDisplayName = () => {
+    const currentModel = selectedModel || model
+    if (provider === 'claude') {
+      const m = availableModels.find(m => m.id === currentModel)
+      return m?.name || 'Claude'
+    }
+    if (provider === 'openai') {
+      const m = availableModels.find(m => m.id === currentModel)
+      return m?.name || 'GPT'
+    }
+    return currentModel
+  }
+
   // Render status indicator
   const renderStatus = () => {
     if (isChecking) {
@@ -175,6 +235,24 @@ export default function ChatPanel() {
         <div className={styles.status}>
           <span className={`${styles.statusDot} ${status.isReady ? styles.available : ''}`} />
           <span>{status.isReady ? 'WebLLM ready' : 'WebLLM'}</span>
+        </div>
+      )
+    }
+
+    if (provider === 'claude') {
+      return (
+        <div className={styles.status}>
+          <span className={`${styles.statusDot} ${isAvailable ? styles.available : ''}`} />
+          <span>{isAvailable ? getModelDisplayName() : 'Claude (no key)'}</span>
+        </div>
+      )
+    }
+
+    if (provider === 'openai') {
+      return (
+        <div className={styles.status}>
+          <span className={`${styles.statusDot} ${isAvailable ? styles.available : ''}`} />
+          <span>{isAvailable ? getModelDisplayName() : 'OpenAI (no key)'}</span>
         </div>
       )
     }
@@ -251,6 +329,31 @@ export default function ChatPanel() {
     )
   }
 
+  // Render cloud provider not configured state
+  if ((provider === 'claude' || provider === 'openai') && !isAvailable) {
+    const providerName = provider === 'claude' ? 'Claude' : 'OpenAI'
+    return (
+      <div className={styles.panel}>
+        <div className={styles.header}>
+          <ScopeSelector />
+          {renderStatus()}
+        </div>
+        <div className={styles.empty}>
+          <span className={styles.emptyIcon}>AI</span>
+          <span className={styles.emptyText}>{providerName} API key required</span>
+          <span className={styles.emptyHint}>
+            Add your API key in Settings to use {providerName}.
+            <br />
+            Keys are stored locally and never sent to our servers.
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  // Get cost estimate
+  const costEstimate = getCostEstimate()
+
   return (
     <div className={styles.panel}>
       {/* Header */}
@@ -310,6 +413,38 @@ export default function ChatPanel() {
 
       {/* Input area */}
       <div className={styles.inputArea}>
+        {/* Model selector and cost estimate for cloud providers */}
+        {isCloudProvider && (
+          <div className={styles.inputMeta}>
+            <div className={styles.modelSelector} ref={modelSelectorRef}>
+              <button
+                className={styles.modelBtn}
+                onClick={() => setShowModelSelector(!showModelSelector)}
+              >
+                {getModelDisplayName()} <span className={styles.modelArrow}>v</span>
+              </button>
+              {showModelSelector && (
+                <div className={styles.modelDropdown}>
+                  {availableModels.map((m) => (
+                    <button
+                      key={m.id}
+                      className={`${styles.modelOption} ${(selectedModel || model) === m.id ? styles.active : ''}`}
+                      onClick={() => handleModelSelect(m.id)}
+                    >
+                      <span className={styles.modelName}>{m.name}</span>
+                      <span className={styles.modelPrice}>{m.inputPrice}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {costEstimate && input.trim() && (
+              <span className={styles.costEstimate}>
+                ~{costEstimate.tokens.toLocaleString()} tokens · ${costEstimate.cost.toFixed(4)}
+              </span>
+            )}
+          </div>
+        )}
         <div className={styles.inputWrapper}>
           <textarea
             ref={inputRef}
@@ -324,7 +459,7 @@ export default function ChatPanel() {
           <button
             className={styles.sendBtn}
             onClick={handleSend}
-            disabled={!input.trim() || isStreaming || (!isAvailable && provider === 'ollama')}
+            disabled={!input.trim() || isStreaming || !isAvailable}
           >
             {isStreaming ? '...' : 'S'}
           </button>
