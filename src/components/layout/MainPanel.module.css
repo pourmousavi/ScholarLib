@@ -55,6 +55,38 @@
   text-overflow: ellipsis;
 }
 
+.actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-right: var(--space-4);
+}
+
+.shareBtn {
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.shareBtn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.shareBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .tabs {
   display: flex;
   gap: var(--space-1);

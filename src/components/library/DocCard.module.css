@@ -41,6 +41,13 @@
   color: var(--text-primary);
 }
 
+.star {
+  color: var(--accent);
+  font-size: 14px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .authors {
   font-family: 'DM Sans', sans-serif;
   font-size: 11px;

@@ -11,12 +11,14 @@ const TEST_PDF_URL = 'https://mozilla.github.io/pdf.js/web/compressed.tracemonke
 export default function MainPanel() {
   const activePanel = useUIStore((s) => s.activePanel)
   const setActivePanel = useUIStore((s) => s.setActivePanel)
+  const setShowModal = useUIStore((s) => s.setShowModal)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const toggleDocList = useUIStore((s) => s.toggleDocList)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const docListCollapsed = useUIStore((s) => s.docListCollapsed)
 
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
+  const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
   const documents = useLibraryStore((s) => s.documents)
   const selectedDoc = selectedDocId ? documents[selectedDocId] : null
 
@@ -34,6 +36,10 @@ export default function MainPanel() {
     console.log('Extracted text length:', text.length)
   }
 
+  const handleShare = () => {
+    setShowModal('share')
+  }
+
   return (
     <div className={styles.panel}>
       {/* Top bar */}
@@ -47,12 +53,22 @@ export default function MainPanel() {
                 else if (docListCollapsed) toggleDocList()
               }}
             >
-              ☰
+              m
             </button>
           )}
           <span className={styles.docTitle}>
             {selectedDoc?.metadata?.title || 'No document selected'}
           </span>
+        </div>
+        <div className={styles.actions}>
+          <button
+            className={styles.shareBtn}
+            onClick={handleShare}
+            disabled={!selectedFolderId}
+            title="Share folder"
+          >
+            @
+          </button>
         </div>
         <div className={styles.tabs}>
           {panels.map((p) => (

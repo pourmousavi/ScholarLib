@@ -1,4 +1,8 @@
+import { useState } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
+import { useUIStore } from '../../store/uiStore'
+import { useToast } from '../../hooks/useToast'
+import { ContextMenu } from '../ui'
 import styles from './FolderTree.module.css'
 
 export default function FolderTree() {
@@ -18,12 +22,18 @@ export default function FolderTree() {
 }
 
 function FolderNode({ folder, depth }) {
+  const [contextMenu, setContextMenu] = useState(null)
+
   const folders = useLibraryStore((s) => s.folders)
   const documents = useLibraryStore((s) => s.documents)
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
   const expandedFolders = useLibraryStore((s) => s.expandedFolders)
   const setSelectedFolderId = useLibraryStore((s) => s.setSelectedFolderId)
   const toggleFolderExpanded = useLibraryStore((s) => s.toggleFolderExpanded)
+
+  const setShowModal = useUIStore((s) => s.setShowModal)
+
+  const { showToast } = useToast()
 
   const isSelected = selectedFolderId === folder.id
   const isExpanded = expandedFolders.includes(folder.id)
@@ -44,26 +54,119 @@ function FolderNode({ folder, depth }) {
     toggleFolderExpanded(folder.id)
   }
 
+  const handleContextMenu = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY })
+  }
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null)
+  }
+
+  const handleShareFolder = () => {
+    setSelectedFolderId(folder.id)
+    setShowModal('share')
+  }
+
+  const handleCopySharingLink = () => {
+    const url = `${window.location.origin}${window.location.pathname}?folder=${folder.slug}`
+    navigator.clipboard.writeText(url)
+    showToast({ message: 'Sharing link copied', type: 'success' })
+  }
+
+  const handleViewAccess = () => {
+    setSelectedFolderId(folder.id)
+    setShowModal('share')
+  }
+
+  const handleUnshareAll = () => {
+    showToast({ message: 'Unshare all not implemented yet', type: 'info' })
+  }
+
+  const handleRenameFolder = () => {
+    showToast({ message: 'Rename folder not implemented yet', type: 'info' })
+  }
+
+  const handleDeleteFolder = () => {
+    if (docCount > 0) {
+      showToast({ message: 'Cannot delete folder with documents', type: 'warning' })
+      return
+    }
+    if (confirm(`Delete folder "${folder.name}"?`)) {
+      showToast({ message: 'Delete folder not implemented yet', type: 'info' })
+    }
+  }
+
+  const contextMenuItems = [
+    {
+      label: 'Share folder...',
+      icon: '@',
+      onClick: handleShareFolder
+    },
+    {
+      label: 'Copy sharing link',
+      icon: '#',
+      onClick: handleCopySharingLink
+    },
+    {
+      label: 'View who has access',
+      icon: '*',
+      onClick: handleViewAccess
+    },
+    { separator: true },
+    {
+      label: 'Rename folder...',
+      icon: '/',
+      onClick: handleRenameFolder
+    },
+    {
+      label: 'Unshare all',
+      icon: 'x',
+      onClick: handleUnshareAll
+    },
+    { separator: true },
+    {
+      label: 'Delete folder...',
+      icon: '-',
+      onClick: handleDeleteFolder,
+      danger: true,
+      disabled: docCount > 0
+    }
+  ]
+
   return (
-    <div className={styles.node}>
-      <div
-        className={`${styles.item} ${isSelected ? styles.selected : ''}`}
-        style={{ paddingLeft: 12 + depth * 14 }}
-        onClick={handleClick}
-      >
-        <button
-          className={styles.toggle}
-          onClick={handleToggle}
-          style={{ visibility: hasChildren ? 'visible' : 'hidden' }}
+    <>
+      <div className={styles.node}>
+        <div
+          className={`${styles.item} ${isSelected ? styles.selected : ''}`}
+          style={{ paddingLeft: 12 + depth * 14 }}
+          onClick={handleClick}
+          onContextMenu={handleContextMenu}
         >
-          {isExpanded ? '▾' : '▸'}
-        </button>
-        <span className={styles.name}>{folder.name}</span>
-        <span className={styles.count}>{docCount}</span>
+          <button
+            className={styles.toggle}
+            onClick={handleToggle}
+            style={{ visibility: hasChildren ? 'visible' : 'hidden' }}
+          >
+            {isExpanded ? '>' : '>'}
+          </button>
+          <span className={styles.name}>{folder.name}</span>
+          <span className={styles.count}>{docCount}</span>
+        </div>
+        {isExpanded && childFolders.map((child) => (
+          <FolderNode key={child.id} folder={child} depth={depth + 1} />
+        ))}
       </div>
-      {isExpanded && childFolders.map((child) => (
-        <FolderNode key={child.id} folder={child} depth={depth + 1} />
-      ))}
-    </div>
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenuItems}
+          onClose={handleCloseContextMenu}
+        />
+      )}
+    </>
   )
 }

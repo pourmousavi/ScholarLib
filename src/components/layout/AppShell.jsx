@@ -4,6 +4,7 @@ import Sidebar from './Sidebar'
 import DocList from '../library/DocList'
 import MainPanel from './MainPanel'
 import { SettingsModal } from '../settings'
+import { ShareModal, ActivityDashboard, MoveFolderPicker } from '../sharing'
 import styles from './AppShell.module.css'
 
 export default function AppShell() {
@@ -52,6 +53,15 @@ export default function AppShell() {
       {/* Modals */}
       {showModal === 'settings' && (
         <SettingsModal onClose={() => setShowModal(null)} />
+      )}
+      {showModal === 'share' && (
+        <ShareModal onClose={() => setShowModal(null)} />
+      )}
+      {showModal === 'activity' && (
+        <ActivityDashboard onClose={() => setShowModal(null)} />
+      )}
+      {showModal === 'move' && (
+        <MoveFolderPicker onClose={() => setShowModal(null)} />
       )}
     </>
   )
