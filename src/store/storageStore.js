@@ -6,6 +6,7 @@ export const useStorageStore = create((set, get) => ({
   adapter: null,
   isConnected: false,
   isConnecting: false,
+  isDemoMode: false,
   error: null,
 
   // Initialize on app load
@@ -76,5 +77,15 @@ export const useStorageStore = create((set, get) => ({
       return null
     }
     return adapter
+  },
+
+  // Enable demo mode (skip storage, use mock data)
+  enableDemoMode: () => {
+    set({ isDemoMode: true, isConnected: true, provider: 'demo' })
+  },
+
+  // Exit demo mode
+  exitDemoMode: () => {
+    set({ isDemoMode: false, isConnected: false, provider: null, adapter: null })
   },
 }))

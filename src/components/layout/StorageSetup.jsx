@@ -6,6 +6,7 @@ import styles from './StorageSetup.module.css'
 export default function StorageSetup() {
   const [selectedProvider, setSelectedProvider] = useState(null)
   const selectProvider = useStorageStore((s) => s.selectProvider)
+  const enableDemoMode = useStorageStore((s) => s.enableDemoMode)
   const isConnecting = useStorageStore((s) => s.isConnecting)
   const error = useStorageStore((s) => s.error)
 
@@ -74,6 +75,14 @@ export default function StorageSetup() {
           Your PDFs and data are stored entirely in your chosen cloud storage.
           ScholarLib servers only log sharing activity.
         </p>
+
+        <button
+          className={styles.demoBtn}
+          onClick={enableDemoMode}
+          disabled={isConnecting}
+        >
+          Skip for now — Try demo mode
+        </button>
       </div>
     </div>
   )

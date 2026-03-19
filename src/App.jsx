@@ -27,10 +27,12 @@ function AppContent() {
   const handleCallback = useStorageStore((s) => s.handleCallback)
   const isConnected = useStorageStore((s) => s.isConnected)
   const isConnecting = useStorageStore((s) => s.isConnecting)
+  const isDemoMode = useStorageStore((s) => s.isDemoMode)
   const adapter = useStorageStore((s) => s.adapter)
   const provider = useStorageStore((s) => s.provider)
 
   const setLibraryData = useLibraryStore((s) => s.setLibraryData)
+  const useMockData = useLibraryStore((s) => s.useMockData)
   const { showToast } = useToast()
 
   // Handle OAuth callback
@@ -72,7 +74,16 @@ function AppContent() {
   // Load library when connected
   useEffect(() => {
     const loadLibrary = async () => {
-      if (!isConnected || !adapter) return
+      if (!isConnected) return
+
+      // Demo mode: use mock data
+      if (isDemoMode) {
+        useMockData()
+        return
+      }
+
+      // Real storage: load from adapter
+      if (!adapter) return
 
       setIsLoadingLibrary(true)
       try {
@@ -87,7 +98,7 @@ function AppContent() {
     }
 
     loadLibrary()
-  }, [isConnected, adapter, setLibraryData, showToast])
+  }, [isConnected, isDemoMode, adapter, setLibraryData, useMockData, showToast])
 
   // Show loading during initialization
   if (isInitializing) {
