@@ -13,6 +13,7 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
     totalPages,
     zoom,
     extractedText,
+    goToPage,
     nextPage,
     prevPage,
     zoomIn,
@@ -21,8 +22,10 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
   } = usePDFLoader(url)
 
   const containerRef = useRef(null)
+  const pageRefs = useRef({})
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [renderedPages, setRenderedPages] = useState([])
+  const [visiblePage, setVisiblePage] = useState(1)
 
   // Notify parent of extracted text
   useEffect(() => {
@@ -38,16 +41,47 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
       return
     }
 
-    const renderPages = async () => {
-      const pages = []
-      for (let i = 1; i <= pdf.numPages; i++) {
-        pages.push(i)
+    const pages = []
+    for (let i = 1; i <= pdf.numPages; i++) {
+      pages.push(i)
+    }
+    setRenderedPages(pages)
+  }, [pdf])
+
+  // Track visible page on scroll
+  useEffect(() => {
+    if (!containerRef.current || renderedPages.length === 0) return
+
+    const container = containerRef.current
+
+    const handleScroll = () => {
+      const containerRect = container.getBoundingClientRect()
+      const containerCenter = containerRect.top + containerRect.height / 2
+
+      let closestPage = 1
+      let closestDistance = Infinity
+
+      for (const [pageNum, ref] of Object.entries(pageRefs.current)) {
+        if (!ref) continue
+        const rect = ref.getBoundingClientRect()
+        const pageCenter = rect.top + rect.height / 2
+        const distance = Math.abs(pageCenter - containerCenter)
+
+        if (distance < closestDistance) {
+          closestDistance = distance
+          closestPage = parseInt(pageNum, 10)
+        }
       }
-      setRenderedPages(pages)
+
+      setVisiblePage(closestPage)
     }
 
-    renderPages()
-  }, [pdf])
+    container.addEventListener('scroll', handleScroll)
+    // Initial check
+    setTimeout(handleScroll, 100)
+
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [renderedPages])
 
   // Save scroll position
   useEffect(() => {
@@ -69,6 +103,24 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [docId, pdf])
 
+  // Scroll to page when navigation buttons are clicked
+  const scrollToPage = useCallback((pageNum) => {
+    const pageRef = pageRefs.current[pageNum]
+    if (pageRef) {
+      pageRef.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [])
+
+  const handlePrevPage = useCallback(() => {
+    const newPage = Math.max(1, visiblePage - 1)
+    scrollToPage(newPage)
+  }, [visiblePage, scrollToPage])
+
+  const handleNextPage = useCallback(() => {
+    const newPage = Math.min(totalPages, visiblePage + 1)
+    scrollToPage(newPage)
+  }, [visiblePage, totalPages, scrollToPage])
+
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       containerRef.current?.parentElement?.requestFullscreen()
@@ -85,6 +137,10 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
     }
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
+  const setPageRef = useCallback((pageNum, ref) => {
+    pageRefs.current[pageNum] = ref
   }, [])
 
   if (!url) {
@@ -123,11 +179,11 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
   return (
     <div className={styles.viewer}>
       <PDFToolbar
-        currentPage={currentPage}
+        currentPage={visiblePage}
         totalPages={totalPages}
         zoom={zoom}
-        onPrevPage={prevPage}
-        onNextPage={nextPage}
+        onPrevPage={handlePrevPage}
+        onNextPage={handleNextPage}
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
         onToggleFullscreen={toggleFullscreen}
@@ -141,6 +197,7 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
               pdf={pdf}
               pageNumber={pageNum}
               zoom={zoom}
+              setRef={(ref) => setPageRef(pageNum, ref)}
             />
           ))}
         </div>
@@ -149,10 +206,18 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
   )
 }
 
-function PageCanvas({ pdf, pageNumber, zoom }) {
+function PageCanvas({ pdf, pageNumber, zoom, setRef }) {
   const canvasRef = useRef(null)
+  const wrapperRef = useRef(null)
   const [isRendering, setIsRendering] = useState(false)
   const renderTaskRef = useRef(null)
+
+  // Set ref for parent to track
+  useEffect(() => {
+    if (setRef) {
+      setRef(wrapperRef.current)
+    }
+  }, [setRef])
 
   useEffect(() => {
     const renderPage = async () => {
@@ -206,7 +271,7 @@ function PageCanvas({ pdf, pageNumber, zoom }) {
   }, [pdf, pageNumber, zoom])
 
   return (
-    <div className={styles.pageWrapper}>
+    <div className={styles.pageWrapper} ref={wrapperRef}>
       <canvas ref={canvasRef} className={styles.page} />
       {isRendering && (
         <div className={styles.pageLoading}>
