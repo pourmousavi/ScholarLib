@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useUIStore } from '../../store/uiStore'
 import { useToast } from '../../hooks/useToast'
 import { StatusDot, Tag, ContextMenu } from '../ui'
 import styles from './DocCard.module.css'
 
-export default function DocCard({ doc }) {
+const DocCard = memo(function DocCard({ doc }) {
   const [contextMenu, setContextMenu] = useState(null)
 
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
@@ -123,26 +123,40 @@ export default function DocCard({ doc }) {
     }
   ]
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handleClick()
+    }
+  }
+
+  const title = doc.metadata?.title || doc.filename
+
   return (
     <>
-      <div
+      <article
         className={`${styles.card} ${isSelected ? styles.selected : ''}`}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+        role="button"
+        aria-selected={isSelected}
+        aria-label={`${title} by ${authorText}${isUnread ? ', unread' : ''}${isStarred ? ', starred' : ''}`}
       >
         <div className={styles.header}>
           <StatusDot status={status} />
           <h3 className={`${styles.title} ${isUnread ? styles.unread : ''}`}>
-            {doc.metadata?.title || doc.filename}
+            {title}
           </h3>
-          {isStarred && <span className={styles.star}>*</span>}
+          {isStarred && <span className={styles.star} aria-hidden="true">*</span>}
         </div>
         <div className={styles.authors}>{authorText}</div>
         {yearJournal && (
           <div className={styles.meta}>{yearJournal}</div>
         )}
         {tags.length > 0 && (
-          <div className={styles.tags}>
+          <div className={styles.tags} aria-label={`Tags: ${tags.join(', ')}`}>
             {tags.slice(0, 3).map((tag) => (
               <Tag key={tag} label={tag} />
             ))}
@@ -151,7 +165,7 @@ export default function DocCard({ doc }) {
             )}
           </div>
         )}
-      </div>
+      </article>
 
       {contextMenu && (
         <ContextMenu
@@ -163,4 +177,6 @@ export default function DocCard({ doc }) {
       )}
     </>
   )
-}
+})
+
+export default DocCard

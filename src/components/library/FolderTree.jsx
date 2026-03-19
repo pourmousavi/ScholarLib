@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useUIStore } from '../../store/uiStore'
 import { useToast } from '../../hooks/useToast'
@@ -12,16 +12,18 @@ export default function FolderTree() {
     .sort((a, b) => a.sort_order - b.sort_order)
 
   return (
-    <div className={styles.tree}>
-      <div className={styles.sectionLabel}>COLLECTIONS</div>
-      {rootFolders.map((folder) => (
-        <FolderNode key={folder.id} folder={folder} depth={0} />
-      ))}
-    </div>
+    <nav className={styles.tree} aria-label="Folder navigation">
+      <div className={styles.sectionLabel} id="collections-label">COLLECTIONS</div>
+      <div role="tree" aria-labelledby="collections-label">
+        {rootFolders.map((folder) => (
+          <FolderNode key={folder.id} folder={folder} depth={0} />
+        ))}
+      </div>
+    </nav>
   )
 }
 
-function FolderNode({ folder, depth }) {
+const FolderNode = memo(function FolderNode({ folder, depth }) {
   const [contextMenu, setContextMenu] = useState(null)
 
   const folders = useLibraryStore((s) => s.folders)
@@ -135,28 +137,55 @@ function FolderNode({ folder, depth }) {
     }
   ]
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handleClick()
+    } else if (e.key === 'ArrowRight' && hasChildren && !isExpanded) {
+      toggleFolderExpanded(folder.id)
+    } else if (e.key === 'ArrowLeft' && hasChildren && isExpanded) {
+      toggleFolderExpanded(folder.id)
+    }
+  }
+
   return (
     <>
-      <div className={styles.node}>
+      <div
+        className={styles.node}
+        role="treeitem"
+        aria-expanded={hasChildren ? isExpanded : undefined}
+        aria-selected={isSelected}
+        aria-level={depth + 1}
+      >
         <div
           className={`${styles.item} ${isSelected ? styles.selected : ''}`}
           style={{ paddingLeft: 12 + depth * 14 }}
           onClick={handleClick}
           onContextMenu={handleContextMenu}
+          onKeyDown={handleKeyDown}
+          tabIndex={0}
+          role="button"
+          aria-label={`${folder.name}, ${docCount} documents`}
         >
           <button
             className={styles.toggle}
             onClick={handleToggle}
             style={{ visibility: hasChildren ? 'visible' : 'hidden' }}
+            aria-label={isExpanded ? 'Collapse folder' : 'Expand folder'}
+            tabIndex={-1}
           >
             {isExpanded ? '>' : '>'}
           </button>
           <span className={styles.name}>{folder.name}</span>
-          <span className={styles.count}>{docCount}</span>
+          <span className={styles.count} aria-label={`${docCount} documents`}>{docCount}</span>
         </div>
-        {isExpanded && childFolders.map((child) => (
-          <FolderNode key={child.id} folder={child} depth={depth + 1} />
-        ))}
+        {isExpanded && (
+          <div role="group">
+            {childFolders.map((child) => (
+              <FolderNode key={child.id} folder={child} depth={depth + 1} />
+            ))}
+          </div>
+        )}
       </div>
 
       {contextMenu && (
@@ -169,4 +198,4 @@ function FolderNode({ folder, depth }) {
       )}
     </>
   )
-}
+})
