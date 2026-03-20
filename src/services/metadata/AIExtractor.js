@@ -30,7 +30,7 @@ export const AIExtractor = {
     try {
       const prompt = EXTRACTION_PROMPT + firstPagesText.slice(0, 4000)
 
-      const response = await aiService.complete([
+      const response = await aiService.chat([
         { role: 'user', content: prompt }
       ])
 

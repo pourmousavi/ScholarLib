@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import { Spinner } from '../ui'
 import { MetadataExtractor } from '../../services/metadata/MetadataExtractor'
+import { aiService } from '../../services/ai/AIService'
 import MetadataModal from './MetadataModal'
 import styles from './UploadZone.module.css'
 
@@ -91,10 +92,19 @@ export default function UploadZone({
 
       // Step 3: Extract metadata
       setProcessingStatus('Looking up metadata...')
+
+      // Check if AI service is available for fallback extraction
+      const isAIAvailable = await aiService.checkAvailability()
+      const aiServiceForExtraction = isAIAvailable ? aiService : null
+
+      if (isAIAvailable) {
+        setProcessingStatus('Looking up metadata (AI available)...')
+      }
+
       const extractedMetadata = await MetadataExtractor.extractMetadata(
         text,
         selectedFile.name,
-        null // AI service - will be added in Stage 09
+        aiServiceForExtraction
       )
 
       setMetadata(extractedMetadata)
