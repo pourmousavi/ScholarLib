@@ -84,8 +84,11 @@ export class DropboxAdapter {
       // Extract _content from data - only send metadata in Dropbox-API-Arg header
       const { _content, ...apiArgs } = data
       headers['Dropbox-API-Arg'] = JSON.stringify(apiArgs)
-      headers['Content-Type'] = 'application/octet-stream'
-      body = _content
+      // Only set Content-Type and body for uploads, not downloads
+      if (_content) {
+        headers['Content-Type'] = 'application/octet-stream'
+        body = _content
+      }
     } else {
       headers['Content-Type'] = 'application/json'
       body = JSON.stringify(data)
@@ -94,7 +97,7 @@ export class DropboxAdapter {
     const response = await fetch(`${baseUrl}${endpoint}`, {
       method: 'POST',
       headers,
-      body,
+      ...(body && { body }),
     })
 
     if (!response.ok) {
