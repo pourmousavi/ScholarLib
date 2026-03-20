@@ -81,9 +81,11 @@ export class DropboxAdapter {
 
     let body
     if (isContent) {
-      headers['Dropbox-API-Arg'] = JSON.stringify(data)
+      // Extract _content from data - only send metadata in Dropbox-API-Arg header
+      const { _content, ...apiArgs } = data
+      headers['Dropbox-API-Arg'] = JSON.stringify(apiArgs)
       headers['Content-Type'] = 'application/octet-stream'
-      body = data._content
+      body = _content
     } else {
       headers['Content-Type'] = 'application/json'
       body = JSON.stringify(data)
