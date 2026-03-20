@@ -48,8 +48,48 @@ export const MetadataExtractor = {
       console.log('No DOI found in PDF text or filename')
     }
 
-    // Step 2: Try to extract title and search
-    console.log('Searching by title:', possibleTitle)
+    // Step 2: When no DOI found, prioritize AI extraction (more reliable than title search)
+    if (aiService) {
+      console.log('Attempting AI extraction (no DOI found, AI is primary method)')
+      try {
+        const aiResult = await AIExtractor.extract(firstPages, aiService)
+        if (aiResult && aiResult.title && aiResult.title.length > 10) {
+          console.log('AI extraction successful:', aiResult.title)
+
+          // Try to find DOI via CrossRef using AI-extracted title
+          if (!aiResult.doi) {
+            try {
+              const crossrefResult = await CrossRefService.searchByTitle(aiResult.title)
+              if (crossrefResult && this.titlesMatch(crossrefResult.title, aiResult.title)) {
+                console.log('Found matching DOI via CrossRef:', crossrefResult.doi)
+                // Merge: use CrossRef DOI but keep AI data where CrossRef is missing
+                return {
+                  ...aiResult,
+                  doi: crossrefResult.doi || aiResult.doi,
+                  url: crossrefResult.url || aiResult.url,
+                  extraction_source: 'ai+crossref',
+                  extraction_confidence: {
+                    ...aiResult.extraction_confidence,
+                    doi: crossrefResult.doi ? 95 : 0
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('CrossRef validation failed:', err.message)
+            }
+          }
+
+          return aiResult
+        } else {
+          console.log('AI extraction returned empty or invalid result')
+        }
+      } catch (err) {
+        console.warn('AI extraction failed:', err.message)
+      }
+    }
+
+    // Step 3: Fallback to title-based API search (less reliable)
+    console.log('Falling back to title-based search:', possibleTitle)
 
     // Try CrossRef title search
     try {
@@ -73,15 +113,6 @@ export const MetadataExtractor = {
       }
     } catch (err) {
       console.warn('Semantic Scholar search failed (likely CORS):', err.message)
-    }
-
-    // Step 3: Try AI extraction
-    if (aiService) {
-      console.log('Attempting AI extraction')
-      const aiResult = await AIExtractor.extract(firstPages, aiService)
-      if (aiResult && aiResult.title) {
-        return aiResult
-      }
     }
 
     // Step 4: Return empty template for manual entry
