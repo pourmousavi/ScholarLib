@@ -104,7 +104,10 @@ export default function UploadZone({
       // Step 1: Read file
       setProcessingStatus('Reading PDF...')
       const arrayBuffer = await selectedFile.arrayBuffer()
-      setPdfBuffer(arrayBuffer)
+
+      // Make a copy for GROBID since pdf.js may detach the original buffer
+      const pdfBufferCopy = arrayBuffer.slice(0)
+      setPdfBuffer(pdfBufferCopy)
 
       // Step 2: Extract text
       setProcessingStatus('Extracting text...')
@@ -131,8 +134,8 @@ export default function UploadZone({
         text,
         selectedFile.name,
         aiServiceForExtraction,
-        arrayBuffer,  // Pass PDF buffer for GROBID
-        settings      // Pass user settings
+        pdfBufferCopy,  // Pass PDF buffer copy for GROBID (original may be detached by pdf.js)
+        settings        // Pass user settings
       )
 
       setMetadata(extractedMetadata)

@@ -24,14 +24,17 @@ export const MetadataExtractor = {
     const firstPages = pdfText.slice(0, 10000) // First ~10 pages worth of text
     const errors = [] // Collect errors for debugging
 
-    // Get user preferences for metadata sources
-    const sources = settings?.global?.metadata_sources || {
+    // Get user preferences for metadata sources (merge with defaults for new fields)
+    const defaultSources = {
       grobid: true,
       openalex: true,
       crossref: true,
       semantic_scholar: true,
       ai: true
     }
+    const userSources = settings?.global?.metadata_sources || {}
+    // Merge: use user settings where defined, fall back to defaults for new/missing fields
+    const sources = { ...defaultSources, ...userSources }
     const grobidEndpoint = settings?.global?.grobid_endpoint || 'huggingface'
     const crossrefEmail = settings?.global?.crossref_email || ''
 
