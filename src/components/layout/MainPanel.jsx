@@ -1,14 +1,16 @@
+import { useState, useEffect } from 'react'
 import { useUIStore } from '../../store/uiStore'
 import { useLibraryStore } from '../../store/libraryStore'
+import { useStorageStore } from '../../store/storageStore'
 import PDFViewer from '../viewer/PDFViewer'
 import { NotesPanel } from '../notes'
 import { ChatPanel } from '../ai'
 import styles from './MainPanel.module.css'
 
-// Test PDF URL for development (Mozilla's PDF.js sample - CORS enabled)
-const TEST_PDF_URL = 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf'
-
 export default function MainPanel() {
+  const [pdfUrl, setPdfUrl] = useState(null)
+  const [pdfError, setPdfError] = useState(null)
+
   const activePanel = useUIStore((s) => s.activePanel)
   const setActivePanel = useUIStore((s) => s.setActivePanel)
   const setShowModal = useUIStore((s) => s.setShowModal)
@@ -22,14 +24,46 @@ export default function MainPanel() {
   const documents = useLibraryStore((s) => s.documents)
   const selectedDoc = selectedDocId ? documents[selectedDocId] : null
 
+  const adapter = useStorageStore((s) => s.adapter)
+  const isConnected = useStorageStore((s) => s.isConnected)
+
   const panels = [
     { id: 'pdf', label: 'PDF' },
     { id: 'ai', label: 'AI Chat' },
     { id: 'notes', label: 'Notes' }
   ]
 
-  // For now, use test PDF URL. In Stage 06, this will be Box streaming URL
-  const pdfUrl = selectedDoc ? TEST_PDF_URL : null
+  // Fetch PDF URL when document changes
+  useEffect(() => {
+    if (!selectedDoc || !adapter || !isConnected) {
+      setPdfUrl(null)
+      setPdfError(null)
+      return
+    }
+
+    const fetchPdfUrl = async () => {
+      try {
+        setPdfError(null)
+        // Use box_path to get streaming URL from storage adapter
+        const path = selectedDoc.box_path
+        if (!path) {
+          setPdfError('Document has no file path')
+          return
+        }
+
+        console.log('Fetching PDF URL for:', path)
+        const url = await adapter.getFileStreamURL(path)
+        console.log('Got PDF URL:', url)
+        setPdfUrl(url)
+      } catch (error) {
+        console.error('Failed to get PDF URL:', error)
+        setPdfError(error.message || 'Failed to load PDF')
+        setPdfUrl(null)
+      }
+    }
+
+    fetchPdfUrl()
+  }, [selectedDoc, adapter, isConnected])
 
   const handleTextExtracted = (text) => {
     // Will be used in Stage 11 for indexing
@@ -90,6 +124,7 @@ export default function MainPanel() {
             url={pdfUrl}
             docId={selectedDocId}
             onTextExtracted={handleTextExtracted}
+            error={pdfError}
           />
         )}
         {activePanel === 'ai' && (
