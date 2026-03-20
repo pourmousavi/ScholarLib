@@ -115,9 +115,10 @@ export class DropboxAdapter {
         throw new StorageError(STORAGE_ERRORS.RATE_LIMITED, 'Rate limited')
       }
 
+      console.error('Dropbox API error:', error)
       throw new StorageError(
         STORAGE_ERRORS.NETWORK_ERROR,
-        error.error_summary || 'Dropbox API error'
+        error.error_summary || error.error_description || JSON.stringify(error) || 'Dropbox API error'
       )
     }
 
@@ -287,7 +288,7 @@ export class DropboxAdapter {
 
     await this._apiCall(
       '/files/upload',
-      { path: fullPath, mode: 'overwrite', _content: blob },
+      { path: fullPath, mode: { '.tag': 'overwrite' }, _content: blob },
       true
     )
   }
@@ -309,7 +310,7 @@ export class DropboxAdapter {
 
     const result = await this._apiCall(
       '/files/upload',
-      { path: fullPath, mode: 'overwrite', _content: file },
+      { path: fullPath, mode: { '.tag': 'overwrite' }, _content: file },
       true
     )
 
