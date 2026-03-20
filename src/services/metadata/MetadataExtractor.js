@@ -13,40 +13,66 @@ export const MetadataExtractor = {
   async extractMetadata(pdfText, filename, aiService = null) {
     const firstPages = pdfText.slice(0, 10000) // First ~10 pages worth of text
 
+    // Debug: Log first 500 chars to help diagnose extraction issues
+    console.log('PDF text preview (first 500 chars):', firstPages.slice(0, 500))
+
     // Extract possible title early for validation
     const possibleTitle = this.extractPossibleTitle(firstPages, filename)
+    console.log('Extracted possible title:', possibleTitle)
 
     // Step 1: Try DOI lookup via CrossRef
-    const doi = this.detectDOI(firstPages)
+    let doi = this.detectDOI(firstPages)
+
+    // If no DOI in text, try to extract from ScienceDirect filename
+    if (!doi) {
+      doi = this.extractDOIFromFilename(filename)
+    }
+
     if (doi) {
       console.log('Found DOI:', doi)
-      const crossrefResult = await CrossRefService.lookup(doi)
-      if (crossrefResult) {
-        // Validate: does the CrossRef title match our extracted title?
-        if (this.titlesMatch(crossrefResult.title, possibleTitle)) {
-          console.log('CrossRef DOI match validated')
-          return crossrefResult
-        } else {
-          console.log('CrossRef DOI result title mismatch, skipping:', crossrefResult.title, 'vs', possibleTitle)
+      try {
+        const crossrefResult = await CrossRefService.lookup(doi)
+        if (crossrefResult) {
+          // Validate: does the CrossRef title match our extracted title?
+          if (this.titlesMatch(crossrefResult.title, possibleTitle)) {
+            console.log('CrossRef DOI match validated')
+            return crossrefResult
+          } else {
+            console.log('CrossRef DOI result title mismatch, skipping:', crossrefResult.title, 'vs', possibleTitle)
+          }
         }
+      } catch (err) {
+        console.warn('CrossRef DOI lookup failed:', err.message)
       }
+    } else {
+      console.log('No DOI found in PDF text or filename')
     }
 
     // Step 2: Try to extract title and search
     console.log('Searching by title:', possibleTitle)
 
     // Try CrossRef title search
-    const crossrefTitleResult = await CrossRefService.searchByTitle(possibleTitle)
-    if (crossrefTitleResult && this.isGoodMatch(crossrefTitleResult, possibleTitle)) {
-      console.log('CrossRef title search match')
-      return crossrefTitleResult
+    try {
+      const crossrefTitleResult = await CrossRefService.searchByTitle(possibleTitle)
+      if (crossrefTitleResult && this.isGoodMatch(crossrefTitleResult, possibleTitle)) {
+        console.log('CrossRef title search match')
+        return crossrefTitleResult
+      } else if (crossrefTitleResult) {
+        console.log('CrossRef title search result did not match well enough')
+      }
+    } catch (err) {
+      console.warn('CrossRef title search failed:', err.message)
     }
 
-    // Try Semantic Scholar
-    const ssResult = await SemanticScholarService.search(possibleTitle)
-    if (ssResult) {
-      console.log('Semantic Scholar match found')
-      return ssResult
+    // Try Semantic Scholar (may fail due to CORS in browser)
+    try {
+      const ssResult = await SemanticScholarService.search(possibleTitle)
+      if (ssResult) {
+        console.log('Semantic Scholar match found')
+        return ssResult
+      }
+    } catch (err) {
+      console.warn('Semantic Scholar search failed (likely CORS):', err.message)
     }
 
     // Step 3: Try AI extraction
@@ -150,36 +176,186 @@ export const MetadataExtractor = {
     return null
   },
 
+  extractDOIFromFilename(filename) {
+    // Try to extract DOI from common publisher filename patterns
+
+    // ScienceDirect: "1-s2.0-S2352152X26002410-main.pdf"
+    // The S number is a PII (Publisher Item Identifier), not a DOI
+    // But we can try to construct potential DOI patterns
+
+    // Check for embedded DOI in filename
+    const doiMatch = filename.match(/(10\.\d{4,}[^\s]+)/i)
+    if (doiMatch) {
+      const cleaned = this.cleanDOI(doiMatch[1])
+      if (cleaned) {
+        console.log('Found DOI embedded in filename:', cleaned)
+        return cleaned
+      }
+    }
+
+    // IEEE format often has DOI in filename
+    const ieeeMatch = filename.match(/(\d{7,})/i)
+    if (ieeeMatch && filename.toLowerCase().includes('ieee')) {
+      console.log('Possible IEEE paper, ID:', ieeeMatch[1])
+      // Can't construct DOI without lookup
+    }
+
+    return null
+  },
+
   extractPossibleTitle(text, filename) {
-    // Try to find title from first few lines
-    const lines = text.split('\n')
-      .map(l => l.trim())
-      .filter(l => l.length > 10 && l.length < 300)
-      .slice(0, 20)
+    // PDF text often has poor formatting - use multiple strategies
+    const headerText = text.slice(0, 5000) // Focus on first part
 
-    // Look for a line that looks like a title (longer, possibly capitalized)
-    for (const line of lines) {
-      // Skip lines that look like headers/footers
-      if (/^\d+$/.test(line)) continue
-      if (/^(abstract|introduction|keywords|doi|copyright)/i.test(line)) continue
-      if (line.includes('@')) continue // Email
+    // Strategy 1: Look for text before common markers
+    const markers = [
+      /\bAbstract\b/i,
+      /\bIntroduction\b/i,
+      /\bKeywords?\s*:/i,
+      /\b[A-Z][a-z]+\s+[A-Z][a-z]+\s*[,\d]?\s*[A-Z][a-z]+\s+[A-Z][a-z]+/,  // Author names pattern
+      /\buniversity\b/i,
+      /\bdepartment\b/i,
+      /\bReceived\s+\d/i,
+      /\bAccepted\s+\d/i,
+    ]
 
-      // Good title candidate
-      if (line.length > 30 && line.length < 250) {
-        // Check if it's mostly alphabetic
-        const alphaRatio = (line.match(/[a-zA-Z]/g) || []).length / line.length
-        if (alphaRatio > 0.7) {
-          return line
+    for (const marker of markers) {
+      const match = headerText.match(marker)
+      if (match && match.index > 50) {
+        const beforeMarker = headerText.slice(0, match.index).trim()
+        const title = this.extractTitleFromChunk(beforeMarker)
+        if (title && title.length > 20) {
+          console.log('Extracted title before marker:', marker.toString())
+          return title
         }
       }
     }
 
-    // Fall back to filename
-    return filename
-      .replace(/\.pdf$/i, '')
-      .replace(/[-_]/g, ' ')
+    // Strategy 2: Look for the longest "title-like" sentence in first 2000 chars
+    const veryEarly = headerText.slice(0, 2000)
+    const sentences = veryEarly
+      .replace(/\s+/g, ' ')
+      .split(/(?<=[.!?])\s+|(?=\n)/)
+      .map(s => s.trim())
+      .filter(s => s.length > 20 && s.length < 300)
+
+    // Score sentences by how "title-like" they are
+    let bestTitle = null
+    let bestScore = 0
+
+    for (const sentence of sentences) {
+      const score = this.scoreTitleCandidate(sentence)
+      if (score > bestScore) {
+        bestScore = score
+        bestTitle = sentence
+      }
+    }
+
+    if (bestTitle && bestScore > 3) {
+      console.log('Best title candidate score:', bestScore)
+      return bestTitle
+    }
+
+    // Strategy 3: Split by double spaces or newlines and find best chunk
+    const chunks = headerText
+      .split(/\n\n+|\s{3,}/)
+      .map(c => c.replace(/\s+/g, ' ').trim())
+      .filter(c => c.length > 20 && c.length < 300)
+
+    for (const chunk of chunks.slice(0, 10)) {
+      const score = this.scoreTitleCandidate(chunk)
+      if (score > 3) {
+        console.log('Title from chunk, score:', score)
+        return chunk
+      }
+    }
+
+    // Strategy 4: Just take first substantial text that looks academic
+    const firstText = headerText
       .replace(/\s+/g, ' ')
       .trim()
+      .slice(0, 300)
+
+    const titleMatch = firstText.match(/^(.{30,200}?)(?:\s+[A-Z][a-z]+\s+[A-Z]|\s+\d{1,2}\s|Abstract|Keywords)/i)
+    if (titleMatch) {
+      console.log('Title from first text pattern')
+      return titleMatch[1].trim()
+    }
+
+    // Last resort: use cleaned filename, but warn
+    console.warn('Could not extract title, using filename')
+    return this.cleanFilenameAsTitle(filename)
+  },
+
+  extractTitleFromChunk(chunk) {
+    // Clean and extract the best title-like portion from a chunk
+    const cleaned = chunk
+      .replace(/\s+/g, ' ')
+      .replace(/^[\d\s.]+/, '') // Remove leading page numbers
+      .replace(/journal of .+$/i, '') // Remove journal names at end
+      .trim()
+
+    // If it's too long, try to find a natural break
+    if (cleaned.length > 250) {
+      const breakMatch = cleaned.match(/^(.{50,200}?)(?:\.\s|:\s|\s-\s)/)
+      if (breakMatch) return breakMatch[1]
+      return cleaned.slice(0, 200)
+    }
+
+    return cleaned
+  },
+
+  scoreTitleCandidate(text) {
+    let score = 0
+
+    // Length scoring
+    if (text.length >= 30 && text.length <= 200) score += 2
+    else if (text.length >= 20 && text.length <= 250) score += 1
+
+    // Capitalization patterns (Title Case or ALL CAPS common in titles)
+    const words = text.split(/\s+/)
+    const capitalizedWords = words.filter(w => /^[A-Z]/.test(w)).length
+    if (capitalizedWords / words.length > 0.5) score += 2
+
+    // Contains academic keywords
+    if (/\b(analysis|study|review|method|model|system|approach|based|using|novel|new|improved)\b/i.test(text)) score += 2
+
+    // Doesn't look like an author line
+    if (!/^[A-Z][a-z]+\s+[A-Z][a-z]+\s*,/.test(text)) score += 1
+
+    // Doesn't contain email patterns
+    if (!/@/.test(text)) score += 1
+
+    // Doesn't start with numbers (except years)
+    if (!/^\d+(?!\d{3})/.test(text)) score += 1
+
+    // No common non-title patterns
+    if (!/\b(university|department|received|accepted|email|corresponding|author)\b/i.test(text)) score += 1
+
+    // Has good alpha ratio
+    const alphaRatio = (text.match(/[a-zA-Z]/g) || []).length / text.length
+    if (alphaRatio > 0.7) score += 1
+    else if (alphaRatio > 0.5) score += 0.5
+
+    return score
+  },
+
+  cleanFilenameAsTitle(filename) {
+    // Handle ScienceDirect and other common filename patterns
+    let cleaned = filename
+      .replace(/\.pdf$/i, '')
+      .replace(/^[\d\s._-]+/, '') // Remove leading numbers/punctuation
+      .replace(/s2\.0-S\d+[-_]main/i, '') // ScienceDirect pattern
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    // If we stripped too much, return original cleaned filename
+    if (cleaned.length < 5) {
+      cleaned = filename.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ').trim()
+    }
+
+    return cleaned
   },
 
   titlesMatch(title1, title2) {
