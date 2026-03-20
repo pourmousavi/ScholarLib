@@ -101,11 +101,26 @@ export class DropboxAdapter {
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}))
+      // Try to get error as JSON, fallback to text
+      const responseText = await response.text()
+      let error = {}
+      try {
+        error = JSON.parse(responseText)
+      } catch {
+        console.error('Dropbox API error (raw):', response.status, responseText)
+      }
 
       if (response.status === 409 && error.error?.['.tag'] === 'path') {
         const pathError = error.error.path?.['.tag']
         if (pathError === 'not_found') {
+          throw new StorageError(STORAGE_ERRORS.NOT_FOUND, 'File not found')
+        }
+      }
+
+      // Handle 400 with path not found (Dropbox sometimes returns this for missing files)
+      if (response.status === 400 || response.status === 409) {
+        const errorTag = error.error?.['.tag']
+        if (errorTag === 'path' || error.error_summary?.includes('not_found')) {
           throw new StorageError(STORAGE_ERRORS.NOT_FOUND, 'File not found')
         }
       }
@@ -118,10 +133,10 @@ export class DropboxAdapter {
         throw new StorageError(STORAGE_ERRORS.RATE_LIMITED, 'Rate limited')
       }
 
-      console.error('Dropbox API error:', error)
+      console.error('Dropbox API error:', response.status, error)
       throw new StorageError(
         STORAGE_ERRORS.NETWORK_ERROR,
-        error.error_summary || error.error_description || JSON.stringify(error) || 'Dropbox API error'
+        error.error_summary || error.error_description || responseText || 'Dropbox API error'
       )
     }
 
