@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { create } from 'zustand'
 import { nanoid } from 'nanoid'
 
@@ -24,9 +25,10 @@ const useToastStore = create((set) => ({
 export function useToast() {
   const addToast = useToastStore((state) => state.addToast)
 
-  const showToast = ({ message, type = 'info' }) => {
+  // Memoize showToast to prevent useEffect re-runs in consumers
+  const showToast = useCallback(({ message, type = 'info' }) => {
     addToast({ message, type })
-  }
+  }, [addToast])
 
   return { showToast }
 }

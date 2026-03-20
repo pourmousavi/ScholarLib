@@ -11,6 +11,10 @@ export const useStorageStore = create((set, get) => ({
 
   // Initialize on app load
   initialize: async () => {
+    // Clear any stale OAuth session state from previous attempts
+    sessionStorage.removeItem('pkce_verifier')
+    sessionStorage.removeItem('oauth_state')
+
     const savedProvider = getSavedProvider()
     if (!savedProvider) {
       set({ isConnected: false })
@@ -24,11 +28,18 @@ export const useStorageStore = create((set, get) => ({
       const connected = await adapter.isConnected()
       set({ isConnected: connected, isConnecting: false })
       if (!connected) {
+        // Clear both provider and tokens when connection is invalid
+        await adapter.disconnect()
         clearProvider()
         set({ provider: null, adapter: null })
       }
     } catch (error) {
-      set({ isConnected: false, isConnecting: false, error: error.message })
+      // Clear everything on error to allow fresh connection
+      if (adapter && adapter.disconnect) {
+        await adapter.disconnect()
+      }
+      clearProvider()
+      set({ provider: null, adapter: null, isConnected: false, isConnecting: false, error: error.message })
     }
   },
 
@@ -68,9 +79,12 @@ export const useStorageStore = create((set, get) => ({
       await adapter.handleCallback(code, state)
       set({ isConnected: true, isConnecting: false })
     } catch (error) {
-      set({ isConnected: false, isConnecting: false, error: error.message })
+      // Clear tokens and provider on callback failure
+      if (adapter && adapter.disconnect) {
+        await adapter.disconnect()
+      }
       clearProvider()
-      set({ provider: null, adapter: null })
+      set({ provider: null, adapter: null, isConnected: false, isConnecting: false, error: error.message })
       throw error
     }
   },
