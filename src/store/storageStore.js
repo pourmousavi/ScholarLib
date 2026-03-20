@@ -42,9 +42,24 @@ export const useStorageStore = create((set, get) => ({
 
   // Handle OAuth callback
   handleCallback: async (code, state) => {
-    const { adapter, provider } = get()
+    let { adapter, provider } = get()
+
+    // If no adapter, try to determine provider from URL and create one
     if (!adapter) {
-      throw new Error('No storage adapter initialized')
+      const url = new URL(window.location.href)
+      if (url.pathname.includes('/auth/dropbox')) {
+        provider = 'dropbox'
+      } else if (url.pathname.includes('/auth/box') || url.pathname.endsWith('/ScholarLib/')) {
+        provider = 'box'
+      }
+
+      if (provider) {
+        adapter = createStorageAdapter(provider)
+        saveProvider(provider)
+        set({ provider, adapter })
+      } else {
+        throw new Error('No storage adapter initialized')
+      }
     }
 
     set({ isConnecting: true, error: null })
