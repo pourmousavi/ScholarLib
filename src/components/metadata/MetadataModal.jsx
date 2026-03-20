@@ -75,8 +75,18 @@ export default function MetadataModal({
 
   const sourceLabel = {
     crossref: 'CrossRef',
+    'crossref+openalex': 'CrossRef + OpenAlex',
+    grobid: 'GROBID (ML)',
+    'grobid+crossref': 'GROBID + CrossRef',
+    'grobid+openalex': 'GROBID + OpenAlex',
+    'grobid+crossref+openalex': 'GROBID + CrossRef + OpenAlex',
+    openalex: 'OpenAlex',
     semantic_scholar: 'Semantic Scholar',
+    'semantic_scholar+openalex': 'Semantic Scholar + OpenAlex',
     ai: 'AI Extracted',
+    'ai+crossref': 'AI + CrossRef',
+    'ai+openalex': 'AI + OpenAlex',
+    'ai+crossref+openalex': 'AI + CrossRef + OpenAlex',
     manual: 'Manual Entry'
   }
 

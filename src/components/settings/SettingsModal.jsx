@@ -653,6 +653,24 @@ export default function SettingsModal({ onClose }) {
           <label className={styles.toggle}>
             <input
               type="checkbox"
+              checked={settings?.global?.metadata_sources?.grobid ?? true}
+              onChange={(e) => updateGlobalSetting('metadata_sources.grobid', e.target.checked)}
+            />
+            <span>GROBID (ML-based, 90%+ accuracy)</span>
+          </label>
+
+          <label className={styles.toggle}>
+            <input
+              type="checkbox"
+              checked={settings?.global?.metadata_sources?.openalex ?? true}
+              onChange={(e) => updateGlobalSetting('metadata_sources.openalex', e.target.checked)}
+            />
+            <span>OpenAlex (citations, open access links)</span>
+          </label>
+
+          <label className={styles.toggle}>
+            <input
+              type="checkbox"
               checked={settings?.global?.metadata_sources?.crossref ?? true}
               onChange={(e) => updateGlobalSetting('metadata_sources.crossref', e.target.checked)}
             />
@@ -674,10 +692,26 @@ export default function SettingsModal({ onClose }) {
               checked={settings?.global?.metadata_sources?.ai ?? true}
               onChange={(e) => updateGlobalSetting('metadata_sources.ai', e.target.checked)}
             />
-            <span>AI Extraction</span>
+            <span>AI Extraction (fallback)</span>
           </label>
         </div>
       </div>
+
+      {settings?.global?.metadata_sources?.grobid && (
+        <div className={styles.field}>
+          <label>GROBID Endpoint</label>
+          <select
+            value={settings?.global?.grobid_endpoint || 'huggingface'}
+            onChange={(e) => updateGlobalSetting('grobid_endpoint', e.target.value)}
+          >
+            <option value="huggingface">HuggingFace (recommended)</option>
+            <option value="scienceminer">ScienceMiner (backup)</option>
+          </select>
+          <span className={styles.fieldHint}>
+            GROBID sends full PDF to external server for ML-based extraction
+          </span>
+        </div>
+      )}
 
       <div className={styles.field}>
         <label>CrossRef Email</label>

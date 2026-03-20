@@ -15,10 +15,13 @@ class SettingsService {
         metadata_extraction_mode: 'auto', // auto | review | manual
         metadata_sources: {
           pdf_embedded: true,
+          grobid: true,           // ML-based extraction, 90%+ accuracy
+          openalex: true,         // Adds citations, open access links
           crossref: true,
           semantic_scholar: true,
           ai: true
         },
+        grobid_endpoint: 'huggingface', // 'huggingface' or 'scienceminer'
         crossref_email: '',
         appearance: {
           theme: 'dark', // dark | light

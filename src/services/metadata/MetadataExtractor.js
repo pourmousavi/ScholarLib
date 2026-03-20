@@ -1,17 +1,39 @@
 import { CrossRefService } from './CrossRefService'
 import { SemanticScholarService } from './SemanticScholarService'
 import { AIExtractor } from './AIExtractor'
+import { GROBIDService } from './GROBIDService'
+import { OpenAlexService } from './OpenAlexService'
 
 export const MetadataExtractor = {
   /**
-   * Extract metadata from PDF text using a cascading pipeline:
+   * Extract metadata from PDF using a cascading pipeline:
    * 1. Try to find DOI and lookup in CrossRef
-   * 2. Try Semantic Scholar search by title
-   * 3. Fall back to AI extraction (if available)
-   * 4. Return manual entry template
+   * 2. Try GROBID ML extraction (90%+ accuracy) - NEW PRIMARY METHOD
+   * 3. Fall back to AI extraction (improved prompts)
+   * 4. Try title-based CrossRef/Semantic Scholar search
+   * 5. Enrich with OpenAlex (citations, OA links)
+   * 6. Return manual entry template
+   *
+   * @param {string} pdfText - Extracted text from PDF
+   * @param {string} filename - Original filename
+   * @param {object} aiService - AI service instance (optional)
+   * @param {ArrayBuffer} pdfBuffer - Raw PDF bytes for GROBID (optional)
+   * @param {object} settings - User settings for metadata sources (optional)
    */
-  async extractMetadata(pdfText, filename, aiService = null) {
+  async extractMetadata(pdfText, filename, aiService = null, pdfBuffer = null, settings = null) {
     const firstPages = pdfText.slice(0, 10000) // First ~10 pages worth of text
+    const errors = [] // Collect errors for debugging
+
+    // Get user preferences for metadata sources
+    const sources = settings?.global?.metadata_sources || {
+      grobid: true,
+      openalex: true,
+      crossref: true,
+      semantic_scholar: true,
+      ai: true
+    }
+    const grobidEndpoint = settings?.global?.grobid_endpoint || 'huggingface'
+    const crossrefEmail = settings?.global?.crossref_email || ''
 
     // Debug: Log first 500 chars to help diagnose extraction issues
     console.log('PDF text preview (first 500 chars):', firstPages.slice(0, 500))
@@ -28,7 +50,7 @@ export const MetadataExtractor = {
       doi = this.extractDOIFromFilename(filename)
     }
 
-    if (doi) {
+    if (doi && sources.crossref) {
       console.log('Found DOI:', doi)
       try {
         const crossrefResult = await CrossRefService.lookup(doi)
@@ -36,6 +58,10 @@ export const MetadataExtractor = {
           // Validate: does the CrossRef title match our extracted title?
           if (this.titlesMatch(crossrefResult.title, possibleTitle)) {
             console.log('CrossRef DOI match validated')
+            // Enrich with OpenAlex if enabled
+            if (sources.openalex) {
+              return await OpenAlexService.enrich(crossrefResult, crossrefEmail)
+            }
             return crossrefResult
           } else {
             console.log('CrossRef DOI result title mismatch, skipping:', crossrefResult.title, 'vs', possibleTitle)
@@ -43,81 +69,203 @@ export const MetadataExtractor = {
         }
       } catch (err) {
         console.warn('CrossRef DOI lookup failed:', err.message)
+        errors.push({ source: 'crossref', error: err.message })
       }
     } else {
       console.log('No DOI found in PDF text or filename')
     }
 
-    // Step 2: When no DOI found, prioritize AI extraction (more reliable than title search)
-    if (aiService) {
-      console.log('Attempting AI extraction (no DOI found, AI is primary method)')
+    // Step 2: Try GROBID ML extraction (PRIMARY method when no DOI)
+    if (pdfBuffer && sources.grobid) {
+      console.log('Attempting GROBID extraction (ML-based, 90%+ accuracy)')
+      try {
+        const grobidResult = await GROBIDService.extractWithFallback(pdfBuffer, grobidEndpoint)
+
+        if (grobidResult && grobidResult.title && grobidResult.title.length > 10) {
+          console.log('GROBID extraction successful:', grobidResult.title)
+
+          // If GROBID found a DOI, validate with CrossRef
+          if (grobidResult.doi && sources.crossref) {
+            try {
+              const crossrefResult = await CrossRefService.lookup(grobidResult.doi)
+              if (crossrefResult && this.titlesMatch(crossrefResult.title, grobidResult.title)) {
+                console.log('GROBID DOI validated with CrossRef')
+                const merged = this.mergeMetadata(grobidResult, crossrefResult, 'grobid+crossref')
+                if (sources.openalex) {
+                  return await OpenAlexService.enrich(merged, crossrefEmail)
+                }
+                return merged
+              }
+            } catch (err) {
+              console.warn('CrossRef validation of GROBID DOI failed:', err.message)
+            }
+          }
+
+          // Try to find DOI via CrossRef title search
+          if (!grobidResult.doi && sources.crossref) {
+            try {
+              const crossrefResult = await CrossRefService.searchByTitle(grobidResult.title)
+              if (crossrefResult && this.titlesMatch(crossrefResult.title, grobidResult.title)) {
+                console.log('Found matching DOI via CrossRef title search:', crossrefResult.doi)
+                const merged = this.mergeMetadata(grobidResult, crossrefResult, 'grobid+crossref')
+                if (sources.openalex) {
+                  return await OpenAlexService.enrich(merged, crossrefEmail)
+                }
+                return merged
+              }
+            } catch (err) {
+              console.warn('CrossRef title search failed:', err.message)
+            }
+          }
+
+          // Enrich GROBID result with OpenAlex
+          if (sources.openalex) {
+            return await OpenAlexService.enrich(grobidResult, crossrefEmail)
+          }
+          return grobidResult
+        } else {
+          console.log('GROBID extraction returned empty or invalid result')
+        }
+      } catch (err) {
+        console.warn('GROBID extraction failed:', err.message)
+        errors.push({ source: 'grobid', error: err.message })
+      }
+    }
+
+    // Step 3: Fall back to AI extraction
+    if (aiService && sources.ai) {
+      console.log('Attempting AI extraction (fallback method)')
       try {
         const aiResult = await AIExtractor.extract(firstPages, aiService)
         if (aiResult && aiResult.title && aiResult.title.length > 10) {
           console.log('AI extraction successful:', aiResult.title)
 
           // Try to find DOI via CrossRef using AI-extracted title
-          if (!aiResult.doi) {
+          if (!aiResult.doi && sources.crossref) {
             try {
               const crossrefResult = await CrossRefService.searchByTitle(aiResult.title)
               if (crossrefResult && this.titlesMatch(crossrefResult.title, aiResult.title)) {
                 console.log('Found matching DOI via CrossRef:', crossrefResult.doi)
-                // Merge: use CrossRef DOI but keep AI data where CrossRef is missing
-                return {
-                  ...aiResult,
-                  doi: crossrefResult.doi || aiResult.doi,
-                  url: crossrefResult.url || aiResult.url,
-                  extraction_source: 'ai+crossref',
-                  extraction_confidence: {
-                    ...aiResult.extraction_confidence,
-                    doi: crossrefResult.doi ? 95 : 0
-                  }
+                const merged = this.mergeMetadata(aiResult, crossrefResult, 'ai+crossref')
+                if (sources.openalex) {
+                  return await OpenAlexService.enrich(merged, crossrefEmail)
                 }
+                return merged
               }
             } catch (err) {
               console.warn('CrossRef validation failed:', err.message)
             }
           }
 
+          // Enrich with OpenAlex
+          if (sources.openalex) {
+            return await OpenAlexService.enrich(aiResult, crossrefEmail)
+          }
           return aiResult
         } else {
           console.log('AI extraction returned empty or invalid result')
         }
       } catch (err) {
         console.warn('AI extraction failed:', err.message)
+        errors.push({ source: 'ai', error: err.message })
       }
     }
 
-    // Step 3: Fallback to title-based API search (less reliable)
+    // Step 4: Fallback to title-based API search (less reliable)
     console.log('Falling back to title-based search:', possibleTitle)
 
     // Try CrossRef title search
-    try {
-      const crossrefTitleResult = await CrossRefService.searchByTitle(possibleTitle)
-      if (crossrefTitleResult && this.isGoodMatch(crossrefTitleResult, possibleTitle)) {
-        console.log('CrossRef title search match')
-        return crossrefTitleResult
-      } else if (crossrefTitleResult) {
-        console.log('CrossRef title search result did not match well enough')
+    if (sources.crossref) {
+      try {
+        const crossrefTitleResult = await CrossRefService.searchByTitle(possibleTitle)
+        if (crossrefTitleResult && this.isGoodMatch(crossrefTitleResult, possibleTitle)) {
+          console.log('CrossRef title search match')
+          if (sources.openalex) {
+            return await OpenAlexService.enrich(crossrefTitleResult, crossrefEmail)
+          }
+          return crossrefTitleResult
+        } else if (crossrefTitleResult) {
+          console.log('CrossRef title search result did not match well enough')
+        }
+      } catch (err) {
+        console.warn('CrossRef title search failed:', err.message)
+        errors.push({ source: 'crossref_title', error: err.message })
       }
-    } catch (err) {
-      console.warn('CrossRef title search failed:', err.message)
     }
 
     // Try Semantic Scholar (may fail due to CORS in browser)
-    try {
-      const ssResult = await SemanticScholarService.search(possibleTitle)
-      if (ssResult) {
-        console.log('Semantic Scholar match found')
-        return ssResult
+    if (sources.semantic_scholar) {
+      try {
+        const ssResult = await SemanticScholarService.search(possibleTitle)
+        if (ssResult) {
+          console.log('Semantic Scholar match found')
+          if (sources.openalex) {
+            return await OpenAlexService.enrich(ssResult, crossrefEmail)
+          }
+          return ssResult
+        }
+      } catch (err) {
+        console.warn('Semantic Scholar search failed (likely CORS):', err.message)
+        errors.push({ source: 'semantic_scholar', error: err.message })
       }
-    } catch (err) {
-      console.warn('Semantic Scholar search failed (likely CORS):', err.message)
     }
 
-    // Step 4: Return empty template for manual entry
+    // Try OpenAlex direct search as last resort
+    if (sources.openalex) {
+      try {
+        const openAlexResult = await OpenAlexService.searchByTitle(possibleTitle, crossrefEmail)
+        if (openAlexResult && openAlexResult.title) {
+          console.log('OpenAlex direct search match found')
+          return openAlexResult
+        }
+      } catch (err) {
+        console.warn('OpenAlex direct search failed:', err.message)
+        errors.push({ source: 'openalex', error: err.message })
+      }
+    }
+
+    // Step 5: Return empty template for manual entry
     console.log('No metadata found, returning manual template')
-    return this.createManualTemplate(filename, possibleTitle)
+    const template = this.createManualTemplate(filename, possibleTitle)
+    template.extraction_errors = errors
+    return template
+  },
+
+  /**
+   * Merge metadata from two sources, preferring higher confidence values
+   */
+  mergeMetadata(primary, secondary, source) {
+    const merged = { ...primary }
+
+    // Merge fields where secondary has higher confidence or primary is missing
+    const fieldsToMerge = ['doi', 'journal', 'volume', 'issue', 'pages', 'year', 'abstract', 'url']
+
+    for (const field of fieldsToMerge) {
+      const primaryConf = primary.extraction_confidence?.[field] || 0
+      const secondaryConf = secondary.extraction_confidence?.[field] || 0
+
+      if (!primary[field] || (secondaryConf > primaryConf && secondary[field])) {
+        merged[field] = secondary[field]
+        if (merged.extraction_confidence) {
+          merged.extraction_confidence[field] = secondaryConf
+        }
+      }
+    }
+
+    // Use URL from secondary if we got DOI from there
+    if (merged.doi && !merged.url) {
+      merged.url = `https://doi.org/${merged.doi}`
+    }
+
+    // Merge keywords
+    const allKeywords = new Set([
+      ...(primary.keywords || []),
+      ...(secondary.keywords || [])
+    ])
+    merged.keywords = Array.from(allKeywords).slice(0, 10)
+
+    merged.extraction_source = source
+    return merged
   },
 
   detectDOI(text) {

@@ -1,8 +1,10 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import { Spinner } from '../ui'
 import { MetadataExtractor } from '../../services/metadata/MetadataExtractor'
 import { aiService } from '../../services/ai/AIService'
+import { settingsService } from '../../services/settings/SettingsService'
+import { useStorageStore } from '../../store/storageStore'
 import MetadataModal from './MetadataModal'
 import styles from './UploadZone.module.css'
 
@@ -23,10 +25,28 @@ export default function UploadZone({
   const [error, setError] = useState(null)
   const [file, setFile] = useState(null)
   const [extractedText, setExtractedText] = useState('')
+  const [pdfBuffer, setPdfBuffer] = useState(null)
   const [metadata, setMetadata] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [settings, setSettings] = useState(null)
 
   const inputRef = useRef(null)
+  const adapter = useStorageStore((s) => s.adapter)
+  const isDemoMode = useStorageStore((s) => s.isDemoMode)
+
+  // Load settings on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const { remote } = await settingsService.load(isDemoMode ? null : adapter)
+        setSettings(remote)
+      } catch (error) {
+        console.error('Failed to load settings:', error)
+        setSettings(settingsService.defaults())
+      }
+    }
+    loadSettings()
+  }, [adapter, isDemoMode])
 
   const handleDragOver = useCallback((e) => {
     e.preventDefault()
@@ -84,6 +104,7 @@ export default function UploadZone({
       // Step 1: Read file
       setProcessingStatus('Reading PDF...')
       const arrayBuffer = await selectedFile.arrayBuffer()
+      setPdfBuffer(arrayBuffer)
 
       // Step 2: Extract text
       setProcessingStatus('Extracting text...')
@@ -97,14 +118,21 @@ export default function UploadZone({
       const isAIAvailable = await aiService.checkAvailability()
       const aiServiceForExtraction = isAIAvailable ? aiService : null
 
-      if (isAIAvailable) {
+      // Show appropriate status based on available methods
+      const hasGROBID = settings?.global?.metadata_sources?.grobid !== false
+      if (hasGROBID) {
+        setProcessingStatus('Looking up metadata (GROBID + API)...')
+      } else if (isAIAvailable) {
         setProcessingStatus('Looking up metadata (AI available)...')
       }
 
+      // Pass PDF buffer for GROBID and settings for user preferences
       const extractedMetadata = await MetadataExtractor.extractMetadata(
         text,
         selectedFile.name,
-        aiServiceForExtraction
+        aiServiceForExtraction,
+        arrayBuffer,  // Pass PDF buffer for GROBID
+        settings      // Pass user settings
       )
 
       setMetadata(extractedMetadata)
