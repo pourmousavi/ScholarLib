@@ -11,6 +11,22 @@ function generateState() {
   return Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+function generateCodeVerifier() {
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  return Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function generateCodeChallenge(verifier) {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(verifier)
+  const digest = await crypto.subtle.digest('SHA-256', data)
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+}
+
 export class DropboxAdapter {
   constructor() {
     this.rootPath = '/ScholarLib'
@@ -136,24 +152,35 @@ export class DropboxAdapter {
       )
     }
 
+    const verifier = generateCodeVerifier()
+    sessionStorage.setItem('pkce_verifier', verifier)
     const state = generateState()
     sessionStorage.setItem('oauth_state', state)
 
-    const params = new URLSearchParams({
-      client_id: appKey,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      token_access_type: 'offline',
-      state: state,
-    })
+    generateCodeChallenge(verifier).then((challenge) => {
+      const params = new URLSearchParams({
+        client_id: appKey,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        token_access_type: 'offline',
+        state: state,
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+      })
 
-    window.location.href = `${DROPBOX_AUTH_URL}?${params}`
+      window.location.href = `${DROPBOX_AUTH_URL}?${params}`
+    })
   }
 
   async handleCallback(code, state) {
     const savedState = sessionStorage.getItem('oauth_state')
     if (state && state !== savedState) {
       throw new StorageError(STORAGE_ERRORS.NOT_CONNECTED, 'OAuth state mismatch')
+    }
+
+    const verifier = sessionStorage.getItem('pkce_verifier')
+    if (!verifier) {
+      throw new StorageError(STORAGE_ERRORS.NOT_CONNECTED, 'PKCE verifier not found')
     }
 
     const appKey = import.meta.env.VITE_DROPBOX_APP_KEY
@@ -168,6 +195,7 @@ export class DropboxAdapter {
         grant_type: 'authorization_code',
         client_id: appKey,
         redirect_uri: redirectUri,
+        code_verifier: verifier,
       }),
     })
 
@@ -183,6 +211,7 @@ export class DropboxAdapter {
     this._storeTokens(access_token, refresh_token, expires_in || 14400)
 
     sessionStorage.removeItem('oauth_state')
+    sessionStorage.removeItem('pkce_verifier')
 
     // Ensure root folder exists
     await this._ensureRootFolder()
