@@ -4,6 +4,7 @@ import { useStorageStore } from '../../store/storageStore'
 import { useIndexStore } from '../../store/indexStore'
 import { settingsService } from '../../services/settings/SettingsService'
 import { ollamaService } from '../../services/ai/OllamaService'
+import { webllmService } from '../../services/ai/WebLLMService'
 import { claudeService } from '../../services/ai/ClaudeService'
 import { openaiService } from '../../services/ai/OpenAIService'
 import { useToast } from '../../hooks/useToast'
@@ -33,6 +34,14 @@ export default function SettingsModal({ onClose }) {
   const [testingOllama, setTestingOllama] = useState(false)
   const [testingClaude, setTestingClaude] = useState(false)
   const [testingOpenai, setTestingOpenai] = useState(false)
+
+  // WebLLM state
+  const [webllmSupported, setWebllmSupported] = useState(false)
+  const [webllmReady, setWebllmReady] = useState(false)
+  const [webllmDownloading, setWebllmDownloading] = useState(false)
+  const [webllmProgress, setWebllmProgress] = useState(0)
+  const [webllmProgressText, setWebllmProgressText] = useState('')
+  const [selectedWebllmModel, setSelectedWebllmModel] = useState('Llama-3.2-3B-Instruct-q4f32_1-MLC')
 
   const provider = useAIStore((s) => s.provider)
   const model = useAIStore((s) => s.model)
@@ -70,7 +79,37 @@ export default function SettingsModal({ onClose }) {
 
     loadSettings()
     checkOllamaStatus()
+    checkWebLLMStatus()
   }, [adapter, isDemoMode])
+
+  const checkWebLLMStatus = () => {
+    setWebllmSupported(webllmService.isSupported())
+    setWebllmReady(webllmService.isReady())
+  }
+
+  const handleDownloadWebLLM = async () => {
+    if (webllmDownloading) return
+
+    setWebllmDownloading(true)
+    setWebllmProgress(0)
+    setWebllmProgressText('Starting download...')
+
+    try {
+      await webllmService.initialize(selectedWebllmModel, (progress) => {
+        setWebllmProgress(progress.progress * 100)
+        setWebllmProgressText(progress.text || `${Math.round(progress.progress * 100)}%`)
+      })
+
+      setWebllmReady(true)
+      setAvailable(true)
+      showToast({ message: 'WebLLM model ready!', type: 'success' })
+    } catch (error) {
+      console.error('WebLLM download failed:', error)
+      showToast({ message: error.message || 'Failed to download model', type: 'error' })
+    } finally {
+      setWebllmDownloading(false)
+    }
+  }
 
   const checkOllamaStatus = async () => {
     const available = await ollamaService.isAvailable()
@@ -154,6 +193,8 @@ export default function SettingsModal({ onClose }) {
     // Update availability
     if (newProvider === 'ollama') {
       setAvailable(ollamaStatus.available)
+    } else if (newProvider === 'webllm') {
+      setAvailable(webllmReady)
     } else if (newProvider === 'claude') {
       setAvailable(claudeService.isConfigured())
     } else if (newProvider === 'openai') {
@@ -341,6 +382,78 @@ export default function SettingsModal({ onClose }) {
                 Download Ollama
               </a>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* WebLLM Config */}
+      {provider === 'webllm' && (
+        <div className={styles.providerConfig}>
+          {!webllmSupported ? (
+            <div className={styles.hint} style={{ color: 'var(--color-error)' }}>
+              WebGPU is not supported in this browser.
+              <br />
+              Try Chrome 113+, Edge 113+, or Safari 18+.
+            </div>
+          ) : (
+            <>
+              <div className={styles.statusRow}>
+                <span className={`${styles.statusDot} ${webllmReady ? styles.available : ''}`} />
+                <span>{webllmReady ? 'Model loaded and ready' : 'Model not loaded'}</span>
+              </div>
+
+              {!webllmReady && !webllmDownloading && (
+                <>
+                  <div className={styles.field}>
+                    <label>Model</label>
+                    <select
+                      value={selectedWebllmModel}
+                      onChange={(e) => setSelectedWebllmModel(e.target.value)}
+                    >
+                      {webllmService.getAvailableModels().map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({m.size}) - {m.description}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    className={styles.primaryBtn}
+                    onClick={handleDownloadWebLLM}
+                    style={{ marginTop: 12 }}
+                  >
+                    Download Model
+                  </button>
+
+                  <div className={styles.hint}>
+                    Model will be downloaded once and cached in your browser.
+                    <br />
+                    Requires ~{webllmService.getAvailableModels().find(m => m.id === selectedWebllmModel)?.size || '2GB'} of storage.
+                  </div>
+                </>
+              )}
+
+              {webllmDownloading && (
+                <div className={styles.progressContainer}>
+                  <div className={styles.progressBar}>
+                    <div
+                      className={styles.progressFill}
+                      style={{ width: `${webllmProgress}%` }}
+                    />
+                  </div>
+                  <span className={styles.progressText}>{webllmProgressText}</span>
+                </div>
+              )}
+
+              {webllmReady && (
+                <div className={styles.hint} style={{ color: 'var(--color-success)' }}>
+                  WebLLM is ready! AI features will run entirely in your browser.
+                  <br />
+                  No data is sent to external servers.
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
