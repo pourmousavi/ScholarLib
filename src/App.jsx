@@ -43,12 +43,9 @@ function AppContent() {
   // Track if we've already processed the OAuth callback
   const oauthProcessed = useRef(false)
 
-  // Handle OAuth callback
+  // Combined initialization and OAuth callback handling
   useEffect(() => {
-    const handleOAuthCallback = async () => {
-      // Prevent duplicate processing
-      if (oauthProcessed.current) return
-
+    const initializeApp = async () => {
       const url = new URL(window.location.href)
       const code = url.searchParams.get('code')
       const state = url.searchParams.get('state')
@@ -57,7 +54,8 @@ function AppContent() {
       const isBoxCallback = url.pathname.includes('/auth/box') || url.pathname.endsWith('/ScholarLib/')
       const isDropboxCallback = url.pathname.includes('/auth/dropbox')
 
-      if (code && (isBoxCallback || isDropboxCallback)) {
+      // Handle OAuth callback FIRST if present
+      if (code && (isBoxCallback || isDropboxCallback) && !oauthProcessed.current) {
         // Mark as processed and clear URL immediately to prevent re-use
         oauthProcessed.current = true
         window.history.replaceState({}, '', url.pathname)
@@ -67,21 +65,19 @@ function AppContent() {
           showToast({ message: 'Connected to storage successfully', type: 'success' })
         } catch (error) {
           showToast({ message: error.message || 'Failed to connect', type: 'error' })
+          // Still initialize even if callback failed
+          await initialize()
         }
+      } else {
+        // No OAuth callback, just initialize normally
+        await initialize()
       }
-    }
 
-    handleOAuthCallback()
-  }, [handleCallback, showToast])
-
-  // Initialize storage on mount
-  useEffect(() => {
-    const init = async () => {
-      await initialize()
       setIsInitializing(false)
     }
-    init()
-  }, [initialize])
+
+    initializeApp()
+  }, [handleCallback, showToast, initialize])
 
   // Load library when connected
   useEffect(() => {
