@@ -8,16 +8,16 @@ compatibility_date = "2024-01-01"
 
 [[kv_namespaces]]
 binding = "SHARES"
-id = "PASTE_SHARES_KV_ID_HERE"
+id = "125a40ad1ec34448ae2d724b1b17dcc2"
 
 [[kv_namespaces]]
 binding = "ACCESS"
-id = "PASTE_ACCESS_KV_ID_HERE"
+id = "e73acc4a444f4b77a544fc3bb9615a42"
 
 [[kv_namespaces]]
 binding = "LOGS"
-id = "PASTE_LOGS_KV_ID_HERE"
+id = "9204f5d5d3a145f3b92aa17cba901d5c"
 
 [vars]
 # Update with your actual domains
-ALLOWED_ORIGINS = "https://pourmousavi.github.io,http://localhost:5173,https://pourmousavi.com"
+ALLOWED_ORIGINS = "https://alipourmousavi.com,http://localhost:5173"
