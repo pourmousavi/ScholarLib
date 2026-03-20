@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import AppShell from './components/layout/AppShell'
 import StorageSetup from './components/layout/StorageSetup'
 import { ToastContainer, Spinner, OfflineBanner, IOSInstallPrompt } from './components/ui'
@@ -40,9 +40,15 @@ function AppContent() {
   const useMockData = useLibraryStore((s) => s.useMockData)
   const { showToast } = useToast()
 
+  // Track if we've already processed the OAuth callback
+  const oauthProcessed = useRef(false)
+
   // Handle OAuth callback
   useEffect(() => {
     const handleOAuthCallback = async () => {
+      // Prevent duplicate processing
+      if (oauthProcessed.current) return
+
       const url = new URL(window.location.href)
       const code = url.searchParams.get('code')
       const state = url.searchParams.get('state')
@@ -52,14 +58,15 @@ function AppContent() {
       const isDropboxCallback = url.pathname.includes('/auth/dropbox')
 
       if (code && (isBoxCallback || isDropboxCallback)) {
+        // Mark as processed and clear URL immediately to prevent re-use
+        oauthProcessed.current = true
+        window.history.replaceState({}, '', url.pathname)
+
         try {
           await handleCallback(code, state)
-          // Clear URL params
-          window.history.replaceState({}, '', url.pathname)
           showToast({ message: 'Connected to storage successfully', type: 'success' })
         } catch (error) {
           showToast({ message: error.message || 'Failed to connect', type: 'error' })
-          window.history.replaceState({}, '', url.pathname)
         }
       }
     }
