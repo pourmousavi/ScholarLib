@@ -35,8 +35,16 @@ export const MetadataExtractor = {
     const grobidEndpoint = settings?.global?.grobid_endpoint || 'huggingface'
     const crossrefEmail = settings?.global?.crossref_email || ''
 
-    // Debug: Log first 500 chars to help diagnose extraction issues
+    // Debug: Log extraction parameters and first 500 chars
     console.log('PDF text preview (first 500 chars):', firstPages.slice(0, 500))
+    console.log('MetadataExtractor params:', {
+      hasPdfBuffer: !!pdfBuffer,
+      pdfBufferType: pdfBuffer?.constructor?.name,
+      pdfBufferSize: pdfBuffer?.byteLength,
+      hasSettings: !!settings,
+      sources,
+      grobidEndpoint
+    })
 
     // Extract possible title early for validation
     const possibleTitle = this.extractPossibleTitle(firstPages, filename)
@@ -76,6 +84,7 @@ export const MetadataExtractor = {
     }
 
     // Step 2: Try GROBID ML extraction (PRIMARY method when no DOI)
+    console.log('GROBID check:', { hasPdfBuffer: !!pdfBuffer, grobidEnabled: sources.grobid })
     if (pdfBuffer && sources.grobid) {
       console.log('Attempting GROBID extraction (ML-based, 90%+ accuracy)')
       try {
