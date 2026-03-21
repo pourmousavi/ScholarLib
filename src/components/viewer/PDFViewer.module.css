@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #141820;
+  background: var(--bg-surface);
 }
 
 .container {
@@ -49,28 +49,28 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  background: linear-gradient(180deg, #0d1017 0%, #141820 100%);
+  background: var(--bg-surface);
 }
 
 .placeholderIcon {
-  width: 80px;
-  height: 100px;
+  width: 72px;
+  height: 90px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px dashed rgba(255, 255, 255, 0.1);
+  background: var(--bg-elevated);
+  border: 2px dashed var(--border-default);
   border-radius: var(--radius-md);
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   letter-spacing: 0.5px;
 }
 
 .placeholderTitle {
   font-family: 'DM Sans', sans-serif;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text-secondary);
   margin-top: var(--space-2);
@@ -81,6 +81,8 @@
   font-size: 13px;
   color: var(--text-muted);
   text-align: center;
+  max-width: 240px;
+  line-height: 1.5;
 }
 
 .loading {
