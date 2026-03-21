@@ -369,8 +369,16 @@ export default function ChatPanel() {
     }
   }
 
-  // Get user initial for avatar
-  const userInitial = 'U'
+  // Get user initial for avatar (from settings or default)
+  const userInitial = (() => {
+    const name = localStorage.getItem('sv_user_name')
+    if (!name) return 'U'
+    const parts = name.trim().split(/\s+/)
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    }
+    return name[0].toUpperCase()
+  })()
 
   // Get display name for current model
   const getModelDisplayName = () => {

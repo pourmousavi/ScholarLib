@@ -7,6 +7,7 @@ import { ollamaService } from '../../services/ai/OllamaService'
 import { webllmService } from '../../services/ai/WebLLMService'
 import { claudeService } from '../../services/ai/ClaudeService'
 import { openaiService } from '../../services/ai/OpenAIService'
+import { settingsService } from '../../services/settings/SettingsService'
 import FolderTree from '../library/FolderTree'
 import styles from './Sidebar.module.css'
 
@@ -185,7 +186,9 @@ export default function Sidebar() {
         <div className={styles.logoIcon}>S</div>
         <div className={styles.logoText}>
           <span className={styles.appName}>ScholarLib</span>
-          <span className={styles.userName}>Dr. Ali Pourmousavi</span>
+          <span className={styles.userName}>
+            {settingsService.getUserName() || 'Set up your profile'}
+          </span>
         </div>
       </div>
 

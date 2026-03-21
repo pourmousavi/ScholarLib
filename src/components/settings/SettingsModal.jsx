@@ -87,6 +87,10 @@ export default function SettingsModal({ onClose }) {
   const [webllmProgressText, setWebllmProgressText] = useState('')
   const [selectedWebllmModel, setSelectedWebllmModel] = useState('Llama-3.2-3B-Instruct-q4f32_1-MLC')
 
+  // Account state
+  const [userName, setUserName] = useState('')
+  const [userEmail, setUserEmail] = useState('')
+
   const provider = useAIStore((s) => s.provider)
   const model = useAIStore((s) => s.model)
   const setProvider = useAIStore((s) => s.setProvider)
@@ -110,6 +114,10 @@ export default function SettingsModal({ onClose }) {
         const { remote, local } = await settingsService.load(isDemoMode ? null : adapter)
         setSettings(remote)
         setLocalSettings(local)
+
+        // Load user profile
+        setUserName(settingsService.getUserName())
+        setUserEmail(settingsService.getUserEmail())
       } catch (error) {
         console.error('Failed to load settings:', error)
         setSettings(settingsService.defaults())
@@ -778,13 +786,49 @@ export default function SettingsModal({ onClose }) {
     </div>
   )
 
+  const handleSaveProfile = () => {
+    settingsService.setUserName(userName)
+    settingsService.setUserEmail(userEmail)
+    showToast({ message: 'Profile saved', type: 'success' })
+  }
+
   const renderAccountSection = () => (
     <div className={styles.section}>
-      <h3 className={styles.sectionTitle}>Account</h3>
+      <h3 className={styles.sectionTitle}>Profile</h3>
+
+      <div className={styles.fieldGroup}>
+        <label className={styles.label}>Name</label>
+        <input
+          type="text"
+          className={styles.input}
+          value={userName}
+          onChange={(e) => setUserName(e.target.value)}
+          placeholder="Enter your name"
+        />
+        <p className={styles.hint}>Your name will be used in the sidebar and for AI chat initials.</p>
+      </div>
+
+      <div className={styles.fieldGroup}>
+        <label className={styles.label}>Email</label>
+        <input
+          type="email"
+          className={styles.input}
+          value={userEmail}
+          onChange={(e) => setUserEmail(e.target.value)}
+          placeholder="Enter your email"
+        />
+        <p className={styles.hint}>Used for sharing and collaboration features.</p>
+      </div>
+
+      <button className={styles.saveBtn} onClick={handleSaveProfile}>
+        Save Profile
+      </button>
+
+      <h3 className={styles.sectionTitle} style={{ marginTop: 32 }}>Device</h3>
 
       <div className={styles.storageInfo}>
         <div className={styles.storageRow}>
-          <span className={styles.storageLabel}>Device</span>
+          <span className={styles.storageLabel}>Device Type</span>
           <span className={styles.storageValue}>{settingsService.getDeviceName()}</span>
         </div>
         <div className={styles.storageRow}>
@@ -795,9 +839,9 @@ export default function SettingsModal({ onClose }) {
         </div>
       </div>
 
-      <h3 className={styles.sectionTitle} style={{ marginTop: 24 }}>Sharing</h3>
+      <h3 className={styles.sectionTitle} style={{ marginTop: 32 }}>Sharing</h3>
       <p className={styles.hint}>
-        Sharing features will be available in a future update.
+        Share folders with collaborators using their email address. They will receive view or edit access to selected folders.
       </p>
     </div>
   )

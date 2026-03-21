@@ -128,8 +128,10 @@
   flex: 1;
   overflow: hidden;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  contain: inline-size;
 }
 
 .placeholder {

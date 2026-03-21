@@ -153,6 +153,52 @@ class SettingsService {
   getAIModel() {
     return localStorage.getItem('sv_ai_model') || 'llama3.2'
   }
+
+  /**
+   * Get user name from localStorage
+   * @returns {string}
+   */
+  getUserName() {
+    return localStorage.getItem('sv_user_name') || ''
+  }
+
+  /**
+   * Set user name in localStorage
+   * @param {string} name
+   */
+  setUserName(name) {
+    localStorage.setItem('sv_user_name', name)
+  }
+
+  /**
+   * Get user email from localStorage
+   * @returns {string}
+   */
+  getUserEmail() {
+    return localStorage.getItem('sv_user_email') || ''
+  }
+
+  /**
+   * Set user email in localStorage
+   * @param {string} email
+   */
+  setUserEmail(email) {
+    localStorage.setItem('sv_user_email', email)
+  }
+
+  /**
+   * Get user initials (for avatar)
+   * @returns {string}
+   */
+  getUserInitials() {
+    const name = this.getUserName()
+    if (!name) return 'U'
+    const parts = name.trim().split(/\s+/)
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    }
+    return name[0].toUpperCase()
+  }
 }
 
 export const settingsService = new SettingsService()
