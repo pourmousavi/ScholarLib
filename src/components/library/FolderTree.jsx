@@ -2,7 +2,7 @@ import { useState, memo } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useUIStore } from '../../store/uiStore'
 import { useToast } from '../../hooks/useToast'
-import { ContextMenu } from '../ui'
+import { ContextMenu, ShareIcon, LinkIcon, UsersIcon, RenameIcon, UnshareIcon, FolderMinusIcon } from '../ui'
 import styles from './FolderTree.module.css'
 
 export default function FolderTree() {
@@ -103,34 +103,34 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
   const contextMenuItems = [
     {
       label: 'Share folder...',
-      icon: '@',
+      icon: <ShareIcon />,
       onClick: handleShareFolder
     },
     {
       label: 'Copy sharing link',
-      icon: '#',
+      icon: <LinkIcon />,
       onClick: handleCopySharingLink
     },
     {
       label: 'View who has access',
-      icon: '*',
+      icon: <UsersIcon />,
       onClick: handleViewAccess
     },
     { separator: true },
     {
       label: 'Rename folder...',
-      icon: '/',
+      icon: <RenameIcon />,
       onClick: handleRenameFolder
     },
     {
       label: 'Unshare all',
-      icon: 'x',
+      icon: <UnshareIcon />,
       onClick: handleUnshareAll
     },
     { separator: true },
     {
       label: 'Delete folder...',
-      icon: '-',
+      icon: <FolderMinusIcon />,
       onClick: handleDeleteFolder,
       danger: true,
       disabled: docCount > 0

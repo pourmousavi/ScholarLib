@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAIStore } from '../../store/aiStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
+import { useUIStore } from '../../store/uiStore'
 import { aiService } from '../../services/ai/AIService'
 import { ollamaService } from '../../services/ai/OllamaService'
 import { claudeService } from '../../services/ai/ClaudeService'
@@ -9,7 +10,7 @@ import { openaiService } from '../../services/ai/OpenAIService'
 import { indexService } from '../../services/indexing/IndexService'
 import { chatHistoryService } from '../../services/ai/ChatHistoryService'
 import { LibraryService } from '../../services/library/LibraryService'
-import { Btn } from '../ui'
+import { Btn, HistoryIcon, PlusIcon } from '../ui'
 import ScopeSelector from './ScopeSelector'
 import styles from './ChatPanel.module.css'
 
@@ -111,6 +112,8 @@ export default function ChatPanel() {
 
   const adapter = useStorageStore((s) => s.adapter)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
+
+  const setShowModal = useUIStore((s) => s.setShowModal)
 
   const isCloudProvider = provider === 'claude' || provider === 'openai'
   const availableModels = aiService.getAvailableModels()
@@ -520,13 +523,20 @@ export default function ChatPanel() {
       <div className={styles.header}>
         <ScopeSelector />
         <div className={styles.headerActions}>
+          <button
+            className={styles.historyBtn}
+            onClick={() => setShowModal('history')}
+            title="AI chat history"
+          >
+            <HistoryIcon />
+          </button>
           {messages.length > 0 && (
             <button
               className={styles.newChatBtn}
               onClick={startNewConversation}
               title="New conversation"
             >
-              +
+              <PlusIcon />
             </button>
           )}
           {renderStatus()}

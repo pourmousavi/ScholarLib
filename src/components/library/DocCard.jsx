@@ -2,7 +2,7 @@ import { useState, memo } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useUIStore } from '../../store/uiStore'
 import { useToast } from '../../hooks/useToast'
-import { StatusDot, Tag, ContextMenu } from '../ui'
+import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon } from '../ui'
 import styles from './DocCard.module.css'
 
 const DocCard = memo(function DocCard({ doc }) {
@@ -90,34 +90,34 @@ const DocCard = memo(function DocCard({ doc }) {
   const contextMenuItems = [
     {
       label: 'Edit metadata...',
-      icon: '/',
+      icon: <EditIcon />,
       onClick: handleEditMetadata
     },
     {
       label: 'Move to folder...',
-      icon: '>',
+      icon: <MoveIcon />,
       onClick: handleMoveToFolder
     },
     {
       label: 'Duplicate',
-      icon: '+',
+      icon: <DuplicateIcon />,
       onClick: handleDuplicate
     },
     { separator: true },
     {
       label: isUnread ? 'Mark as read' : 'Mark as unread',
-      icon: isUnread ? 'v' : 'o',
+      icon: isUnread ? <CheckIcon /> : <CircleIcon />,
       onClick: handleToggleRead
     },
     {
       label: isStarred ? 'Remove star' : 'Add star',
-      icon: '*',
+      icon: isStarred ? <StarFilledIcon /> : <StarIcon />,
       onClick: handleToggleStar
     },
     { separator: true },
     {
       label: 'Delete...',
-      icon: 'x',
+      icon: <TrashIcon />,
       onClick: handleDelete,
       danger: true
     }

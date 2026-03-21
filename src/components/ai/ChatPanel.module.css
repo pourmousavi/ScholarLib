@@ -43,6 +43,32 @@
   color: var(--accent);
 }
 
+.historyBtn {
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.historyBtn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.historyBtn svg,
+.newChatBtn svg {
+  width: 14px;
+  height: 14px;
+}
+
 .conversationTitle {
   padding: var(--space-1) var(--space-4);
   font-family: 'DM Sans', sans-serif;
