@@ -6,6 +6,7 @@ import { chatHistoryService } from '../../services/ai/ChatHistoryService'
 import { chatExporter } from '../../services/ai/ChatExporter'
 import { useToast } from '../../hooks/useToast'
 import Modal from '../ui/Modal'
+import { CloseIcon, DownloadIcon, TrashIcon } from '../ui'
 import styles from './ChatHistoryModal.module.css'
 
 const EXPORT_FORMATS = [
@@ -161,7 +162,9 @@ export default function ChatHistoryModal({ onClose, onLoadConversation }) {
         {/* Header */}
         <div className={styles.header}>
           <h2>Chat History</h2>
-          <button className={styles.closeBtn} onClick={onClose}>x</button>
+          <button className={styles.closeBtn} onClick={onClose}>
+            <CloseIcon />
+          </button>
         </div>
 
         {/* Scope filter */}
@@ -240,8 +243,9 @@ export default function ChatHistoryModal({ onClose, onLoadConversation }) {
                         e.stopPropagation()
                         setExportMenuOpen(exportMenuOpen === conv.id ? null : conv.id)
                       }}
+                      title="Export conversation"
                     >
-                      v
+                      <DownloadIcon />
                     </button>
                     {exportMenuOpen === conv.id && (
                       <div className={styles.exportMenu}>
@@ -266,8 +270,9 @@ export default function ChatHistoryModal({ onClose, onLoadConversation }) {
                       e.stopPropagation()
                       handleDelete(conv.id)
                     }}
+                    title="Delete conversation"
                   >
-                    x
+                    <TrashIcon />
                   </button>
                 </div>
               </div>
