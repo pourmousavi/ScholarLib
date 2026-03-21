@@ -74,6 +74,32 @@ export default function DocList() {
     current = current.parent_id ? folders.find(f => f.id === current.parent_id) : null
   }
 
+  // Index a single document
+  const indexDocument = async (doc) => {
+    if (!adapter || !isConnected) {
+      console.log('Cannot index: storage not connected')
+      return false
+    }
+
+    startIndexing(doc.id)
+
+    try {
+      // Get the actual PDF URL from storage
+      const pdfURL = await adapter.getFileStreamURL(doc.box_path)
+
+      await indexService.indexDocument(doc.id, pdfURL, adapter, (progress) => {
+        setProgress(progress)
+      })
+
+      completeIndexing(doc.id)
+      return true
+    } catch (error) {
+      console.error('Indexing failed:', error)
+      failIndexing(doc.id, error)
+      return false
+    }
+  }
+
   const handleIndexNow = async () => {
     if (!adapter || !isConnected || isDemoMode) {
       showToast({ message: 'Storage connection required for indexing', type: 'warning' })
@@ -97,28 +123,17 @@ export default function DocList() {
 
     // Index first pending document
     const doc = pendingDocs[0]
-    startIndexing(doc.id)
+    const success = await indexDocument(doc)
 
-    try {
-      // For now, use a test PDF URL since we're in demo mode
-      // In production, this would be the Box streaming URL
-      const pdfURL = 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf'
-
-      await indexService.indexDocument(doc.id, pdfURL, adapter, (progress) => {
-        setProgress(progress)
-      })
-
-      completeIndexing(doc.id)
+    if (success) {
       showToast({ message: `Indexed "${doc.metadata?.title || doc.filename}"`, type: 'success' })
 
       // If more pending, show message
       if (pendingDocs.length > 1) {
         showToast({ message: `${pendingDocs.length - 1} more documents pending`, type: 'info' })
       }
-    } catch (error) {
-      console.error('Indexing failed:', error)
-      failIndexing(doc.id, error)
-      showToast({ message: error.message || 'Indexing failed', type: 'error' })
+    } else {
+      showToast({ message: 'Indexing failed', type: 'error' })
     }
   }
 
@@ -153,6 +168,15 @@ export default function DocList() {
 
       showToast({ message: `Added "${metadata.title || file.name}"`, type: 'success' })
       setShowUpload(false)
+
+      // Auto-index the document for AI chat
+      if (!isDemoMode) {
+        showToast({ message: 'Indexing for AI chat...', type: 'info' })
+        const success = await indexDocument(doc)
+        if (success) {
+          showToast({ message: 'Document ready for AI chat', type: 'success' })
+        }
+      }
     } catch (error) {
       console.error('Upload failed:', error)
       showToast({ message: error.message || 'Failed to upload document', type: 'error' })

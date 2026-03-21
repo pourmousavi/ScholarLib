@@ -8,7 +8,12 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(node scripts/generate-icons.mjs:*)",
+      "Bash(git reset:*)",
+      "Bash(grep:*)",
+      "WebSearch",
+      "Bash(git restore:*)"
     ]
   }
 }

@@ -1,43 +1,91 @@
 /**
  * EmbeddingService - Generate embeddings for text chunks
  *
- * Routes to appropriate embedding provider based on AI settings
+ * Routes to appropriate embedding provider:
+ * 1. Ollama (if available) - fastest for local
+ * 2. Browser transformers.js - works everywhere, no server needed
  */
 import { useAIStore } from '../../store/aiStore'
 import { ollamaService } from '../ai/OllamaService'
+import { pipeline, env } from '@xenova/transformers'
+
+// Configure transformers.js to use browser cache
+env.useBrowserCache = true
+env.allowLocalModels = false
 
 class EmbeddingService {
   constructor() {
-    this.dimensions = 768 // nomic-embed-text dimensions
-    this.modelName = 'nomic-embed-text'
+    this.dimensions = 384 // all-MiniLM-L6-v2 dimensions
+    this.modelName = 'Xenova/all-MiniLM-L6-v2'
+    this.extractor = null
+    this.isInitializing = false
+    this.initPromise = null
+  }
+
+  /**
+   * Initialize the browser embedding model
+   * @param {Function} onProgress - Progress callback
+   */
+  async initBrowserModel(onProgress) {
+    if (this.extractor) return this.extractor
+
+    if (this.isInitializing) {
+      return this.initPromise
+    }
+
+    this.isInitializing = true
+    this.initPromise = (async () => {
+      try {
+        console.log('Loading browser embedding model...')
+        this.extractor = await pipeline('feature-extraction', this.modelName, {
+          progress_callback: (progress) => {
+            if (progress.status === 'progress') {
+              onProgress?.({
+                progress: progress.progress / 100,
+                text: `Loading embedding model: ${Math.round(progress.progress)}%`
+              })
+            }
+          }
+        })
+        console.log('Browser embedding model loaded')
+        return this.extractor
+      } catch (error) {
+        console.error('Failed to load browser embedding model:', error)
+        throw error
+      } finally {
+        this.isInitializing = false
+      }
+    })()
+
+    return this.initPromise
   }
 
   /**
    * Generate embedding for text
    * @param {string} text - Text to embed
+   * @param {Function} onProgress - Progress callback for model loading
    * @returns {Promise<number[]>} Embedding vector
    */
-  async embed(text) {
+  async embed(text, onProgress) {
     const { provider } = useAIStore.getState()
 
     // Truncate very long text (embedding models have limits)
     const truncatedText = text.slice(0, 8000)
 
+    // Try Ollama first if it's the provider
     if (provider === 'ollama') {
-      return await this.embedWithOllama(truncatedText)
+      try {
+        const ollamaAvailable = await ollamaService.isAvailable()
+        if (ollamaAvailable) {
+          return await this.embedWithOllama(truncatedText)
+        }
+      } catch (error) {
+        console.log('Ollama embedding failed, falling back to browser:', error.message)
+      }
     }
 
-    // For cloud providers and WebLLM, fall back to Ollama if available
-    // In production, we'd use OpenAI's text-embedding-ada-002 or similar
-    const ollamaAvailable = await ollamaService.isAvailable()
-    if (ollamaAvailable) {
-      return await this.embedWithOllama(truncatedText)
-    }
-
-    throw {
-      code: 'EMBEDDING_NOT_AVAILABLE',
-      message: 'Ollama is required for generating embeddings. Please start Ollama with: ollama serve'
-    }
+    // Use browser-based embeddings (works with WebLLM and as fallback)
+    return await this.embedWithBrowser(truncatedText, onProgress)
   }
 
   /**
@@ -47,13 +95,15 @@ class EmbeddingService {
    */
   async embedWithOllama(text) {
     try {
-      const embedding = await ollamaService.embed(text, this.modelName)
+      const embedding = await ollamaService.embed(text, 'nomic-embed-text')
       if (!embedding || !Array.isArray(embedding)) {
         throw new Error('Invalid embedding response')
       }
+      // Update dimensions if different
+      this.dimensions = embedding.length
       return embedding
     } catch (error) {
-      // If nomic-embed-text not available, try to pull it
+      // If nomic-embed-text not available, throw with helpful message
       if (error.message?.includes('not found')) {
         throw {
           code: 'EMBEDDING_MODEL_NOT_FOUND',
@@ -62,6 +112,28 @@ class EmbeddingService {
       }
       throw error
     }
+  }
+
+  /**
+   * Generate embedding using browser transformers.js
+   * @param {string} text
+   * @param {Function} onProgress
+   * @returns {Promise<number[]>}
+   */
+  async embedWithBrowser(text, onProgress) {
+    // Initialize model if needed
+    const extractor = await this.initBrowserModel(onProgress)
+
+    // Generate embedding
+    const output = await extractor(text, {
+      pooling: 'mean',
+      normalize: true
+    })
+
+    // Convert to array
+    const embedding = Array.from(output.data)
+    this.dimensions = embedding.length
+    return embedding
   }
 
   /**
@@ -119,6 +191,14 @@ class EmbeddingService {
    */
   getDimensions() {
     return this.dimensions
+  }
+
+  /**
+   * Check if browser embedding model is loaded
+   * @returns {boolean}
+   */
+  isBrowserModelLoaded() {
+    return this.extractor !== null
   }
 }
 
