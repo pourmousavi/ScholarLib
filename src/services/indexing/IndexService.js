@@ -252,16 +252,32 @@ class IndexService {
     }
 
     // Calculate similarity for each relevant chunk
-    const results = relevantIndices
-      .map(i => {
-        const score = embeddingService.cosineSimilarity(queryEmbedding, indexData[i])
-        return { index: i, score }
-      })
-      .filter(r => r.score > 0.3) // Minimum relevance threshold
+    const allScores = relevantIndices.map(i => {
+      const score = embeddingService.cosineSimilarity(queryEmbedding, indexData[i])
+      return { index: i, score }
+    })
+
+    // Log ALL scores before filtering to debug
+    const sortedScores = [...allScores].sort((a, b) => b.score - a.score)
+    console.log('All similarity scores (top 10 before filter):', sortedScores.slice(0, 10).map(r => ({
+      index: r.index,
+      score: r.score,
+      scoreStr: typeof r.score === 'number' ? r.score.toFixed(4) : r.score
+    })))
+
+    // Check if scores are valid numbers
+    const invalidScores = allScores.filter(r => isNaN(r.score) || r.score === null || r.score === undefined)
+    if (invalidScores.length > 0) {
+      console.error('Invalid scores found:', invalidScores.length)
+    }
+
+    // Use a lower threshold for now to debug
+    const results = allScores
+      .filter(r => r.score > 0.1) // Lowered threshold for debugging
       .sort((a, b) => b.score - a.score)
       .slice(0, topK)
 
-    console.log('Similarity scores (top 5):', results.slice(0, 5).map(r => r.score.toFixed(3)))
+    console.log('Results after filtering (threshold 0.1):', results.length)
 
     // Build result objects with text and citations
     const documents = useLibraryStore.getState().documents
