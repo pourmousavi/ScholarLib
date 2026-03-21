@@ -1,12 +1,16 @@
 import { create } from 'zustand'
 
+// Read initial values from localStorage
+const getInitialProvider = () => localStorage.getItem('sv_ai_provider') || 'ollama'
+const getInitialModel = () => localStorage.getItem('sv_ai_model') || 'llama3.2'
+
 /**
  * AI Store - Manages AI provider state and chat
  */
 export const useAIStore = create((set, get) => ({
-  // Provider configuration
-  provider: 'ollama', // ollama | webllm | claude | openai
-  model: 'llama3.2',
+  // Provider configuration - initialize from localStorage
+  provider: getInitialProvider(),
+  model: getInitialModel(),
   isAvailable: false,
   isChecking: true,
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAIStore } from '../../store/aiStore'
+import { useUIStore } from '../../store/uiStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useIndexStore } from '../../store/indexStore'
 import { settingsService } from '../../services/settings/SettingsService'
@@ -53,6 +54,9 @@ export default function SettingsModal({ onClose }) {
   const storageProvider = useStorageStore((s) => s.provider)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
   const disconnect = useStorageStore((s) => s.disconnect)
+
+  const setTheme = useUIStore((s) => s.setTheme)
+  const currentTheme = useUIStore((s) => s.theme)
 
   const { showToast } = useToast()
 
@@ -759,11 +763,15 @@ export default function SettingsModal({ onClose }) {
       <div className={styles.field}>
         <label>Theme</label>
         <select
-          value={settings?.global?.appearance?.theme || 'dark'}
-          onChange={(e) => updateGlobalSetting('appearance.theme', e.target.value)}
+          value={currentTheme}
+          onChange={(e) => {
+            const newTheme = e.target.value
+            setTheme(newTheme)
+            updateGlobalSetting('appearance.theme', newTheme)
+          }}
         >
           <option value="dark">Dark</option>
-          <option value="light">Light (Coming soon)</option>
+          <option value="light">Light</option>
         </select>
       </div>
 
