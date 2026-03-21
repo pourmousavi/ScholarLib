@@ -796,31 +796,29 @@ export default function SettingsModal({ onClose }) {
     <div className={styles.section}>
       <h3 className={styles.sectionTitle}>Profile</h3>
 
-      <div className={styles.fieldGroup}>
-        <label className={styles.label}>Name</label>
+      <div className={styles.field}>
+        <label>Name</label>
         <input
           type="text"
-          className={styles.input}
           value={userName}
           onChange={(e) => setUserName(e.target.value)}
           placeholder="Enter your name"
         />
-        <p className={styles.hint}>Your name will be used in the sidebar and for AI chat initials.</p>
+        <span className={styles.fieldHint}>Your name will be used in the sidebar and for AI chat initials.</span>
       </div>
 
-      <div className={styles.fieldGroup}>
-        <label className={styles.label}>Email</label>
+      <div className={styles.field}>
+        <label>Email</label>
         <input
           type="email"
-          className={styles.input}
           value={userEmail}
           onChange={(e) => setUserEmail(e.target.value)}
           placeholder="Enter your email"
         />
-        <p className={styles.hint}>Used for sharing and collaboration features.</p>
+        <span className={styles.fieldHint}>Used for sharing and collaboration features.</span>
       </div>
 
-      <button className={styles.saveBtn} onClick={handleSaveProfile}>
+      <button className={styles.primaryBtn} onClick={handleSaveProfile}>
         Save Profile
       </button>
 

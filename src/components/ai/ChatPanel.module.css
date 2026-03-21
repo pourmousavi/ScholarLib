@@ -3,11 +3,9 @@
   flex-direction: column;
   height: 100%;
   width: 100%;
-  max-width: 100%;
   overflow: hidden;
   background: var(--bg-base);
   box-sizing: border-box;
-  contain: inline-size;
 }
 
 /* Header with scope and status */
@@ -19,9 +17,7 @@
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
   gap: var(--space-3);
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
+  width: 100%;
   box-sizing: border-box;
 }
 
@@ -130,8 +126,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  min-width: 0;
-  max-width: 100%;
+  width: 100%;
   box-sizing: border-box;
 }
 
@@ -140,7 +135,8 @@
   gap: var(--space-3);
   animation: fadeIn 0.2s ease;
   min-width: 0;
-  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @keyframes fadeIn {
@@ -179,7 +175,7 @@
 
 .content {
   flex: 1;
-  max-width: 85%;
+  max-width: 100%;
   min-width: 0;
   overflow: hidden;
   box-sizing: border-box;
@@ -358,16 +354,15 @@
 
 /* Empty state */
 .empty {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
   gap: var(--space-3);
   color: var(--text-muted);
-  padding: var(--space-6);
+  padding: var(--space-4);
   text-align: left;
-  max-width: min(500px, 100%);
+  width: 100%;
   box-sizing: border-box;
 }
 
