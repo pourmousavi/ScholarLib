@@ -7,40 +7,61 @@
 }
 
 .sidebar {
-  width: var(--sidebar-width);
   flex-shrink: 0;
   background: var(--bg-sidebar);
-  border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  transition: margin-left var(--transition-std), opacity var(--transition-std);
+  transition: width 0.15s ease, opacity 0.15s ease;
+  overflow: hidden;
 }
 
 .sidebar.collapsed {
-  margin-left: calc(-1 * var(--sidebar-width));
+  width: 0 !important;
   opacity: 0;
   pointer-events: none;
 }
 
 .docList {
-  width: var(--doclist-width);
   flex-shrink: 0;
   background: var(--bg-base);
-  border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  transition: margin-left var(--transition-std), opacity var(--transition-std);
+  transition: width 0.15s ease, opacity 0.15s ease;
+  overflow: hidden;
 }
 
 .docList.collapsed {
-  margin-left: calc(-1 * var(--doclist-width));
+  width: 0 !important;
   opacity: 0;
   pointer-events: none;
 }
 
+.resizeHandle {
+  width: 4px;
+  flex-shrink: 0;
+  background: var(--border-subtle);
+  cursor: col-resize;
+  transition: background 0.15s ease;
+  position: relative;
+}
+
+.resizeHandle:hover,
+.resizeHandle:active {
+  background: var(--accent);
+}
+
+.resizeHandle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+}
+
 .mainPanel {
   flex: 1;
-  min-width: 400px;
+  min-width: 300px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -48,13 +69,17 @@
 
 /* Mobile drawer mode */
 @media (max-width: 899px) {
+  .resizeHandle {
+    display: none;
+  }
+
   .docList:not(.collapsed) {
     position: fixed;
-    left: var(--sidebar-width);
+    left: 228px;
     top: 0;
     bottom: 0;
     z-index: 100;
-    margin-left: 0;
+    width: 310px !important;
     box-shadow: var(--shadow-modal);
   }
 }
@@ -66,11 +91,12 @@
     top: 0;
     bottom: 0;
     z-index: 150;
-    margin-left: 0;
+    width: 228px !important;
     box-shadow: var(--shadow-modal);
   }
 
   .docList:not(.collapsed) {
     left: 0;
+    width: 100% !important;
   }
 }

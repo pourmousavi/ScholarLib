@@ -26,6 +26,21 @@ const applyTheme = (theme) => {
 const initialTheme = getInitialTheme()
 applyTheme(initialTheme)
 
+// Get initial panel widths from localStorage
+const getInitialPanelWidths = () => {
+  const stored = localStorage.getItem('sv_panel_widths')
+  if (stored) {
+    try {
+      return JSON.parse(stored)
+    } catch {
+      // Use defaults if parse fails
+    }
+  }
+  return { sidebarWidth: 228, docListWidth: 310 }
+}
+
+const initialWidths = getInitialPanelWidths()
+
 export const useUIStore = create((set) => ({
   activePanel: 'pdf',
   showModal: null,
@@ -33,12 +48,34 @@ export const useUIStore = create((set) => ({
   docListCollapsed: false,
   theme: initialTheme,
 
+  // Panel widths (resizable)
+  sidebarWidth: initialWidths.sidebarWidth,
+  docListWidth: initialWidths.docListWidth,
+
   setActivePanel: (panel) => set({ activePanel: panel }),
   setShowModal: (modal) => set({ showModal: modal }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   toggleDocList: () => set((s) => ({ docListCollapsed: !s.docListCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   setDocListCollapsed: (collapsed) => set({ docListCollapsed: collapsed }),
+
+  // Panel width setters
+  setSidebarWidth: (width) => {
+    const clampedWidth = Math.max(180, Math.min(400, width))
+    localStorage.setItem('sv_panel_widths', JSON.stringify({
+      sidebarWidth: clampedWidth,
+      docListWidth: useUIStore.getState().docListWidth
+    }))
+    set({ sidebarWidth: clampedWidth })
+  },
+  setDocListWidth: (width) => {
+    const clampedWidth = Math.max(200, Math.min(500, width))
+    localStorage.setItem('sv_panel_widths', JSON.stringify({
+      sidebarWidth: useUIStore.getState().sidebarWidth,
+      docListWidth: clampedWidth
+    }))
+    set({ docListWidth: clampedWidth })
+  },
 
   setTheme: (theme) => {
     applyTheme(theme)

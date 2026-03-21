@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useUIStore } from '../../store/uiStore'
 import { useAIStore } from '../../store/aiStore'
 import Sidebar from './Sidebar'
@@ -20,12 +20,64 @@ export default function AppShell() {
   const setDocListCollapsed = useUIStore((s) => s.setDocListCollapsed)
   const setActivePanel = useUIStore((s) => s.setActivePanel)
 
+  // Panel widths
+  const sidebarWidth = useUIStore((s) => s.sidebarWidth)
+  const docListWidth = useUIStore((s) => s.docListWidth)
+  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
+  const setDocListWidth = useUIStore((s) => s.setDocListWidth)
+
+  // Resize state
+  const resizingRef = useRef(null)
+  const startXRef = useRef(0)
+  const startWidthRef = useRef(0)
+
   const loadConversation = useAIStore((s) => s.loadConversation)
 
   const handleLoadConversation = (conversation) => {
     loadConversation(conversation)
     setActivePanel('ai')
   }
+
+  // Handle resize mouse events
+  const handleMouseDown = useCallback((panel, e) => {
+    e.preventDefault()
+    resizingRef.current = panel
+    startXRef.current = e.clientX
+    startWidthRef.current = panel === 'sidebar' ? sidebarWidth : docListWidth
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [sidebarWidth, docListWidth])
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!resizingRef.current) return
+
+      const delta = e.clientX - startXRef.current
+      const newWidth = startWidthRef.current + delta
+
+      if (resizingRef.current === 'sidebar') {
+        setSidebarWidth(newWidth)
+      } else if (resizingRef.current === 'doclist') {
+        setDocListWidth(newWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      if (resizingRef.current) {
+        resizingRef.current = null
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [setSidebarWidth, setDocListWidth])
 
   // Handle responsive breakpoints
   useEffect(() => {
@@ -51,12 +103,30 @@ export default function AppShell() {
   return (
     <>
       <div className={styles.shell}>
-        <div className={`${styles.sidebar} ${sidebarCollapsed ? styles.collapsed : ''}`}>
+        <div
+          className={`${styles.sidebar} ${sidebarCollapsed ? styles.collapsed : ''}`}
+          style={{ width: sidebarCollapsed ? 0 : sidebarWidth }}
+        >
           <Sidebar />
         </div>
-        <div className={`${styles.docList} ${docListCollapsed ? styles.collapsed : ''}`}>
+        {!sidebarCollapsed && (
+          <div
+            className={styles.resizeHandle}
+            onMouseDown={(e) => handleMouseDown('sidebar', e)}
+          />
+        )}
+        <div
+          className={`${styles.docList} ${docListCollapsed ? styles.collapsed : ''}`}
+          style={{ width: docListCollapsed ? 0 : docListWidth }}
+        >
           <DocList />
         </div>
+        {!docListCollapsed && (
+          <div
+            className={styles.resizeHandle}
+            onMouseDown={(e) => handleMouseDown('doclist', e)}
+          />
+        )}
         <div className={styles.mainPanel}>
           <MainPanel />
         </div>
