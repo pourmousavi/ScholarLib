@@ -147,7 +147,11 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
     return (
       <div className={styles.viewer}>
         <div className={styles.placeholder}>
-          <span className={styles.placeholderText}>Select a document to view</span>
+          <div className={styles.placeholderIcon}>PDF</div>
+          <span className={styles.placeholderTitle}>No document selected</span>
+          <span className={styles.placeholderText}>
+            Select a paper from the list to view it here
+          </span>
         </div>
       </div>
     )
