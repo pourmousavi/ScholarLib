@@ -7,6 +7,7 @@ import MainPanel from './MainPanel'
 import { SettingsModal } from '../settings'
 import { ShareModal, ActivityDashboard, MoveFolderPicker } from '../sharing'
 import { ChatHistoryModal } from '../ai'
+import EditMetadataModal from '../metadata/EditMetadataModal'
 import styles from './AppShell.module.css'
 
 export default function AppShell() {
@@ -78,6 +79,9 @@ export default function AppShell() {
           onClose={() => setShowModal(null)}
           onLoadConversation={handleLoadConversation}
         />
+      )}
+      {showModal === 'metadata' && (
+        <EditMetadataModal onClose={() => setShowModal(null)} />
       )}
     </>
   )
