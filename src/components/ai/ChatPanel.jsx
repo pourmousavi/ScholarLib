@@ -181,7 +181,9 @@ export default function ChatPanel() {
             docId: selectedDocId,
             folderId: selectedFolderId
           }
-          retrievedChunks = await indexService.search(trimmedInput, searchScope, adapter, 6)
+          // Use fewer chunks for WebLLM (smaller context window)
+          const topK = provider === 'webllm' ? 3 : 6
+          retrievedChunks = await indexService.search(trimmedInput, searchScope, adapter, topK)
           console.log('RAG search results:', retrievedChunks.length, 'chunks found')
         } catch (err) {
           console.error('RAG search failed:', err)
@@ -192,7 +194,9 @@ export default function ChatPanel() {
       }
 
       // Build messages array with system prompt including retrieved context
-      const systemPrompt = aiService.buildSystemPrompt(scope, retrievedChunks)
+      // Use smaller context for WebLLM (limited context window)
+      const maxContextChars = provider === 'webllm' ? 6000 : 12000
+      const systemPrompt = aiService.buildSystemPrompt(scope, retrievedChunks, maxContextChars)
       const chatMessages = [
         { role: 'system', content: systemPrompt },
         ...messages.map(m => ({ role: m.role, content: m.content })),

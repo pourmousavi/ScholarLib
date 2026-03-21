@@ -18,16 +18,34 @@ class AIService {
    * Build system prompt for academic assistant
    * @param {Object} scope - Current scope settings
    * @param {Array} retrievedChunks - Retrieved document chunks (Stage 11)
+   * @param {number} maxContextChars - Maximum characters for context (for small context windows)
    * @returns {string}
    */
-  buildSystemPrompt(scope, retrievedChunks = []) {
-    const contextSection = retrievedChunks.length > 0
-      ? `\n\nRetrieved context:\n${retrievedChunks.map(c => `[${c.citation}]\n${c.text}`).join('\n\n')}`
-      : ''
+  buildSystemPrompt(scope, retrievedChunks = [], maxContextChars = 8000) {
+    // Build context section, respecting max character limit
+    let contextSection = ''
+    let totalChars = 0
+    let includedChunks = 0
+
+    if (retrievedChunks.length > 0) {
+      const chunks = []
+      for (const c of retrievedChunks) {
+        const chunkText = `[${c.citation}]\n${c.text}`
+        if (totalChars + chunkText.length > maxContextChars) {
+          break // Stop adding chunks if we exceed limit
+        }
+        chunks.push(chunkText)
+        totalChars += chunkText.length
+        includedChunks++
+      }
+      if (chunks.length > 0) {
+        contextSection = `\n\nRetrieved context:\n${chunks.join('\n\n')}`
+      }
+    }
 
     return `You are ScholarLib AI, an academic research assistant.
 The user is reviewing ${scope.description}.
-${retrievedChunks.length > 0 ? `${retrievedChunks.length} relevant excerpts from ${scope.docCount} documents have been retrieved.` : 'No document context is currently loaded.'}
+${includedChunks > 0 ? `${includedChunks} relevant excerpts from the document have been retrieved.` : 'No document context is currently loaded.'}
 ${contextSection}
 
 Rules:
