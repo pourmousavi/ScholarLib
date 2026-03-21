@@ -18,15 +18,31 @@ export function usePDFLoader(url) {
 
   const loadPDF = useCallback(async () => {
     if (!url) {
+      // Clean up existing PDF
+      if (pdfRef.current) {
+        pdfRef.current.destroy()
+        pdfRef.current = null
+      }
       setPdf(null)
       setTotalPages(0)
       setCurrentPage(1)
       return
     }
 
-    // Cancel any existing loading task
+    // Cancel any pending loading task (only if still loading)
     if (loadingTaskRef.current) {
-      loadingTaskRef.current.destroy()
+      try {
+        loadingTaskRef.current.destroy()
+      } catch (e) {
+        // Ignore errors from destroying already-completed tasks
+      }
+      loadingTaskRef.current = null
+    }
+
+    // Clean up previous PDF document
+    if (pdfRef.current) {
+      pdfRef.current.destroy()
+      pdfRef.current = null
     }
 
     setLoading(true)
@@ -37,6 +53,10 @@ export function usePDFLoader(url) {
       loadingTaskRef.current = loadingTask
 
       const pdfDoc = await loadingTask.promise
+
+      // Clear loading task ref after successful load
+      loadingTaskRef.current = null
+
       pdfRef.current = pdfDoc
       setPdf(pdfDoc)
       setTotalPages(pdfDoc.numPages)
@@ -46,7 +66,8 @@ export function usePDFLoader(url) {
       // Extract text in background
       extractAllText(pdfDoc)
     } catch (err) {
-      if (err.name !== 'PromiseCancelled') {
+      loadingTaskRef.current = null
+      if (err.name !== 'PromiseCancelled' && err.name !== 'AbortException') {
         setError(err.message || 'Failed to load PDF')
         setLoading(false)
       }
@@ -71,8 +92,19 @@ export function usePDFLoader(url) {
   useEffect(() => {
     loadPDF()
     return () => {
+      // Cancel any pending loading task on unmount
       if (loadingTaskRef.current) {
-        loadingTaskRef.current.destroy()
+        try {
+          loadingTaskRef.current.destroy()
+        } catch (e) {
+          // Ignore
+        }
+        loadingTaskRef.current = null
+      }
+      // Clean up PDF document on unmount
+      if (pdfRef.current) {
+        pdfRef.current.destroy()
+        pdfRef.current = null
       }
     }
   }, [loadPDF])

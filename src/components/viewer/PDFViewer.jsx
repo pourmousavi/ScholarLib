@@ -224,18 +224,38 @@ function PageCanvas({ pdf, pageNumber, zoom, setRef }) {
   }, [setRef])
 
   useEffect(() => {
+    let cancelled = false
+
     const renderPage = async () => {
       if (!pdf || !canvasRef.current) return
 
       // Cancel any existing render
       if (renderTaskRef.current) {
-        renderTaskRef.current.cancel()
+        try {
+          renderTaskRef.current.cancel()
+        } catch (e) {
+          // Ignore
+        }
+        renderTaskRef.current = null
       }
 
       setIsRendering(true)
 
       try {
+        // Check if PDF is still valid (not destroyed)
+        if (!pdf.numPages) {
+          setIsRendering(false)
+          return
+        }
+
         const page = await pdf.getPage(pageNumber)
+
+        // Check if cancelled during async operation
+        if (cancelled || !canvasRef.current) {
+          setIsRendering(false)
+          return
+        }
+
         const scale = zoom / 100
         const viewport = page.getViewport({ scale: scale * 1.5 }) // 1.5 for higher resolution
 
@@ -256,20 +276,33 @@ function PageCanvas({ pdf, pageNumber, zoom, setRef }) {
         renderTaskRef.current = renderTask
 
         await renderTask.promise
-        setIsRendering(false)
-      } catch (err) {
-        if (err.name !== 'RenderingCancelledException') {
-          console.error('Page render error:', err)
+        if (!cancelled) {
+          setIsRendering(false)
         }
-        setIsRendering(false)
+      } catch (err) {
+        if (!cancelled && err.name !== 'RenderingCancelledException') {
+          // Don't log "Worker was destroyed" errors during document switches
+          if (!err.message?.includes('Worker was destroyed')) {
+            console.error('Page render error:', err)
+          }
+        }
+        if (!cancelled) {
+          setIsRendering(false)
+        }
       }
     }
 
     renderPage()
 
     return () => {
+      cancelled = true
       if (renderTaskRef.current) {
-        renderTaskRef.current.cancel()
+        try {
+          renderTaskRef.current.cancel()
+        } catch (e) {
+          // Ignore
+        }
+        renderTaskRef.current = null
       }
     }
   }, [pdf, pageNumber, zoom])
