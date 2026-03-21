@@ -29,6 +29,10 @@ export default function Sidebar() {
   const setSelectedDocId = useLibraryStore((s) => s.setSelectedDocId)
   const setSelectedFolderId = useLibraryStore((s) => s.setSelectedFolderId)
 
+  const webllmStatus = useAIStore((s) => s.webllmStatus)
+  const setWebLLMStatus = useAIStore((s) => s.setWebLLMStatus)
+  const setWebLLMProgress = useAIStore((s) => s.setWebLLMProgress)
+
   // Check AI availability on mount and when provider changes
   useEffect(() => {
     const checkAvailability = async () => {
@@ -40,7 +44,25 @@ export default function Sidebar() {
           available = await ollamaService.isAvailable()
           break
         case 'webllm':
-          available = webllmService.isReady()
+          // Check if already ready
+          if (webllmService.isReady()) {
+            available = true
+          } else if (webllmService.isSupported()) {
+            // Auto-initialize WebLLM (model files are cached in browser)
+            setWebLLMStatus('downloading')
+            try {
+              const savedModel = localStorage.getItem('sv_webllm_model') || 'Llama-3.2-3B-Instruct-q4f32_1-MLC'
+              await webllmService.initialize(savedModel, (progress) => {
+                setWebLLMProgress(progress.progress * 100)
+              })
+              setWebLLMStatus('ready')
+              available = true
+            } catch (error) {
+              console.error('WebLLM auto-init failed:', error)
+              setWebLLMStatus('idle')
+              available = false
+            }
+          }
           break
         case 'claude':
           available = claudeService.isConfigured()
@@ -60,7 +82,7 @@ export default function Sidebar() {
     }
 
     checkAvailability()
-  }, [provider, setAvailable, setChecking])
+  }, [provider, setAvailable, setChecking, setWebLLMStatus, setWebLLMProgress])
 
   // Search functionality
   const handleSearch = (query) => {
@@ -136,6 +158,11 @@ export default function Sidebar() {
 
     if (provider === 'none') {
       return { name: 'AI Disabled', status: '' }
+    }
+
+    // Special handling for WebLLM loading state
+    if (provider === 'webllm' && webllmStatus === 'downloading') {
+      return { name: providerName, status: 'loading...' }
     }
 
     if (isAvailable) {

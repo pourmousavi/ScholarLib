@@ -147,6 +147,9 @@ export default function SettingsModal({ onClose }) {
         setWebllmProgressText(progress.text || `${Math.round(progress.progress * 100)}%`)
       })
 
+      // Save the model so we can auto-initialize on next load
+      localStorage.setItem('sv_webllm_model', selectedWebllmModel)
+
       setWebllmReady(true)
       setAvailable(true)
       showToast({ message: 'WebLLM model ready!', type: 'success' })
