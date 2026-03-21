@@ -1,7 +1,9 @@
-import { useState, memo } from 'react'
+import { useState, memo, useCallback } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
+import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
 import { useToast } from '../../hooks/useToast'
+import { LibraryService } from '../../services/library/LibraryService'
 import { ContextMenu, ShareIcon, LinkIcon, UsersIcon, RenameIcon, UnshareIcon, FolderMinusIcon } from '../ui'
 import styles from './FolderTree.module.css'
 
@@ -32,10 +34,26 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
   const expandedFolders = useLibraryStore((s) => s.expandedFolders)
   const setSelectedFolderId = useLibraryStore((s) => s.setSelectedFolderId)
   const toggleFolderExpanded = useLibraryStore((s) => s.toggleFolderExpanded)
+  const removeFolder = useLibraryStore((s) => s.removeFolder)
+  const updateFolder = useLibraryStore((s) => s.updateFolder)
+
+  const adapter = useStorageStore((s) => s.adapter)
+  const isDemoMode = useStorageStore((s) => s.isDemoMode)
 
   const setShowModal = useUIStore((s) => s.setShowModal)
 
   const { showToast } = useToast()
+
+  // Helper to save library after updates
+  const saveLibrary = useCallback(async () => {
+    if (isDemoMode || !adapter) return
+    try {
+      const { folders, documents } = useLibraryStore.getState()
+      await LibraryService.saveLibrary(adapter, { version: '1.0', folders, documents })
+    } catch (e) {
+      console.error('Failed to save library:', e)
+    }
+  }, [adapter, isDemoMode])
 
   const isSelected = selectedFolderId === folder.id
   const isExpanded = expandedFolders.includes(folder.id)
@@ -99,16 +117,57 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
     showToast({ message: 'Rename folder not implemented yet', type: 'info' })
   }
 
-  const handleDeleteFolder = () => {
+  const handleDeleteFolder = async () => {
     handleCloseContextMenu()
+
+    // Check for documents
     if (docCount > 0) {
-      showToast({ message: 'Cannot delete folder with documents', type: 'warning' })
+      showToast({ message: 'Cannot delete folder with documents. Move or delete documents first.', type: 'warning' })
       return
     }
-    if (confirm(`Delete folder "${folder.name}"?`)) {
-      showToast({ message: 'Delete folder not implemented yet', type: 'info' })
+
+    // Check for child folders
+    if (hasChildren) {
+      showToast({ message: 'Cannot delete folder with subfolders. Delete subfolders first.', type: 'warning' })
+      return
+    }
+
+    if (!confirm(`Delete folder "${folder.name}"? This cannot be undone.`)) {
+      return
+    }
+
+    try {
+      // Remove from parent's children array
+      if (folder.parent_id) {
+        const parentFolder = folders.find(f => f.id === folder.parent_id)
+        if (parentFolder) {
+          updateFolder(folder.parent_id, {
+            children: parentFolder.children.filter(id => id !== folder.id)
+          })
+        }
+      }
+
+      // Remove the folder
+      removeFolder(folder.id)
+
+      // Clear selection if this folder was selected
+      if (selectedFolderId === folder.id) {
+        setSelectedFolderId(folder.parent_id || null)
+      }
+
+      // Save to storage
+      await saveLibrary()
+
+      showToast({ message: 'Folder deleted', type: 'success' })
+    } catch (error) {
+      console.error('Failed to delete folder:', error)
+      showToast({ message: 'Failed to delete folder', type: 'error' })
     }
   }
+
+  // Check if folder is shared with anyone
+  const isShared = folder.shared_with && folder.shared_with.length > 0
+  const canDelete = docCount === 0 && !hasChildren
 
   const contextMenuItems = [
     {
@@ -121,29 +180,31 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
       icon: <LinkIcon />,
       onClick: handleCopySharingLink
     },
-    {
+    // Only show "View who has access" if folder is shared
+    ...(isShared ? [{
       label: 'View who has access',
       icon: <UsersIcon />,
       onClick: handleViewAccess
-    },
+    }] : []),
     { separator: true },
     {
       label: 'Rename folder...',
       icon: <RenameIcon />,
       onClick: handleRenameFolder
     },
-    {
+    // Only show "Unshare all" if folder is shared
+    ...(isShared ? [{
       label: 'Unshare all',
       icon: <UnshareIcon />,
       onClick: handleUnshareAll
-    },
+    }] : []),
     { separator: true },
     {
-      label: 'Delete folder...',
+      label: canDelete ? 'Delete folder...' : (hasChildren ? 'Delete folder (has subfolders)' : 'Delete folder (has documents)'),
       icon: <FolderMinusIcon />,
       onClick: handleDeleteFolder,
       danger: true,
-      disabled: docCount > 0
+      disabled: !canDelete
     }
   ]
 
