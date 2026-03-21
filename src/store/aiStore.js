@@ -105,18 +105,23 @@ export const useAIStore = create((set, get) => ({
 
   setConversationTitle: (title) => set({ conversationTitle: title }),
 
-  loadConversation: (conversation) => set({
-    currentConversationId: conversation.id,
-    conversationTitle: conversation.title,
-    messages: conversation.messages || [],
-    scope: conversation.scope || {
-      type: 'document',
-      docId: null,
-      folderId: null,
-      description: 'current document',
-      docCount: 1
-    }
-  }),
+  loadConversation: (conversation) => {
+    console.log('aiStore.loadConversation:', conversation.id)
+    console.log('Messages count:', conversation.messages?.length)
+    console.log('Messages:', conversation.messages)
+    return set({
+      currentConversationId: conversation.id,
+      conversationTitle: conversation.title,
+      messages: conversation.messages || [],
+      scope: conversation.scope || {
+        type: 'document',
+        docId: null,
+        folderId: null,
+        description: 'current document',
+        docCount: 1
+      }
+    })
+  },
 
   startNewConversation: () => set({
     currentConversationId: null,

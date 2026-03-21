@@ -71,6 +71,8 @@ export default function ChatHistoryModal({ onClose, onLoadConversation }) {
   }
 
   const handleLoadConversation = (conv) => {
+    console.log('Loading conversation:', conv.id, 'with', conv.messages?.length, 'messages')
+    console.log('Full conversation:', JSON.stringify(conv, null, 2))
     onLoadConversation(conv)
     onClose()
   }
