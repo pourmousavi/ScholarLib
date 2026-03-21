@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { useAIStore } from '../../store/aiStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
@@ -600,7 +601,15 @@ export default function ChatPanel() {
               </div>
               <div className={styles.content}>
                 <div className={styles.bubble}>
-                  {msg.content || (isStreaming && msg.role === 'assistant' ? (
+                  {msg.content ? (
+                    msg.role === 'assistant' ? (
+                      <div className={styles.markdown}>
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      msg.content
+                    )
+                  ) : (isStreaming && msg.role === 'assistant' ? (
                     <div className={styles.thinking}>
                       <span className={styles.dot} />
                       <span className={styles.dot} />
