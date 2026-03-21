@@ -68,12 +68,25 @@ export default function ChatPanel() {
   const updateDocument = useLibraryStore((s) => s.updateDocument)
   const selectedDoc = selectedDocId ? documents[selectedDocId] : null
 
-  // Clear conversation when document/folder selection changes and scope no longer matches
+  // Track previous selection to detect USER-initiated changes (not conversation loads)
+  const prevSelectionRef = useRef({ docId: selectedDocId, folderId: selectedFolderId })
+
+  // Clear conversation ONLY when user changes document/folder selection
+  // (not when loading a conversation from history which also changes scope)
   useEffect(() => {
-    // Only clear if there's an active conversation
+    const prevDocId = prevSelectionRef.current.docId
+    const prevFolderId = prevSelectionRef.current.folderId
+
+    // Update ref for next comparison
+    prevSelectionRef.current = { docId: selectedDocId, folderId: selectedFolderId }
+
+    // Only clear if there's an active conversation AND the selection actually changed
     if (!currentConversationId) return
 
-    // Check if the current conversation's scope still matches the selection
+    const selectionChanged = prevDocId !== selectedDocId || prevFolderId !== selectedFolderId
+    if (!selectionChanged) return
+
+    // Check if the current conversation's scope still matches the NEW selection
     const scopeMatches = (() => {
       if (scope.type === 'document') {
         return scope.docId === selectedDocId
@@ -86,7 +99,7 @@ export default function ChatPanel() {
     })()
 
     if (!scopeMatches) {
-      // Start a new conversation since scope no longer matches
+      // Start a new conversation since user changed to different doc/folder
       startNewConversation()
     }
   }, [selectedDocId, selectedFolderId, scope.type, scope.docId, scope.folderId, currentConversationId, startNewConversation])
