@@ -1,7 +1,9 @@
-import { useState, memo } from 'react'
+import { useState, memo, useCallback } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
+import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
 import { useToast } from '../../hooks/useToast'
+import { LibraryService } from '../../services/library/LibraryService'
 import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon } from '../ui'
 import styles from './DocCard.module.css'
 
@@ -12,10 +14,26 @@ const DocCard = memo(function DocCard({ doc }) {
   const setSelectedDocId = useLibraryStore((s) => s.setSelectedDocId)
   const updateDocument = useLibraryStore((s) => s.updateDocument)
   const removeDocument = useLibraryStore((s) => s.removeDocument)
+  const folders = useLibraryStore((s) => s.folders)
+  const documents = useLibraryStore((s) => s.documents)
+
+  const adapter = useStorageStore((s) => s.adapter)
+  const isDemoMode = useStorageStore((s) => s.isDemoMode)
 
   const setShowModal = useUIStore((s) => s.setShowModal)
 
   const { showToast } = useToast()
+
+  // Helper to save library after updates
+  const saveLibrary = useCallback(async () => {
+    if (isDemoMode || !adapter) return
+    try {
+      const { folders, documents } = useLibraryStore.getState()
+      await LibraryService.saveLibrary(adapter, { version: '1.0', folders, documents })
+    } catch (e) {
+      console.error('Failed to save library:', e)
+    }
+  }, [adapter, isDemoMode])
 
   const isSelected = selectedDocId === doc.id
   const isUnread = !doc.user_data?.read
@@ -46,17 +64,19 @@ const DocCard = memo(function DocCard({ doc }) {
     setContextMenu(null)
   }
 
-  const handleToggleRead = () => {
+  const handleToggleRead = async () => {
     updateDocument(doc.id, {
       user_data: {
         ...doc.user_data,
-        read: isUnread  // If unread, mark as read (true); if read, mark as unread (false)
+        read: isUnread,  // If unread, mark as read (true); if read, mark as unread (false)
+        read_at: isUnread ? new Date().toISOString() : null
       }
     })
     showToast({ message: isUnread ? 'Marked as read' : 'Marked as unread', type: 'success' })
+    await saveLibrary()
   }
 
-  const handleToggleStar = () => {
+  const handleToggleStar = async () => {
     updateDocument(doc.id, {
       user_data: {
         ...doc.user_data,
@@ -64,6 +84,7 @@ const DocCard = memo(function DocCard({ doc }) {
       }
     })
     showToast({ message: isStarred ? 'Removed from starred' : 'Added to starred', type: 'success' })
+    await saveLibrary()
   }
 
   const handleEditMetadata = () => {

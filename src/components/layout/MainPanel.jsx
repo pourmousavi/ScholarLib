@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useUIStore } from '../../store/uiStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
+import { LibraryService } from '../../services/library/LibraryService'
 import PDFViewer from '../viewer/PDFViewer'
 import { NotesPanel } from '../notes'
 import { ChatPanel } from '../ai'
@@ -27,6 +28,7 @@ export default function MainPanel() {
 
   const adapter = useStorageStore((s) => s.adapter)
   const isConnected = useStorageStore((s) => s.isConnected)
+  const isDemoMode = useStorageStore((s) => s.isDemoMode)
 
   const panels = [
     { id: 'pdf', label: 'PDF' },
@@ -36,18 +38,35 @@ export default function MainPanel() {
 
   // Auto-mark document as read when opened
   useEffect(() => {
-    if (!selectedDocId || !selectedDoc) return
+    if (!selectedDocId) return
+
+    const doc = documents[selectedDocId]
+    if (!doc) return
 
     // Only mark as read if it's currently unread
-    if (!selectedDoc.user_data?.read) {
+    if (!doc.user_data?.read) {
       updateDocument(selectedDocId, {
         user_data: {
-          ...selectedDoc.user_data,
-          read: true
+          ...doc.user_data,
+          read: true,
+          read_at: new Date().toISOString()
         }
       })
+
+      // Persist to storage
+      if (!isDemoMode && adapter) {
+        const saveAsync = async () => {
+          try {
+            const { folders, documents } = useLibraryStore.getState()
+            await LibraryService.saveLibrary(adapter, { version: '1.0', folders, documents })
+          } catch (e) {
+            console.error('Failed to save read status:', e)
+          }
+        }
+        saveAsync()
+      }
     }
-  }, [selectedDocId]) // Only depend on selectedDocId, not selectedDoc to avoid re-runs
+  }, [selectedDocId, adapter, isDemoMode, updateDocument]) // Include necessary deps
 
   // Fetch PDF URL when document changes
   useEffect(() => {
