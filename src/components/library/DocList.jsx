@@ -55,15 +55,16 @@ export default function DocList() {
       case 'starred':
         return doc.user_data?.starred
       case 'pending':
-        return doc.index_status?.status === 'pending' || doc.index_status?.status === 'processing'
+        // Show documents that need indexing (no status, pending, or processing)
+        return !doc.index_status?.status || doc.index_status?.status === 'pending' || doc.index_status?.status === 'processing'
       default:
         return true
     }
   })
 
-  // Count pending docs
+  // Count pending docs (including documents without index_status)
   const pendingCount = allDocs.filter(
-    d => d.index_status?.status === 'pending' || d.index_status?.status === 'processing'
+    d => !d.index_status?.status || d.index_status?.status === 'pending' || d.index_status?.status === 'processing'
   ).length
 
   // Build breadcrumb
