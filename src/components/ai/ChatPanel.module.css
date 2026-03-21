@@ -164,6 +164,7 @@
 .content {
   flex: 1;
   max-width: 85%;
+  min-width: 0;
 }
 
 .message.user .content {
@@ -171,7 +172,6 @@
 }
 
 .bubble {
-  display: inline-block;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-lg);
   font-family: 'DM Sans', sans-serif;
@@ -180,13 +180,17 @@
   color: var(--text-secondary);
 }
 
+/* Assistant bubbles take full width for consistent layout during streaming */
 .message.assistant .bubble {
+  display: block;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   text-align: left;
 }
 
+/* User bubbles stay inline for right-aligned compact look */
 .message.user .bubble {
+  display: inline-block;
   background: var(--accent-dim);
   border: 1px solid var(--accent-border);
 }
