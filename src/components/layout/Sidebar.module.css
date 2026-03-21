@@ -49,18 +49,23 @@
 }
 
 /* Search bar */
-.search {
+.searchWrapper {
+  position: relative;
   padding: var(--space-3) var(--space-4);
+}
+
+.search {
   position: relative;
 }
 
 .searchIcon {
   position: absolute;
-  left: 24px;
+  left: 10px;
   top: 50%;
   transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
   color: var(--text-muted);
-  font-size: 12px;
   pointer-events: none;
 }
 
@@ -69,7 +74,7 @@
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 8px 12px 8px 28px;
+  padding: 8px 12px 8px 32px;
   color: var(--text-secondary);
   font-family: 'DM Sans', sans-serif;
   font-size: 12px;
@@ -82,6 +87,77 @@
 }
 
 .searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+/* Search results dropdown */
+.searchResults {
+  position: absolute;
+  top: 100%;
+  left: var(--space-4);
+  right: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  margin-top: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: var(--shadow-card);
+}
+
+.searchResult {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.searchResult:hover {
+  background: var(--bg-hover);
+}
+
+.resultIcon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.resultText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.resultTitle {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resultSubtitle {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.noResults {
+  padding: var(--space-3);
+  text-align: center;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -122,8 +198,9 @@
   color: #0a0d12;
 }
 
-.installIcon {
-  font-size: 14px;
+.btnIcon {
+  width: 16px;
+  height: 16px;
 }
 
 .actions {
@@ -133,18 +210,22 @@
 }
 
 .actionBtn {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   background: var(--bg-hover);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   color: var(--text-tertiary);
-  font-size: 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all var(--transition-fast);
+}
+
+.actionBtn svg {
+  width: 18px;
+  height: 18px;
 }
 
 .actionBtn:hover {
@@ -163,7 +244,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--text-muted);
+  background: var(--error);
+  flex-shrink: 0;
 }
 
 .aiDot.available {
@@ -172,7 +254,11 @@
 
 .aiText {
   font-family: 'DM Mono', monospace;
-  font-size: 9px;
-  color: var(--text-muted);
+  font-size: 10px;
+  color: var(--text-secondary);
   letter-spacing: 0.02em;
+}
+
+.aiStatusText {
+  color: var(--text-muted);
 }
