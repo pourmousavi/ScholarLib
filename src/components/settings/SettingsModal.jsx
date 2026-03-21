@@ -12,13 +12,56 @@ import { useToast } from '../../hooks/useToast'
 import Modal from '../ui/Modal'
 import styles from './SettingsModal.module.css'
 
+// SVG Icons for settings sections
+const SectionIcons = {
+  ai: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1.27c.34-.6.99-1 1.73-1a2 2 0 110 4c-.74 0-1.39-.4-1.73-1H21a7 7 0 01-7 7v1.27c.6.34 1 .99 1 1.73a2 2 0 11-4 0c0-.74.4-1.39 1-1.73V23a7 7 0 01-7-7H3.73c-.34.6-.99 1-1.73 1a2 2 0 110-4c.74 0 1.39.4 1.73 1H5a7 7 0 017-7V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2z"/>
+      <circle cx="12" cy="14" r="3"/>
+    </svg>
+  ),
+  storage: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/>
+      <path d="M4 14a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z"/>
+      <circle cx="7" cy="7" r="1" fill="currentColor"/>
+      <circle cx="7" cy="15" r="1" fill="currentColor"/>
+    </svg>
+  ),
+  metadata: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M7 7h10M7 12h10M7 17h6"/>
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+    </svg>
+  ),
+  account: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="12" cy="8" r="4"/>
+      <path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/>
+    </svg>
+  ),
+  appearance: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M12 3v18"/>
+      <path d="M12 3a9 9 0 000 18" fill="currentColor" fillOpacity="0.15"/>
+    </svg>
+  ),
+  export: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M12 3v12m0 0l-4-4m4 4l4-4"/>
+      <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
+    </svg>
+  )
+}
+
 const SECTIONS = [
-  { id: 'ai', label: 'AI & Models', icon: '~' },
-  { id: 'storage', label: 'Storage', icon: '@' },
-  { id: 'metadata', label: 'Metadata', icon: '#' },
-  { id: 'account', label: 'Account', icon: '*' },
-  { id: 'appearance', label: 'Appearance', icon: '&' },
-  { id: 'export', label: 'Export & Privacy', icon: '%' }
+  { id: 'ai', label: 'AI & Models' },
+  { id: 'storage', label: 'Storage' },
+  { id: 'metadata', label: 'Metadata' },
+  { id: 'account', label: 'Account' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'export', label: 'Export & Privacy' }
 ]
 
 export default function SettingsModal({ onClose }) {
@@ -902,7 +945,11 @@ export default function SettingsModal({ onClose }) {
         {/* Header */}
         <div className={styles.header}>
           <h2 className={styles.title}>Settings</h2>
-          <button className={styles.closeBtn} onClick={onClose}>x</button>
+          <button className={styles.closeBtn} onClick={onClose}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
         </div>
 
         {/* Content */}
@@ -915,7 +962,7 @@ export default function SettingsModal({ onClose }) {
                 className={`${styles.navItem} ${activeSection === section.id ? styles.active : ''}`}
                 onClick={() => setActiveSection(section.id)}
               >
-                <span className={styles.navIcon}>{section.icon}</span>
+                <span className={styles.navIcon}>{SectionIcons[section.id]}</span>
                 <span className={styles.navLabel}>{section.label}</span>
               </button>
             ))}

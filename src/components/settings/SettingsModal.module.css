@@ -27,10 +27,12 @@
   background: none;
   border: none;
   color: var(--text-tertiary);
-  font-size: 16px;
   cursor: pointer;
   border-radius: var(--radius-sm);
   transition: background var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .closeBtn:hover {
@@ -82,9 +84,22 @@
 }
 
 .navIcon {
-  width: 20px;
-  text-align: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0.7;
+}
+
+.navIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.navItem.active .navIcon {
+  opacity: 1;
 }
 
 .navLabel {
