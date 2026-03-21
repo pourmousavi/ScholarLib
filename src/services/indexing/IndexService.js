@@ -7,6 +7,7 @@ import * as pdfjsLib from 'pdfjs-dist'
 import { textChunker } from './TextChunker'
 import { embeddingService } from './EmbeddingService'
 import { useLibraryStore } from '../../store/libraryStore'
+import { LibraryService } from '../library/LibraryService'
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}pdf.worker.min.mjs`
@@ -164,16 +165,27 @@ class IndexService {
       this.indexCache = { indexData, meta }
       this.chunkTextCache = chunksMeta
 
-      // 9. Update document status in library
+      // 9. Update document status in library (both store and storage)
+      const indexStatus = {
+        status: 'indexed',
+        indexed_at: new Date().toISOString(),
+        chunk_count: chunks.length,
+        embedding_version: 'v1'
+      }
+
+      // Update Zustand store
       const updateDocument = useLibraryStore.getState().updateDocument
-      updateDocument(docId, {
-        index_status: {
-          status: 'indexed',
-          indexed_at: new Date().toISOString(),
-          chunk_count: chunks.length,
-          embedding_version: 'v1'
-        }
-      })
+      updateDocument(docId, { index_status: indexStatus })
+
+      // Persist to storage
+      const { folders, documents } = useLibraryStore.getState()
+      const library = {
+        version: '1.0',
+        last_modified: new Date().toISOString(),
+        folders,
+        documents
+      }
+      await LibraryService.saveLibrary(adapter, library)
 
       onProgress?.({ stage: 'complete', docId, progress: 1 })
 
@@ -181,14 +193,29 @@ class IndexService {
     } catch (error) {
       console.error('Indexing failed:', error)
 
-      // Update document status to failed
+      // Update document status to failed (both store and storage)
+      const failedStatus = {
+        status: 'failed',
+        error: error.message || 'Indexing failed'
+      }
+
+      // Update Zustand store
       const updateDocument = useLibraryStore.getState().updateDocument
-      updateDocument(docId, {
-        index_status: {
-          status: 'failed',
-          error: error.message || 'Indexing failed'
+      updateDocument(docId, { index_status: failedStatus })
+
+      // Persist to storage
+      try {
+        const { folders, documents } = useLibraryStore.getState()
+        const library = {
+          version: '1.0',
+          last_modified: new Date().toISOString(),
+          folders,
+          documents
         }
-      })
+        await LibraryService.saveLibrary(adapter, library)
+      } catch (saveError) {
+        console.error('Failed to save library after indexing error:', saveError)
+      }
 
       throw error
     }
