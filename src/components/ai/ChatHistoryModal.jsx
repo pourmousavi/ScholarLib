@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAIStore } from '../../store/aiStore'
+import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { chatHistoryService } from '../../services/ai/ChatHistoryService'
 import { chatExporter } from '../../services/ai/ChatExporter'
@@ -20,11 +21,31 @@ export default function ChatHistoryModal({ onClose, onLoadConversation }) {
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [exportMenuOpen, setExportMenuOpen] = useState(null)
+  const [showAllScopes, setShowAllScopes] = useState(false)
 
   const adapter = useStorageStore((s) => s.adapter)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
 
+  const scope = useAIStore((s) => s.scope)
+  const selectedDocId = useLibraryStore((s) => s.selectedDocId)
+  const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
+  const documents = useLibraryStore((s) => s.documents)
+  const folders = useLibraryStore((s) => s.folders)
+
   const { showToast } = useToast()
+
+  // Get current scope description for display
+  const getCurrentScopeDescription = () => {
+    if (scope.type === 'document' && selectedDocId) {
+      const doc = documents[selectedDocId]
+      return doc?.metadata?.title || doc?.filename || 'current document'
+    }
+    if (scope.type === 'folder' && selectedFolderId) {
+      const folder = folders.find(f => f.id === selectedFolderId)
+      return folder?.name || 'current folder'
+    }
+    return 'entire library'
+  }
 
   // Load conversations on mount
   useEffect(() => {
@@ -42,8 +63,25 @@ export default function ChatHistoryModal({ onClose, onLoadConversation }) {
     loadHistory()
   }, [adapter, isDemoMode])
 
-  // Filter conversations by search
+  // Filter conversations by scope and search
   const filteredConversations = conversations.filter(conv => {
+    // First filter by scope (unless showing all)
+    if (!showAllScopes) {
+      if (scope.type === 'document' && selectedDocId) {
+        // Only show conversations for this specific document
+        if (conv.scope?.type !== 'document' || conv.scope?.docId !== selectedDocId) {
+          return false
+        }
+      } else if (scope.type === 'folder' && selectedFolderId) {
+        // Show conversations for this folder
+        if (conv.scope?.type !== 'folder' || conv.scope?.folderId !== selectedFolderId) {
+          return false
+        }
+      }
+      // For library scope, show all conversations
+    }
+
+    // Then filter by search query
     if (!searchQuery.trim()) return true
 
     const query = searchQuery.toLowerCase()
@@ -53,6 +91,17 @@ export default function ChatHistoryModal({ onClose, onLoadConversation }) {
       conv.model?.toLowerCase().includes(query)
     )
   })
+
+  // Count conversations matching current scope (before search filter)
+  const scopedCount = conversations.filter(conv => {
+    if (scope.type === 'document' && selectedDocId) {
+      return conv.scope?.type === 'document' && conv.scope?.docId === selectedDocId
+    }
+    if (scope.type === 'folder' && selectedFolderId) {
+      return conv.scope?.type === 'folder' && conv.scope?.folderId === selectedFolderId
+    }
+    return true
+  }).length
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr)
@@ -115,6 +164,23 @@ export default function ChatHistoryModal({ onClose, onLoadConversation }) {
           <button className={styles.closeBtn} onClick={onClose}>x</button>
         </div>
 
+        {/* Scope filter */}
+        <div className={styles.scopeFilter}>
+          <label className={styles.scopeToggle}>
+            <input
+              type="checkbox"
+              checked={showAllScopes}
+              onChange={(e) => setShowAllScopes(e.target.checked)}
+            />
+            <span>Show all conversations</span>
+          </label>
+          {!showAllScopes && (
+            <span className={styles.scopeLabel}>
+              Showing: {getCurrentScopeDescription()}
+            </span>
+          )}
+        </div>
+
         {/* Search and actions */}
         <div className={styles.toolbar}>
           <input
@@ -128,7 +194,7 @@ export default function ChatHistoryModal({ onClose, onLoadConversation }) {
             <button
               className={styles.exportAllBtn}
               onClick={() => handleExportAll('json')}
-              disabled={conversations.length === 0}
+              disabled={filteredConversations.length === 0}
             >
               Export All
             </button>
@@ -212,7 +278,11 @@ export default function ChatHistoryModal({ onClose, onLoadConversation }) {
         {/* Footer */}
         <div className={styles.footer}>
           <span className={styles.footerText}>
-            {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
+            {showAllScopes ? (
+              `${filteredConversations.length} conversation${filteredConversations.length !== 1 ? 's' : ''}`
+            ) : (
+              `${filteredConversations.length} of ${conversations.length} conversation${conversations.length !== 1 ? 's' : ''}`
+            )}
           </span>
         </div>
       </div>

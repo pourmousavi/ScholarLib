@@ -22,6 +22,7 @@ export default function MainPanel() {
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
   const documents = useLibraryStore((s) => s.documents)
+  const updateDocument = useLibraryStore((s) => s.updateDocument)
   const selectedDoc = selectedDocId ? documents[selectedDocId] : null
 
   const adapter = useStorageStore((s) => s.adapter)
@@ -32,6 +33,21 @@ export default function MainPanel() {
     { id: 'ai', label: 'AI Chat' },
     { id: 'notes', label: 'Notes' }
   ]
+
+  // Auto-mark document as read when opened
+  useEffect(() => {
+    if (!selectedDocId || !selectedDoc) return
+
+    // Only mark as read if it's currently unread
+    if (!selectedDoc.user_data?.read) {
+      updateDocument(selectedDocId, {
+        user_data: {
+          ...selectedDoc.user_data,
+          read: true
+        }
+      })
+    }
+  }, [selectedDocId]) // Only depend on selectedDocId, not selectedDoc to avoid re-runs
 
   // Fetch PDF URL when document changes
   useEffect(() => {

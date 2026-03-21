@@ -50,7 +50,7 @@ const DocCard = memo(function DocCard({ doc }) {
     updateDocument(doc.id, {
       user_data: {
         ...doc.user_data,
-        read: !isUnread
+        read: isUnread  // If unread, mark as read (true); if read, mark as unread (false)
       }
     })
     showToast({ message: isUnread ? 'Marked as read' : 'Marked as unread', type: 'success' })
