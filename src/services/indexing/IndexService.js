@@ -203,21 +203,35 @@ class IndexService {
    * @returns {Promise<Array>}
    */
   async search(query, scope, adapter, topK = 8) {
+    console.log('IndexService.search called with scope:', scope)
+
     // Generate query embedding
     const queryEmbedding = await embeddingService.embed(query)
+    console.log('Query embedding generated, length:', queryEmbedding.length)
 
     // Load index
     const { indexData, meta } = await this.loadIndex(adapter)
     const chunksMeta = await this.loadChunksMeta(adapter)
 
+    console.log('Index loaded:', {
+      totalVectors: indexData.length,
+      totalDocs: meta.total_docs_indexed,
+      totalChunks: meta.total_chunks,
+      indexedDocIds: Object.keys(meta.docs),
+      chunksMetaCount: Object.keys(chunksMeta.chunks || {}).length
+    })
+
     if (indexData.length === 0) {
+      console.log('Index is empty, no vectors stored')
       return []
     }
 
     // Get relevant chunk indices based on scope
     const relevantIndices = this.getScopeIndices(scope, meta)
+    console.log('Relevant indices for scope:', relevantIndices.length, 'indices')
 
     if (relevantIndices.length === 0) {
+      console.log('No relevant indices found for scope')
       return []
     }
 
@@ -258,18 +272,31 @@ class IndexService {
     const documents = useLibraryStore.getState().documents
     const indices = []
 
+    console.log('getScopeIndices:', {
+      scopeType: scope.type,
+      scopeDocId: scope.docId,
+      scopeFolderId: scope.folderId,
+      indexedDocs: Object.keys(meta.docs),
+      libraryDocs: Object.keys(documents)
+    })
+
     for (const [docId, docMeta] of Object.entries(meta.docs)) {
       const doc = documents[docId]
-      if (!doc) continue
+      if (!doc) {
+        console.log('Document not found in library:', docId)
+        continue
+      }
 
       let include = false
 
       switch (scope.type) {
         case 'document':
           include = docId === scope.docId
+          console.log(`Document scope check: ${docId} === ${scope.docId} = ${include}`)
           break
         case 'folder':
           include = doc.folder_id === scope.folderId
+          console.log(`Folder scope check: ${doc.folder_id} === ${scope.folderId} = ${include}`)
           break
         case 'library':
           include = true
