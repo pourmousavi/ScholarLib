@@ -235,15 +235,33 @@ class IndexService {
       return []
     }
 
+    // Check for dimension mismatch
+    if (indexData.length > 0 && relevantIndices.length > 0) {
+      const storedDim = indexData[relevantIndices[0]]?.length
+      const queryDim = queryEmbedding.length
+      console.log('Embedding dimensions:', { query: queryDim, stored: storedDim })
+
+      if (storedDim !== queryDim) {
+        console.error('DIMENSION MISMATCH! Index needs to be rebuilt with current embedding model.')
+        console.log('To fix: Re-index all documents using "Index All Documents" button')
+        // Clear the cache to force re-download of index
+        this.indexCache = null
+        this.chunkTextCache = null
+        return []
+      }
+    }
+
     // Calculate similarity for each relevant chunk
     const results = relevantIndices
-      .map(i => ({
-        index: i,
-        score: embeddingService.cosineSimilarity(queryEmbedding, indexData[i])
-      }))
+      .map(i => {
+        const score = embeddingService.cosineSimilarity(queryEmbedding, indexData[i])
+        return { index: i, score }
+      })
       .filter(r => r.score > 0.3) // Minimum relevance threshold
       .sort((a, b) => b.score - a.score)
       .slice(0, topK)
+
+    console.log('Similarity scores (top 5):', results.slice(0, 5).map(r => r.score.toFixed(3)))
 
     // Build result objects with text and citations
     const documents = useLibraryStore.getState().documents
