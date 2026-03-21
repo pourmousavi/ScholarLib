@@ -8,6 +8,7 @@ import { claudeService } from '../../services/ai/ClaudeService'
 import { openaiService } from '../../services/ai/OpenAIService'
 import { indexService } from '../../services/indexing/IndexService'
 import { chatHistoryService } from '../../services/ai/ChatHistoryService'
+import { LibraryService } from '../../services/library/LibraryService'
 import { Btn } from '../ui'
 import ScopeSelector from './ScopeSelector'
 import styles from './ChatPanel.module.css'
@@ -26,6 +27,8 @@ export default function ChatPanel() {
   const [downloadStatus, setDownloadStatus] = useState('')
   const [selectedModel, setSelectedModel] = useState(null)
   const [showModelSelector, setShowModelSelector] = useState(false)
+  const [isIndexingDoc, setIsIndexingDoc] = useState(false)
+  const [indexingProgress, setIndexingProgress] = useState('')
 
   const messagesRef = useRef(null)
   const inputRef = useRef(null)
@@ -60,6 +63,8 @@ export default function ChatPanel() {
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
   const documents = useLibraryStore((s) => s.documents)
+  const folders = useLibraryStore((s) => s.folders)
+  const updateDocument = useLibraryStore((s) => s.updateDocument)
   const selectedDoc = selectedDocId ? documents[selectedDocId] : null
 
   // Clear conversation when document/folder selection changes and scope no longer matches
@@ -162,6 +167,41 @@ export default function ChatPanel() {
 
     return aiService.estimateCost(allMessages)
   }, [input, messages, scope, isCloudProvider])
+
+  // Handle indexing current document
+  const handleIndexNow = useCallback(async () => {
+    if (!selectedDoc || !adapter || isDemoMode || isIndexingDoc) return
+
+    setIsIndexingDoc(true)
+    setIndexingProgress('Starting...')
+
+    try {
+      // Get the PDF URL
+      const pdfURL = await adapter.getFileStreamURL(selectedDoc.box_path)
+
+      await indexService.indexDocument(selectedDoc.id, pdfURL, adapter, (progress) => {
+        const stageText = {
+          extracting: 'Extracting text...',
+          chunking: 'Processing...',
+          embedding: `Embedding ${progress.current || 0}/${progress.total || '?'}`,
+          saving: 'Saving...',
+          complete: 'Done!'
+        }
+        setIndexingProgress(stageText[progress.stage] || 'Indexing...')
+      })
+
+      setIndexingProgress('Complete!')
+      // The indexService already updates the store and saves library
+    } catch (error) {
+      console.error('Indexing failed:', error)
+      setIndexingProgress('Failed: ' + (error.message || 'Unknown error'))
+    } finally {
+      setTimeout(() => {
+        setIsIndexingDoc(false)
+        setIndexingProgress('')
+      }, 2000)
+    }
+  }, [selectedDoc, adapter, isDemoMode, isIndexingDoc])
 
   // Handle sending a message
   const handleSend = useCallback(async () => {
@@ -510,9 +550,19 @@ export default function ChatPanel() {
               }
             </span>
             {scope.type === 'document' && selectedDoc && selectedDoc.index_status?.status !== 'indexed' ? (
-              <span className={styles.emptyWarning}>
-                This document needs to be indexed first. Go to the document list and click "Index Now" in the Pending tab.
-              </span>
+              <>
+                <span className={styles.emptyWarning}>
+                  {isIndexingDoc ? indexingProgress : 'This document needs to be indexed for AI chat.'}
+                </span>
+                <Btn
+                  gold
+                  onClick={handleIndexNow}
+                  disabled={isIndexingDoc || isDemoMode || !adapter}
+                  style={{ marginTop: 12 }}
+                >
+                  {isIndexingDoc ? indexingProgress : 'Index Now'}
+                </Btn>
+              </>
             ) : (
               <span className={styles.emptyHint}>
                 AI will search indexed documents and provide cited answers

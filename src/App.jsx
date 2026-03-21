@@ -8,6 +8,7 @@ import { usePWAInstall } from './hooks/usePWAInstall'
 import { useStorageStore } from './store/storageStore'
 import { useLibraryStore } from './store/libraryStore'
 import { LibraryService } from './services/library/LibraryService'
+import { indexService } from './services/indexing/IndexService'
 
 function ToastProvider({ children }) {
   const toasts = useToastStore((state) => state.toasts)
@@ -97,6 +98,13 @@ function AppContent() {
       try {
         const library = await LibraryService.loadLibrary(adapter)
         setLibraryData(library)
+
+        // Sync index status with actual index metadata
+        // This fixes cases where library.json has stale status
+        const { synced } = await indexService.syncIndexStatus(adapter)
+        if (synced > 0) {
+          console.log(`Synced ${synced} document(s) index status from index metadata`)
+        }
       } catch (error) {
         console.error('Failed to load library:', error)
         showToast({ message: 'Failed to load library', type: 'error' })

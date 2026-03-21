@@ -436,6 +436,64 @@ class IndexService {
       lastUpdated: meta.last_updated
     }
   }
+
+  /**
+   * Sync library.json index_status with actual index metadata
+   * This fixes cases where library.json has stale status
+   * @param {StorageAdapter} adapter
+   * @returns {Promise<{synced: number, updated: boolean}>}
+   */
+  async syncIndexStatus(adapter) {
+    try {
+      const { meta } = await this.loadIndex(adapter)
+      const { folders, documents } = useLibraryStore.getState()
+      const updateDocument = useLibraryStore.getState().updateDocument
+
+      let syncedCount = 0
+      let needsSave = false
+
+      // Check each document against index metadata
+      for (const docId of Object.keys(documents)) {
+        const doc = documents[docId]
+        const isInIndex = !!meta.docs[docId]
+        const currentStatus = doc.index_status?.status
+
+        if (isInIndex && currentStatus !== 'indexed') {
+          // Document is in index but library says it's not - update library
+          const indexInfo = meta.docs[docId]
+          updateDocument(docId, {
+            index_status: {
+              status: 'indexed',
+              indexed_at: indexInfo.indexed_at,
+              chunk_count: indexInfo.chunk_count,
+              embedding_version: 'v1'
+            }
+          })
+          syncedCount++
+          needsSave = true
+          console.log(`Synced index status for ${docId}: now indexed`)
+        }
+      }
+
+      // Save updated library if changes were made
+      if (needsSave) {
+        const updatedState = useLibraryStore.getState()
+        const library = {
+          version: '1.0',
+          last_modified: new Date().toISOString(),
+          folders: updatedState.folders,
+          documents: updatedState.documents
+        }
+        await LibraryService.saveLibrary(adapter, library)
+        console.log(`Synced ${syncedCount} document(s) index status`)
+      }
+
+      return { synced: syncedCount, updated: needsSave }
+    } catch (error) {
+      console.error('Failed to sync index status:', error)
+      return { synced: 0, updated: false }
+    }
+  }
 }
 
 export const indexService = new IndexService()
