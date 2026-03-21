@@ -168,16 +168,27 @@ export default function ChatPanel() {
       let retrievedChunks = []
       if (adapter && !isDemoMode) {
         try {
+          // Check if document is indexed first
+          if (scope.type === 'document' && selectedDocId) {
+            const isIndexed = await indexService.isIndexed(selectedDocId, adapter)
+            if (!isIndexed) {
+              console.log('Document not indexed yet, skipping RAG search')
+            }
+          }
+
           const searchScope = {
             type: scope.type,
             docId: selectedDocId,
             folderId: selectedFolderId
           }
           retrievedChunks = await indexService.search(trimmedInput, searchScope, adapter, 6)
+          console.log('RAG search results:', retrievedChunks.length, 'chunks found')
         } catch (err) {
-          console.log('RAG search skipped:', err.message)
+          console.error('RAG search failed:', err)
           // Continue without RAG if search fails
         }
+      } else {
+        console.log('RAG search skipped - adapter:', !!adapter, 'isDemoMode:', isDemoMode)
       }
 
       // Build messages array with system prompt including retrieved context
@@ -457,9 +468,15 @@ export default function ChatPanel() {
                 : `Ask questions about all ${totalDocCount} document${totalDocCount !== 1 ? 's' : ''} in your library`
               }
             </span>
-            <span className={styles.emptyHint}>
-              AI will search indexed documents and provide cited answers
-            </span>
+            {scope.type === 'document' && selectedDoc && selectedDoc.index_status?.status !== 'indexed' ? (
+              <span className={styles.emptyWarning}>
+                This document needs to be indexed first. Go to the document list and click "Index Now" in the Pending tab.
+              </span>
+            ) : (
+              <span className={styles.emptyHint}>
+                AI will search indexed documents and provide cited answers
+              </span>
+            )}
           </div>
         ) : (
           messages.map((msg) => (
