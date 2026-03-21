@@ -61,6 +61,12 @@ export default function ChatPanel() {
   const documents = useLibraryStore((s) => s.documents)
   const selectedDoc = selectedDocId ? documents[selectedDocId] : null
 
+  // Count documents for scope display
+  const folderDocCount = Object.values(documents).filter(
+    d => d.folder_id === selectedFolderId
+  ).length
+  const totalDocCount = Object.keys(documents).length
+
   const adapter = useStorageStore((s) => s.adapter)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
 
@@ -444,7 +450,12 @@ export default function ChatPanel() {
           <div className={styles.empty}>
             <span className={styles.emptyIcon}>AI</span>
             <span className={styles.emptyText}>
-              Ask questions about {selectedDoc?.metadata?.title || 'your documents'}
+              {scope.type === 'document' && selectedDoc
+                ? `Ask questions about "${selectedDoc?.metadata?.title || 'this document'}"`
+                : scope.type === 'folder'
+                ? `Ask questions about ${folderDocCount} document${folderDocCount !== 1 ? 's' : ''} in this folder`
+                : `Ask questions about all ${totalDocCount} document${totalDocCount !== 1 ? 's' : ''} in your library`
+              }
             </span>
             <span className={styles.emptyHint}>
               AI will search indexed documents and provide cited answers
