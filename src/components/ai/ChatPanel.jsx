@@ -55,11 +55,48 @@ export default function ChatPanel() {
   const clearError = useAIStore((s) => s.clearError)
   const setCurrentConversation = useAIStore((s) => s.setCurrentConversation)
   const startNewConversation = useAIStore((s) => s.startNewConversation)
+  const setScopeType = useAIStore((s) => s.setScopeType)
 
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
   const documents = useLibraryStore((s) => s.documents)
   const selectedDoc = selectedDocId ? documents[selectedDocId] : null
+
+  // Clear conversation when document/folder selection changes and scope no longer matches
+  useEffect(() => {
+    // Only clear if there's an active conversation
+    if (!currentConversationId) return
+
+    // Check if the current conversation's scope still matches the selection
+    const scopeMatches = (() => {
+      if (scope.type === 'document') {
+        return scope.docId === selectedDocId
+      }
+      if (scope.type === 'folder') {
+        return scope.folderId === selectedFolderId
+      }
+      // Library scope always matches
+      return true
+    })()
+
+    if (!scopeMatches) {
+      // Start a new conversation since scope no longer matches
+      startNewConversation()
+    }
+  }, [selectedDocId, selectedFolderId, scope.type, scope.docId, scope.folderId, currentConversationId, startNewConversation])
+
+  // Sync scope with current document/folder selection when there's no active conversation
+  useEffect(() => {
+    // Only sync if no active conversation (fresh state)
+    if (currentConversationId) return
+
+    // Update scope to match current selection
+    if (scope.type === 'document' && scope.docId !== selectedDocId) {
+      setScopeType('document', selectedDocId, selectedFolderId)
+    } else if (scope.type === 'folder' && scope.folderId !== selectedFolderId) {
+      setScopeType('folder', selectedDocId, selectedFolderId)
+    }
+  }, [selectedDocId, selectedFolderId, scope.type, scope.docId, scope.folderId, currentConversationId, setScopeType])
 
   // Count documents for scope display
   const folderDocCount = Object.values(documents).filter(

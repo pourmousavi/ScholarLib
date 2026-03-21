@@ -259,27 +259,43 @@ export default function DocList() {
       {/* Pending notice */}
       <PendingNotice count={pendingCount} onIndexNow={handleIndexNow} />
 
-      {/* Debug: Show index all button if there are any documents */}
-      {allDocs.length > 0 && pendingCount === 0 && (
-        <div className={styles.debugNotice}>
-          <span>{allDocs.length} documents in folder</span>
-          <button
-            className={styles.indexBtn}
-            onClick={async () => {
-              // Force re-index all docs in folder
-              for (const doc of allDocs) {
-                if (doc.index_status?.status !== 'indexed') {
+      {/* Show index all button only if there are unindexed documents */}
+      {(() => {
+        const unindexedDocs = allDocs.filter(
+          d => !d.index_status?.status ||
+               d.index_status?.status === 'pending' ||
+               d.index_status?.status === 'processing' ||
+               d.index_status?.status === 'failed'
+        )
+        if (unindexedDocs.length === 0) return null
+
+        return (
+          <div className={styles.debugNotice}>
+            <span>{unindexedDocs.length} document{unindexedDocs.length !== 1 ? 's' : ''} need indexing</span>
+            <button
+              className={styles.indexBtn}
+              disabled={isIndexing}
+              onClick={async () => {
+                let successCount = 0
+                for (const doc of unindexedDocs) {
                   console.log('Indexing:', doc.id, doc.filename)
-                  await indexDocument(doc)
+                  const success = await indexDocument(doc)
+                  if (success) successCount++
                 }
-              }
-              showToast({ message: 'Indexing complete', type: 'success' })
-            }}
-          >
-            Index All Documents
-          </button>
-        </div>
-      )}
+                if (successCount === unindexedDocs.length) {
+                  showToast({ message: 'All documents indexed successfully', type: 'success' })
+                } else if (successCount > 0) {
+                  showToast({ message: `Indexed ${successCount} of ${unindexedDocs.length} documents`, type: 'warning' })
+                } else {
+                  showToast({ message: 'Indexing failed', type: 'error' })
+                }
+              }}
+            >
+              {isIndexing ? 'Indexing...' : 'Index All Documents'}
+            </button>
+          </div>
+        )
+      })()}
     </div>
   )
 }
