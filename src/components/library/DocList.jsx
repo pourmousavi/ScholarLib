@@ -258,6 +258,28 @@ export default function DocList() {
 
       {/* Pending notice */}
       <PendingNotice count={pendingCount} onIndexNow={handleIndexNow} />
+
+      {/* Debug: Show index all button if there are any documents */}
+      {allDocs.length > 0 && pendingCount === 0 && (
+        <div className={styles.debugNotice}>
+          <span>{allDocs.length} documents in folder</span>
+          <button
+            className={styles.indexBtn}
+            onClick={async () => {
+              // Force re-index all docs in folder
+              for (const doc of allDocs) {
+                if (doc.index_status?.status !== 'indexed') {
+                  console.log('Indexing:', doc.id, doc.filename)
+                  await indexDocument(doc)
+                }
+              }
+              showToast({ message: 'Indexing complete', type: 'success' })
+            }}
+          >
+            Index All Documents
+          </button>
+        </div>
+      )}
     </div>
   )
 }
