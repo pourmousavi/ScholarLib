@@ -6,6 +6,7 @@ export default function ContextMenu({ x, y, items, onClose }) {
 
   useEffect(() => {
     const handleClickOutside = (e) => {
+      // Only close if click is outside the menu
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         onClose()
       }
@@ -17,10 +18,15 @@ export default function ContextMenu({ x, y, items, onClose }) {
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
+    // Use a small delay to avoid catching the initial right-click that opened the menu
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside)
+    }, 0)
+
     document.addEventListener('keydown', handleEscape)
 
     return () => {
+      clearTimeout(timeoutId)
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleEscape)
     }

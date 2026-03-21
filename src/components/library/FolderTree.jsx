@@ -67,30 +67,40 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
   }
 
   const handleShareFolder = () => {
+    handleCloseContextMenu()
     setSelectedFolderId(folder.id)
     setShowModal('share')
   }
 
-  const handleCopySharingLink = () => {
-    const url = `${window.location.origin}${window.location.pathname}?folder=${folder.slug}`
-    navigator.clipboard.writeText(url)
-    showToast({ message: 'Sharing link copied', type: 'success' })
+  const handleCopySharingLink = async () => {
+    handleCloseContextMenu()
+    try {
+      const url = `${window.location.origin}${window.location.pathname}?folder=${folder.slug}`
+      await navigator.clipboard.writeText(url)
+      showToast({ message: 'Sharing link copied', type: 'success' })
+    } catch (err) {
+      showToast({ message: 'Failed to copy link', type: 'error' })
+    }
   }
 
   const handleViewAccess = () => {
+    handleCloseContextMenu()
     setSelectedFolderId(folder.id)
     setShowModal('share')
   }
 
   const handleUnshareAll = () => {
+    handleCloseContextMenu()
     showToast({ message: 'Unshare all not implemented yet', type: 'info' })
   }
 
   const handleRenameFolder = () => {
+    handleCloseContextMenu()
     showToast({ message: 'Rename folder not implemented yet', type: 'info' })
   }
 
   const handleDeleteFolder = () => {
+    handleCloseContextMenu()
     if (docCount > 0) {
       showToast({ message: 'Cannot delete folder with documents', type: 'warning' })
       return
