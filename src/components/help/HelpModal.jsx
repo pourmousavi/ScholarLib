@@ -288,6 +288,13 @@ export default function HelpModal({ onClose }) {
         <li>Click "Re-extract with AI" to try extraction again</li>
       </ul>
 
+      <h3>Re-indexing Documents</h3>
+      <ul>
+        <li>Right-click a document → "Re-index for AI"</li>
+        <li>Useful after switching to a better AI/embedding model</li>
+        <li>Re-generates document chunks and embeddings for improved AI chat</li>
+      </ul>
+
       <h3>Search</h3>
       <p>
         Use the search box at the top of the sidebar to find documents by title,

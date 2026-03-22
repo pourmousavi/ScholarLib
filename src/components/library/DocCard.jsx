@@ -4,11 +4,13 @@ import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
 import { useToast } from '../../hooks/useToast'
 import { LibraryService } from '../../services/library/LibraryService'
-import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon } from '../ui'
+import { indexService } from '../../services/indexing/IndexService'
+import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon } from '../ui'
 import styles from './DocCard.module.css'
 
 const DocCard = memo(function DocCard({ doc }) {
   const [contextMenu, setContextMenu] = useState(null)
+  const [isReindexing, setIsReindexing] = useState(false)
 
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
   const setSelectedDocId = useLibraryStore((s) => s.setSelectedDocId)
@@ -108,6 +110,38 @@ const DocCard = memo(function DocCard({ doc }) {
     }
   }
 
+  const handleReindex = async () => {
+    if (isReindexing || isDemoMode || !adapter) return
+
+    const path = doc.box_path
+    if (!path) {
+      showToast({ message: 'Document has no file path', type: 'error' })
+      return
+    }
+
+    setIsReindexing(true)
+    showToast({ message: 'Re-indexing document...', type: 'info' })
+
+    try {
+      // Get PDF URL
+      const pdfUrl = await adapter.getFileStreamURL(path)
+
+      // Re-index the document
+      await indexService.indexDocument(doc.id, pdfUrl, adapter, (progress) => {
+        if (progress.stage === 'embedding') {
+          // Could update a progress indicator here if needed
+        }
+      })
+
+      showToast({ message: 'Document re-indexed successfully', type: 'success' })
+    } catch (error) {
+      console.error('Re-indexing failed:', error)
+      showToast({ message: error.message || 'Re-indexing failed', type: 'error' })
+    } finally {
+      setIsReindexing(false)
+    }
+  }
+
   const contextMenuItems = [
     {
       label: 'Edit metadata...',
@@ -134,6 +168,13 @@ const DocCard = memo(function DocCard({ doc }) {
       label: isStarred ? 'Remove star' : 'Add star',
       icon: isStarred ? <StarFilledIcon /> : <StarIcon />,
       onClick: handleToggleStar
+    },
+    { separator: true },
+    {
+      label: isReindexing ? 'Re-indexing...' : 'Re-index for AI',
+      icon: <RefreshIcon />,
+      onClick: handleReindex,
+      disabled: isReindexing || isDemoMode
     },
     { separator: true },
     {
