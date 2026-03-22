@@ -103,9 +103,10 @@ const DocCard = memo(function DocCard({ doc }) {
     showToast({ message: 'Duplicate not implemented yet', type: 'info' })
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm(`Delete "${doc.metadata?.title || doc.filename}"? This cannot be undone.`)) {
       removeDocument(doc.id)
+      await saveLibrary()
       showToast({ message: 'Document deleted', type: 'success' })
     }
   }

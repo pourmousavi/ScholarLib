@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { useAIStore } from '../../store/aiStore'
 import { useUIStore } from '../../store/uiStore'
 import { useStorageStore } from '../../store/storageStore'
+import { useLibraryStore } from '../../store/libraryStore'
 import { useIndexStore } from '../../store/indexStore'
 import { settingsService } from '../../services/settings/SettingsService'
+import { LibraryService } from '../../services/library/LibraryService'
 import { ollamaService } from '../../services/ai/OllamaService'
 import { webllmService } from '../../services/ai/WebLLMService'
 import { claudeService } from '../../services/ai/ClaudeService'
@@ -325,6 +327,64 @@ export default function SettingsModal({ onClose }) {
   const handleReindexAll = () => {
     if (confirm('Re-index all documents? This may take a while.')) {
       showToast({ message: 'Re-indexing started (not yet implemented)', type: 'info' })
+    }
+  }
+
+  const handleCleanupOrphans = async () => {
+    if (isDemoMode || !adapter) {
+      showToast({ message: 'Not available in demo mode', type: 'warning' })
+      return
+    }
+
+    const documents = useLibraryStore.getState().documents
+    const removeDocument = useLibraryStore.getState().removeDocument
+    const docIds = Object.keys(documents)
+
+    if (docIds.length === 0) {
+      showToast({ message: 'No documents to check', type: 'info' })
+      return
+    }
+
+    showToast({ message: 'Checking for orphaned documents...', type: 'info' })
+
+    const orphanedIds = []
+
+    for (const docId of docIds) {
+      const doc = documents[docId]
+      if (!doc.box_path) {
+        orphanedIds.push(docId)
+        continue
+      }
+
+      try {
+        // Try to check if file exists
+        await adapter.getFileStreamURL(doc.box_path)
+      } catch (error) {
+        // File doesn't exist
+        orphanedIds.push(docId)
+      }
+    }
+
+    if (orphanedIds.length === 0) {
+      showToast({ message: 'No orphaned documents found', type: 'success' })
+      return
+    }
+
+    const orphanedNames = orphanedIds.map(id => {
+      const doc = documents[id]
+      return doc.metadata?.title || doc.filename || id
+    }).join('\n- ')
+
+    if (confirm(`Found ${orphanedIds.length} orphaned document(s) (files no longer exist):\n\n- ${orphanedNames}\n\nRemove these from your library?`)) {
+      for (const docId of orphanedIds) {
+        removeDocument(docId)
+      }
+
+      // Save to storage
+      const { folders, documents: updatedDocs } = useLibraryStore.getState()
+      await LibraryService.saveLibrary(adapter, { version: '1.0', folders, documents: updatedDocs })
+
+      showToast({ message: `Removed ${orphanedIds.length} orphaned document(s)`, type: 'success' })
     }
   }
 
@@ -984,7 +1044,18 @@ export default function SettingsModal({ onClose }) {
         >
           Re-index all documents
         </button>
+
+        <button
+          className={styles.secondaryBtn}
+          onClick={handleCleanupOrphans}
+        >
+          Remove orphaned documents
+        </button>
       </div>
+
+      <p className={styles.hint} style={{ marginTop: 8 }}>
+        Orphaned documents are library entries whose PDF files no longer exist in storage.
+      </p>
     </div>
   )
 
