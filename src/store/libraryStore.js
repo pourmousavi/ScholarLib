@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { tagService } from '../services/tags/TagService'
 
 // Mock folder data for development/offline mode
 const mockFolders = [
@@ -204,10 +205,96 @@ const mockDocuments = {
   }
 }
 
+// Mock tag registry for development
+const mockTagRegistry = {
+  'degradation': {
+    displayName: 'Degradation',
+    color: '#E85D75',
+    category: 'topics',
+    description: 'Battery degradation research',
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z'
+  },
+  'thermal': {
+    displayName: 'Thermal',
+    color: '#F39C12',
+    category: 'topics',
+    description: 'Thermal management',
+    created_at: '2024-01-02T10:00:00Z',
+    updated_at: '2024-01-02T10:00:00Z'
+  },
+  'cycling': {
+    displayName: 'Cycling',
+    color: '#4A90D9',
+    category: 'topics',
+    description: '',
+    created_at: '2024-01-03T10:00:00Z',
+    updated_at: '2024-01-03T10:00:00Z'
+  },
+  'capacity': {
+    displayName: 'Capacity',
+    color: '#50C878',
+    category: 'topics',
+    description: '',
+    created_at: '2024-01-04T10:00:00Z',
+    updated_at: '2024-01-04T10:00:00Z'
+  },
+  'soh': {
+    displayName: 'SOH',
+    color: '#9B59B6',
+    category: 'topics',
+    description: 'State of Health',
+    created_at: '2024-01-05T10:00:00Z',
+    updated_at: '2024-01-05T10:00:00Z'
+  },
+  'ml': {
+    displayName: 'ML',
+    color: '#1ABC9C',
+    category: 'methods',
+    description: 'Machine Learning',
+    created_at: '2024-01-06T10:00:00Z',
+    updated_at: '2024-01-06T10:00:00Z'
+  },
+  'frequency': {
+    displayName: 'Frequency',
+    color: '#E67E22',
+    category: 'topics',
+    description: 'Frequency regulation',
+    created_at: '2024-01-07T10:00:00Z',
+    updated_at: '2024-01-07T10:00:00Z'
+  },
+  'ancillary': {
+    displayName: 'Ancillary',
+    color: '#3498DB',
+    category: 'topics',
+    description: 'Ancillary services',
+    created_at: '2024-01-08T10:00:00Z',
+    updated_at: '2024-01-08T10:00:00Z'
+  },
+  'lstm': {
+    displayName: 'LSTM',
+    color: '#4A90D9',
+    category: 'methods',
+    description: '',
+    created_at: '2024-01-09T10:00:00Z',
+    updated_at: '2024-01-09T10:00:00Z'
+  },
+  'forecasting': {
+    displayName: 'Forecasting',
+    color: '#E85D75',
+    category: 'topics',
+    description: '',
+    created_at: '2024-01-10T10:00:00Z',
+    updated_at: '2024-01-10T10:00:00Z'
+  }
+}
+
 export const useLibraryStore = create((set, get) => ({
   // Library data
   folders: mockFolders,
   documents: mockDocuments,
+  tagRegistry: mockTagRegistry,
+  smartCollections: [],
   libraryVersion: null,
   lastModified: null,
 
@@ -220,6 +307,8 @@ export const useLibraryStore = create((set, get) => ({
   setLibraryData: (library) => {
     const folders = library.folders || []
     const documents = library.documents || {}
+    const tagRegistry = library.tag_registry || {}
+    const smartCollections = library.smart_collections || []
 
     // Auto-expand root folders
     const rootFolderIds = folders
@@ -232,6 +321,8 @@ export const useLibraryStore = create((set, get) => ({
     set({
       folders,
       documents,
+      tagRegistry,
+      smartCollections,
       libraryVersion: library.version,
       lastModified: library.last_modified,
       expandedFolders: rootFolderIds,
@@ -245,6 +336,8 @@ export const useLibraryStore = create((set, get) => ({
     set({
       folders: [],
       documents: {},
+      tagRegistry: {},
+      smartCollections: [],
       libraryVersion: null,
       lastModified: null,
       selectedFolderId: null,
@@ -258,6 +351,8 @@ export const useLibraryStore = create((set, get) => ({
     set({
       folders: mockFolders,
       documents: mockDocuments,
+      tagRegistry: mockTagRegistry,
+      smartCollections: [],
       expandedFolders: ['f_root1', 'f_bess1', 'f_root2'],
       selectedFolderId: 'f_bess1',
     })
@@ -310,4 +405,218 @@ export const useLibraryStore = create((set, get) => ({
   removeFolder: (folderId) => set((state) => ({
     folders: state.folders.filter(f => f.id !== folderId)
   })),
+
+  // ============================================
+  // Tag Registry Actions
+  // ============================================
+
+  // Create a new tag in the registry
+  createTag: async (displayName, options = {}) => {
+    const { tagRegistry } = get()
+    const result = tagService.createTag(tagRegistry, displayName, options)
+
+    if (result.error) {
+      return result
+    }
+
+    const newRegistry = { ...tagRegistry, [result.slug]: result.tag }
+    set({ tagRegistry: newRegistry })
+
+    return result
+  },
+
+  // Update tag metadata (color, category, description, displayName)
+  updateTag: (slug, updates) => {
+    const { tagRegistry, documents } = get()
+    const result = tagService.updateTag(tagRegistry, documents, {}, slug, updates)
+
+    if (result.error) {
+      return result
+    }
+
+    // Update registry
+    const newRegistry = { ...tagRegistry }
+    delete newRegistry[result.oldSlug]
+    newRegistry[result.newSlug] = result.tag
+
+    // Update documents if slug changed
+    let newDocuments = documents
+    if (result.slugChanged && result.docUpdates.length > 0) {
+      newDocuments = { ...documents }
+      for (const { docId, newTags } of result.docUpdates) {
+        newDocuments[docId] = {
+          ...newDocuments[docId],
+          user_data: { ...newDocuments[docId].user_data, tags: newTags }
+        }
+      }
+    }
+
+    set({ tagRegistry: newRegistry, documents: newDocuments })
+    return result
+  },
+
+  // Delete tag from registry and all documents
+  deleteTag: (slug) => {
+    const { tagRegistry, documents } = get()
+    const result = tagService.deleteTag(tagRegistry, documents, {}, slug)
+
+    if (result.error) {
+      return result
+    }
+
+    // Remove from registry
+    const newRegistry = { ...tagRegistry }
+    delete newRegistry[slug]
+
+    // Update documents
+    const newDocuments = { ...documents }
+    for (const { docId, newTags } of result.affectedDocs) {
+      newDocuments[docId] = {
+        ...newDocuments[docId],
+        user_data: { ...newDocuments[docId].user_data, tags: newTags }
+      }
+    }
+
+    set({ tagRegistry: newRegistry, documents: newDocuments })
+    return result
+  },
+
+  // Set tags for a specific document
+  setDocumentTags: (docId, tags) => {
+    const { documents } = get()
+    const doc = documents[docId]
+    if (!doc) {
+      return { error: 'Document not found' }
+    }
+
+    const newDoc = {
+      ...doc,
+      user_data: { ...doc.user_data, tags }
+    }
+    const newDocuments = { ...documents, [docId]: newDoc }
+
+    set({ documents: newDocuments })
+    return { success: true }
+  },
+
+  // Add a tag to a document
+  addTagToDocument: (docId, slug) => {
+    const { documents, tagRegistry } = get()
+    const doc = documents[docId]
+    if (!doc) {
+      return { error: 'Document not found' }
+    }
+    if (!tagRegistry[slug]) {
+      return { error: 'Tag not found in registry' }
+    }
+
+    const currentTags = doc.user_data?.tags || []
+    if (currentTags.includes(slug)) {
+      return { error: 'Tag already added' }
+    }
+
+    const newTags = [...currentTags, slug]
+    const newDoc = {
+      ...doc,
+      user_data: { ...doc.user_data, tags: newTags }
+    }
+    const newDocuments = { ...documents, [docId]: newDoc }
+
+    set({ documents: newDocuments })
+    return { success: true }
+  },
+
+  // Remove a tag from a document
+  removeTagFromDocument: (docId, slug) => {
+    const { documents } = get()
+    const doc = documents[docId]
+    if (!doc) {
+      return { error: 'Document not found' }
+    }
+
+    const currentTags = doc.user_data?.tags || []
+    const newTags = currentTags.filter(t => t !== slug)
+
+    const newDoc = {
+      ...doc,
+      user_data: { ...doc.user_data, tags: newTags }
+    }
+    const newDocuments = { ...documents, [docId]: newDoc }
+
+    set({ documents: newDocuments })
+    return { success: true }
+  },
+
+  // Bulk add tag to multiple documents
+  bulkAddTag: (slug, docIds) => {
+    const { documents, tagRegistry } = get()
+    if (!tagRegistry[slug]) {
+      return { error: 'Tag not found in registry' }
+    }
+
+    const updates = tagService.addTagToDocuments(documents, slug, docIds)
+    if (updates.length === 0) {
+      return { success: true, updated: 0 }
+    }
+
+    const newDocuments = { ...documents }
+    for (const { docId, newTags } of updates) {
+      newDocuments[docId] = {
+        ...newDocuments[docId],
+        user_data: { ...newDocuments[docId].user_data, tags: newTags }
+      }
+    }
+
+    set({ documents: newDocuments })
+    return { success: true, updated: updates.length }
+  },
+
+  // Bulk remove tag from multiple documents
+  bulkRemoveTag: (slug, docIds) => {
+    const { documents } = get()
+    const updates = tagService.removeTagFromDocuments(documents, slug, docIds)
+
+    if (updates.length === 0) {
+      return { success: true, updated: 0 }
+    }
+
+    const newDocuments = { ...documents }
+    for (const { docId, newTags } of updates) {
+      newDocuments[docId] = {
+        ...newDocuments[docId],
+        user_data: { ...newDocuments[docId].user_data, tags: newTags }
+      }
+    }
+
+    set({ documents: newDocuments })
+    return { success: true, updated: updates.length }
+  },
+
+  // Merge multiple tags into one
+  mergeTags: (sourceSlugs, targetSlug) => {
+    const { tagRegistry, documents } = get()
+    const result = tagService.mergeTags(tagRegistry, documents, {}, sourceSlugs, targetSlug)
+
+    if (result.error) {
+      return result
+    }
+
+    // Update registry (remove source tags)
+    const newRegistry = { ...tagRegistry }
+    for (const slug of result.tagsToDelete) {
+      delete newRegistry[slug]
+    }
+
+    // Update documents
+    const newDocuments = { ...documents }
+    for (const { docId, newTags } of result.docUpdates) {
+      newDocuments[docId] = {
+        ...newDocuments[docId],
+        user_data: { ...newDocuments[docId].user_data, tags: newTags }
+      }
+    }
+
+    set({ tagRegistry: newRegistry, documents: newDocuments })
+    return result
+  },
 }))

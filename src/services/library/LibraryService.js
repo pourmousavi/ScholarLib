@@ -10,6 +10,8 @@ function createEmptyLibrary() {
     last_modified_by: 'local',
     folders: [],
     documents: {},
+    tag_registry: {},
+    smart_collections: [],
   }
 }
 

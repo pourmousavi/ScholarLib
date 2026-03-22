@@ -20,6 +20,7 @@ const DocCard = memo(function DocCard({ doc }) {
   const removeDocument = useLibraryStore((s) => s.removeDocument)
   const folders = useLibraryStore((s) => s.folders)
   const documents = useLibraryStore((s) => s.documents)
+  const tagRegistry = useLibraryStore((s) => s.tagRegistry)
 
   const adapter = useStorageStore((s) => s.adapter)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
@@ -256,10 +257,17 @@ const DocCard = memo(function DocCard({ doc }) {
           <div className={styles.meta}>{yearJournal}</div>
         )}
         {tags.length > 0 && (
-          <div className={styles.tags} aria-label={`Tags: ${tags.join(', ')}`}>
-            {tags.slice(0, 3).map((tag) => (
-              <Tag key={tag} label={tag} />
-            ))}
+          <div className={styles.tags} aria-label={`Tags: ${tags.map(t => tagRegistry[t]?.displayName || t).join(', ')}`}>
+            {tags.slice(0, 3).map((slug) => {
+              const tagData = tagRegistry[slug]
+              return (
+                <Tag
+                  key={slug}
+                  label={tagData?.displayName || slug}
+                  color={tagData?.color}
+                />
+              )
+            })}
             {tags.length > 3 && (
               <span className={styles.moreTags}>+{tags.length - 3}</span>
             )}

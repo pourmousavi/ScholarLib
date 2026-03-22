@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
-import { Modal, Btn, Input, Tag, Spinner } from '../ui'
+import { Modal, Btn, Input, Tag, TagInput, Spinner } from '../ui'
 import { MetadataExtractor } from '../../services/metadata/MetadataExtractor'
 import { aiService } from '../../services/ai/AIService'
 import { settingsService } from '../../services/settings/SettingsService'
@@ -23,6 +23,7 @@ export default function EditMetadataModal({ onClose }) {
   const doc = selectedDocId ? documents[selectedDocId] : null
 
   const [metadata, setMetadata] = useState(doc?.metadata || {})
+  const [userTags, setUserTags] = useState(doc?.user_data?.tags || [])
   const [isSaving, setIsSaving] = useState(false)
   const [isExtracting, setIsExtracting] = useState(false)
   const [tagInput, setTagInput] = useState('')
@@ -137,14 +138,27 @@ export default function EditMetadataModal({ onClose }) {
     setIsSaving(true)
 
     try {
+      // Build updated document with metadata and user tags
+      const updatedDoc = {
+        ...doc,
+        metadata,
+        user_data: {
+          ...doc.user_data,
+          tags: userTags
+        }
+      }
+
       // Update in store
-      updateDocument(doc.id, { metadata })
+      updateDocument(doc.id, {
+        metadata,
+        user_data: updatedDoc.user_data
+      })
 
       // Save to storage
       if (!isDemoMode && adapter) {
         const library = {
           folders,
-          documents: { ...documents, [doc.id]: { ...doc, metadata } },
+          documents: { ...documents, [doc.id]: updatedDoc },
           version: '1.0',
           last_modified: new Date().toISOString()
         }
@@ -288,9 +302,9 @@ export default function EditMetadataModal({ onClose }) {
                 />
               </div>
 
-              {/* Tags */}
+              {/* Keywords (from paper metadata) */}
               <div className={styles.field}>
-                <label className={styles.label}>Tags</label>
+                <label className={styles.label}>Keywords (from paper)</label>
                 <div className={styles.tags}>
                   {(metadata.keywords || []).map(tag => (
                     <Tag key={tag} label={tag} onRemove={() => handleRemoveTag(tag)} />
@@ -300,9 +314,21 @@ export default function EditMetadataModal({ onClose }) {
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={handleTagKeyDown}
-                    placeholder="Add tag..."
+                    placeholder="Add keyword..."
                   />
                 </div>
+                <span className={styles.hint}>Machine-extracted keywords from the paper</span>
+              </div>
+
+              {/* User Tags (for organization) */}
+              <div className={styles.field}>
+                <label className={styles.label}>Tags (for organization)</label>
+                <TagInput
+                  tags={userTags}
+                  onChange={setUserTags}
+                  placeholder="Add organizational tags..."
+                />
+                <span className={styles.hint}>Your personal tags for organizing this document</span>
               </div>
             </div>
 

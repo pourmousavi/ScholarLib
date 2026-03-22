@@ -1,26 +1,30 @@
 .tag {
   font-family: 'DM Mono', monospace;
   font-size: 10px;
-  background: var(--accent-dim);
-  color: var(--accent);
-  border: 1px solid var(--accent-border);
+  background: var(--tag-bg, var(--accent-dim));
+  color: var(--tag-color, var(--accent));
+  border: 1px solid var(--tag-border, var(--accent-border));
   border-radius: var(--radius-sm);
   padding: 2px 7px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .remove {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: pointer;
-  font-size: 9px;
+  font-size: 10px;
   background: none;
   border: none;
   color: inherit;
   padding: 0;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .remove:hover {
