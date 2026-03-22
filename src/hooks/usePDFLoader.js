@@ -4,13 +4,13 @@ import * as pdfjsLib from 'pdfjs-dist'
 // Set worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}pdf.worker.min.mjs`
 
-export function usePDFLoader(url) {
+export function usePDFLoader(url, initialZoom = 100) {
   const [pdf, setPdf] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
-  const [zoom, setZoom] = useState(100)
+  const [zoom, setZoom] = useState(initialZoom)
   const [extractedText, setExtractedText] = useState('')
 
   const pdfRef = useRef(null)

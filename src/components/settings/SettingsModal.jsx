@@ -104,6 +104,12 @@ export default function SettingsModal({ onClose }) {
 
   const setTheme = useUIStore((s) => s.setTheme)
   const currentTheme = useUIStore((s) => s.theme)
+  const showDocCounts = useUIStore((s) => s.showDocCounts)
+  const setShowDocCounts = useUIStore((s) => s.setShowDocCounts)
+  const fontSize = useUIStore((s) => s.fontSize)
+  const setFontSize = useUIStore((s) => s.setFontSize)
+  const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
+  const setPdfDefaultZoom = useUIStore((s) => s.setPdfDefaultZoom)
 
   const { showToast } = useToast()
 
@@ -867,8 +873,11 @@ export default function SettingsModal({ onClose }) {
         <label className={styles.toggle}>
           <input
             type="checkbox"
-            checked={settings?.global?.appearance?.show_doc_counts ?? true}
-            onChange={(e) => updateGlobalSetting('appearance.show_doc_counts', e.target.checked)}
+            checked={showDocCounts}
+            onChange={(e) => {
+              setShowDocCounts(e.target.checked)
+              updateGlobalSetting('appearance.show_doc_counts', e.target.checked)
+            }}
           />
           <span>Show document counts in sidebar</span>
         </label>
@@ -877,8 +886,11 @@ export default function SettingsModal({ onClose }) {
       <div className={styles.field}>
         <label>Font Size</label>
         <select
-          value={settings?.global?.appearance?.font_size || 'normal'}
-          onChange={(e) => updateGlobalSetting('appearance.font_size', e.target.value)}
+          value={fontSize}
+          onChange={(e) => {
+            setFontSize(e.target.value)
+            updateGlobalSetting('appearance.font_size', e.target.value)
+          }}
         >
           <option value="normal">Normal</option>
           <option value="large">Large</option>
@@ -888,8 +900,12 @@ export default function SettingsModal({ onClose }) {
       <div className={styles.field}>
         <label>PDF Default Zoom</label>
         <select
-          value={settings?.global?.appearance?.pdf_default_zoom || 100}
-          onChange={(e) => updateGlobalSetting('appearance.pdf_default_zoom', parseInt(e.target.value))}
+          value={pdfDefaultZoom}
+          onChange={(e) => {
+            const zoom = parseInt(e.target.value)
+            setPdfDefaultZoom(zoom)
+            updateGlobalSetting('appearance.pdf_default_zoom', zoom)
+          }}
         >
           <option value={75}>75%</option>
           <option value={100}>100%</option>

@@ -12,6 +12,15 @@ const getInitialTheme = () => {
   return 'dark'
 }
 
+// Get initial appearance settings from localStorage
+const getInitialAppearance = () => {
+  return {
+    showDocCounts: localStorage.getItem('sv_show_doc_counts') !== 'false',
+    fontSize: localStorage.getItem('sv_font_size') || 'normal',
+    pdfDefaultZoom: parseInt(localStorage.getItem('sv_pdf_default_zoom')) || 100
+  }
+}
+
 // Apply theme to document
 const applyTheme = (theme) => {
   if (theme === 'light') {
@@ -22,9 +31,18 @@ const applyTheme = (theme) => {
   localStorage.setItem('sv_theme', theme)
 }
 
-// Apply initial theme immediately
+// Apply font size to document
+const applyFontSize = (size) => {
+  document.documentElement.setAttribute('data-font-size', size)
+  localStorage.setItem('sv_font_size', size)
+}
+
+// Apply initial theme and font size immediately
 const initialTheme = getInitialTheme()
 applyTheme(initialTheme)
+
+const initialAppearance = getInitialAppearance()
+applyFontSize(initialAppearance.fontSize)
 
 // Get initial panel widths from localStorage
 const getInitialPanelWidths = () => {
@@ -47,6 +65,11 @@ export const useUIStore = create((set) => ({
   sidebarCollapsed: false,
   docListCollapsed: false,
   theme: initialTheme,
+
+  // Appearance settings
+  showDocCounts: initialAppearance.showDocCounts,
+  fontSize: initialAppearance.fontSize,
+  pdfDefaultZoom: initialAppearance.pdfDefaultZoom,
 
   // Panel widths (resizable)
   sidebarWidth: initialWidths.sidebarWidth,
@@ -85,5 +108,19 @@ export const useUIStore = create((set) => ({
     const newTheme = s.theme === 'dark' ? 'light' : 'dark'
     applyTheme(newTheme)
     return { theme: newTheme }
-  })
+  }),
+
+  // Appearance setters
+  setShowDocCounts: (show) => {
+    localStorage.setItem('sv_show_doc_counts', show.toString())
+    set({ showDocCounts: show })
+  },
+  setFontSize: (size) => {
+    applyFontSize(size)
+    set({ fontSize: size })
+  },
+  setPdfDefaultZoom: (zoom) => {
+    localStorage.setItem('sv_pdf_default_zoom', zoom.toString())
+    set({ pdfDefaultZoom: zoom })
+  }
 }))

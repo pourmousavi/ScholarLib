@@ -10,6 +10,7 @@ body {
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: 'DM Sans', 'Helvetica Neue', sans-serif;
+  font-size: var(--font-size-base);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }

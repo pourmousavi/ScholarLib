@@ -41,6 +41,7 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
 
   const setShowModal = useUIStore((s) => s.setShowModal)
+  const showDocCounts = useUIStore((s) => s.showDocCounts)
 
   const { showToast } = useToast()
 
@@ -248,7 +249,9 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
             {isExpanded ? '>' : '>'}
           </button>
           <span className={styles.name}>{folder.name}</span>
-          <span className={styles.count} aria-label={`${docCount} documents`}>{docCount}</span>
+          {showDocCounts && (
+            <span className={styles.count} aria-label={`${docCount} documents`}>{docCount}</span>
+          )}
         </div>
         {isExpanded && (
           <div role="group">

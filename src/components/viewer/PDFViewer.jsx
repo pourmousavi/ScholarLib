@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { usePDFLoader } from '../../hooks/usePDFLoader'
+import { useUIStore } from '../../store/uiStore'
 import { Spinner, Btn } from '../ui'
 import PDFToolbar from './PDFToolbar'
 import styles from './PDFViewer.module.css'
 
 export default function PDFViewer({ url, docId, onTextExtracted }) {
+  const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
+
   const {
     pdf,
     loading,
@@ -19,7 +22,7 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
     zoomIn,
     zoomOut,
     retry
-  } = usePDFLoader(url)
+  } = usePDFLoader(url, pdfDefaultZoom)
 
   const containerRef = useRef(null)
   const pageRefs = useRef({})
