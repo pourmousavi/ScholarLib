@@ -379,8 +379,9 @@ export default function HelpModal({ onClose }) {
       <h3>Appearance</h3>
       <ul>
         <li><strong>Theme:</strong> Dark or Light mode</li>
-        <li><strong>Font Size:</strong> Normal or Large</li>
-        <li><strong>PDF Zoom:</strong> Default zoom level for PDFs</li>
+        <li><strong>Show Document Counts:</strong> Toggle folder document counts in sidebar</li>
+        <li><strong>Font Size:</strong> Normal or Large (scales all text)</li>
+        <li><strong>PDF Default Zoom:</strong> Initial zoom level when opening PDFs (75-150%)</li>
       </ul>
 
       <h3>Export & Privacy</h3>
