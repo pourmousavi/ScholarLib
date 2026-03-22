@@ -303,6 +303,10 @@ export const useLibraryStore = create((set, get) => ({
   selectedDocId: null,
   expandedFolders: [],
 
+  // Tag filter state
+  selectedTags: [],
+  tagFilterMode: 'AND', // 'AND' | 'OR'
+
   // Set library data from storage
   setLibraryData: (library) => {
     const folders = library.folders || []
@@ -368,6 +372,27 @@ export const useLibraryStore = create((set, get) => ({
         ? state.expandedFolders.filter(f => f !== id)
         : [...state.expandedFolders, id]
     }
+  }),
+
+  // Tag filter actions
+  toggleTagSelection: (slug) => set((state) => {
+    const newTags = state.selectedTags.includes(slug)
+      ? state.selectedTags.filter(t => t !== slug)
+      : [...state.selectedTags, slug]
+    return { selectedTags: newTags }
+  }),
+
+  setSelectedTags: (tags) => set({ selectedTags: tags }),
+
+  setTagFilterMode: (mode) => set({ tagFilterMode: mode }),
+
+  clearTagFilter: () => set({ selectedTags: [], tagFilterMode: 'AND' }),
+
+  // Select a single tag for filtering (clears folder selection to show all matching docs)
+  selectTagFilter: (slug) => set({
+    selectedTags: [slug],
+    selectedFolderId: null,  // Clear folder selection to show docs from all folders
+    tagFilterMode: 'AND'
   }),
 
   // Add document to store (after saving to storage)

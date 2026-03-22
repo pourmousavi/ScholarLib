@@ -7,6 +7,7 @@ import { indexService } from '../../services/indexing/IndexService'
 import { useToast } from '../../hooks/useToast'
 import DocCard from './DocCard'
 import IndexingBar from './IndexingBar'
+import ActiveFilters from './ActiveFilters'
 import UploadZone from '../metadata/UploadZone'
 import styles from './DocList.module.css'
 
@@ -25,6 +26,9 @@ export default function DocList() {
   const documents = useLibraryStore((s) => s.documents)
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
   const addDocument = useLibraryStore((s) => s.addDocument)
+  const selectedTags = useLibraryStore((s) => s.selectedTags)
+  const tagFilterMode = useLibraryStore((s) => s.tagFilterMode)
+  const tagRegistry = useLibraryStore((s) => s.tagRegistry)
 
   const adapter = useStorageStore((s) => s.adapter)
   const isConnected = useStorageStore((s) => s.isConnected)
@@ -43,13 +47,28 @@ export default function DocList() {
 
   const folder = folders.find(f => f.id === selectedFolderId)
 
-  // Get all docs for the selected folder
+  // Check if we're viewing by tags (no folder selected, but tags selected)
+  const isTagView = selectedTags.length > 0 && !selectedFolderId
+
+  // Get all docs - either for folder or filtered by tags
   const allDocs = Object.values(documents)
-    .filter(d => d.folder_id === selectedFolderId)
+    .filter(d => {
+      // If viewing by tags, show docs from all folders that match tags
+      if (isTagView) {
+        const docTags = d.user_data?.tags || []
+        if (tagFilterMode === 'AND') {
+          return selectedTags.every(t => docTags.includes(t))
+        } else {
+          return selectedTags.some(t => docTags.includes(t))
+        }
+      }
+      // Otherwise, filter by selected folder
+      return d.folder_id === selectedFolderId
+    })
     .sort((a, b) => new Date(b.added_at) - new Date(a.added_at))
 
-  // Apply filter
-  const filteredDocs = allDocs.filter(doc => {
+  // Apply additional filters (unread, starred, pending)
+  let filteredDocs = allDocs.filter(doc => {
     switch (activeFilter) {
       case 'unread':
         return !doc.user_data?.read
@@ -62,6 +81,18 @@ export default function DocList() {
         return true
     }
   })
+
+  // If in folder view but tags are also selected, apply tag filter too
+  if (!isTagView && selectedTags.length > 0) {
+    filteredDocs = filteredDocs.filter(doc => {
+      const docTags = doc.user_data?.tags || []
+      if (tagFilterMode === 'AND') {
+        return selectedTags.every(t => docTags.includes(t))
+      } else {
+        return selectedTags.some(t => docTags.includes(t))
+      }
+    })
+  }
 
   // Build breadcrumb
   const breadcrumb = []
@@ -207,10 +238,18 @@ export default function DocList() {
     }
   }
 
-  if (!folder) {
+  // Build tag view title
+  const getTagViewTitle = () => {
+    if (selectedTags.length === 0) return ''
+    const tagNames = selectedTags.map(slug => tagRegistry[slug]?.displayName || slug)
+    const connector = tagFilterMode === 'AND' ? ' & ' : ' | '
+    return tagNames.join(connector)
+  }
+
+  if (!folder && !isTagView) {
     return (
       <div className={styles.docList}>
-        <div className={styles.empty}>Select a folder</div>
+        <div className={styles.empty}>Select a folder or tag</div>
       </div>
     )
   }
@@ -220,25 +259,37 @@ export default function DocList() {
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.breadcrumb}>
-          {breadcrumb.map((f, i) => (
-            <span key={f.id}>
-              {i > 0 && <span className={styles.separator}> › </span>}
-              <span className={i === breadcrumb.length - 1 ? styles.current : ''}>
-                {f.name}
-              </span>
+          {isTagView ? (
+            <span className={styles.tagViewTitle}>
+              <span className={styles.tagIcon}>🏷</span>
+              {getTagViewTitle()}
             </span>
-          ))}
+          ) : (
+            breadcrumb.map((f, i) => (
+              <span key={f.id}>
+                {i > 0 && <span className={styles.separator}> › </span>}
+                <span className={i === breadcrumb.length - 1 ? styles.current : ''}>
+                  {f.name}
+                </span>
+              </span>
+            ))
+          )}
         </div>
         <div className={styles.headerMeta}>
           <span className={styles.docCount}>{allDocs.length} documents</span>
-          <button
-            className={styles.addBtn}
-            onClick={() => setShowUpload(!showUpload)}
-          >
-            {showUpload ? '✕ Cancel' : '+ Add'}
-          </button>
+          {!isTagView && (
+            <button
+              className={styles.addBtn}
+              onClick={() => setShowUpload(!showUpload)}
+            >
+              {showUpload ? '✕ Cancel' : '+ Add'}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Active tag filters */}
+      <ActiveFilters />
 
       {/* Upload zone */}
       {showUpload && (

@@ -9,6 +9,7 @@ import { claudeService } from '../../services/ai/ClaudeService'
 import { openaiService } from '../../services/ai/OpenAIService'
 import { settingsService } from '../../services/settings/SettingsService'
 import FolderTree from '../library/FolderTree'
+import TagsList from '../library/TagsList'
 import styles from './Sidebar.module.css'
 
 export default function Sidebar() {
@@ -241,6 +242,7 @@ export default function Sidebar() {
       {/* Folder tree */}
       <div className={styles.tree}>
         <FolderTree />
+        <TagsList />
       </div>
 
       {/* Footer */}
