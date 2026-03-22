@@ -11,13 +11,17 @@ Stored at: `/ScholarLib/_system/library.json` in Box/Dropbox.
 ```json
 {
   "version": "1.0",
-  "schema_updated": "2026-03-19",
+  "schema_updated": "2026-03-23",
   "last_modified": "ISO8601 timestamp",
   "last_modified_by": "device-id or email",
   "folders": [FolderNode],
   "documents": {
     "[doc-id]": DocumentRecord
-  }
+  },
+  "tag_registry": {
+    "[tag-slug]": TagRecord
+  },
+  "smart_collections": [SmartCollection]
 }
 ```
 
@@ -102,7 +106,7 @@ Stored at: `/ScholarLib/_system/library.json` in Box/Dropbox.
     "read": false,
     "read_at": null,
     "starred": false,
-    "tags": ["degradation", "thermal", "calendar-aging"],
+    "tags": ["degradation", "thermal", "calendar-aging"],  // Tag slugs referencing tag_registry
     "rating": null,
     "custom_fields": {}
   },
@@ -128,6 +132,137 @@ Stored at: `/ScholarLib/_system/library.json` in Box/Dropbox.
 
 ---
 
+## TagRecord
+
+Tags are stored in a global registry with metadata. Documents reference tags by slug only.
+
+```json
+{
+  "battery-thermal-management": {
+    "displayName": "Battery Thermal Management",
+    "color": "#4A90D9",
+    "category": null,
+    "description": "",
+    "created_at": "2026-01-15T10:30:00Z",
+    "updated_at": "2026-01-15T10:30:00Z"
+  },
+  "to-cite": {
+    "displayName": "To Cite",
+    "color": "#E85D75",
+    "category": "status",
+    "description": "Papers to cite in current manuscript",
+    "created_at": "2026-02-20T14:00:00Z",
+    "updated_at": "2026-02-20T14:00:00Z"
+  },
+  "literature-review": {
+    "displayName": "Literature Review",
+    "color": "#50C878",
+    "category": "workflow",
+    "description": "",
+    "created_at": "2026-03-01T09:00:00Z",
+    "updated_at": "2026-03-01T09:00:00Z"
+  }
+}
+```
+
+### Tag Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `displayName` | string | Original user input for display (e.g., "Battery Thermal Management") |
+| `color` | string | Hex color code for visual distinction (default: system assigns from palette) |
+| `category` | string \| null | Optional grouping (e.g., "topics", "status", "workflow", "projects") |
+| `description` | string | Optional description of what this tag represents |
+| `created_at` | ISO8601 | When the tag was first created |
+| `updated_at` | ISO8601 | When the tag metadata was last modified |
+
+### Tag Slug Rules
+- The key (slug) is derived from `displayName`
+- Lowercase only
+- Spaces replaced with hyphens
+- Special characters removed
+- Must be unique across registry
+- Example: "Battery Thermal Management" → `battery-thermal-management`
+
+### Tag Deletion Behavior
+When a tag is deleted from the registry:
+1. Remove the tag entry from `tag_registry`
+2. Remove the tag slug from ALL `documents[*].user_data.tags` arrays
+3. Remove the tag slug from ALL `notes[*].tags` arrays
+4. This is an atomic operation — all references are cleaned up
+
+### Default Color Palette
+When a tag is created without a color, assign from this rotating palette:
+```javascript
+const TAG_COLORS = [
+  '#4A90D9', // Blue
+  '#E85D75', // Rose
+  '#50C878', // Emerald
+  '#9B59B6', // Purple
+  '#F39C12', // Amber
+  '#1ABC9C', // Teal
+  '#E67E22', // Orange
+  '#3498DB', // Sky
+]
+```
+
+---
+
+## SmartCollection
+
+Smart collections are saved tag-based filters that auto-update as documents are tagged.
+
+```json
+{
+  "id": "sc_a1b2c3d4",
+  "name": "Chapter 3 Sources",
+  "icon": "bookmark",
+  "filter": {
+    "tags": ["literature-review", "chapter-3"],
+    "tagMode": "AND",
+    "starred": null,
+    "read": true
+  },
+  "created_at": "2026-03-15T14:00:00Z",
+  "updated_at": "2026-03-15T14:00:00Z"
+}
+```
+
+### SmartCollection Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique ID prefixed with `sc_` |
+| `name` | string | Display name for the collection |
+| `icon` | string | Icon identifier (bookmark, folder, star, tag, etc.) |
+| `filter.tags` | string[] | Array of tag slugs to match |
+| `filter.tagMode` | "AND" \| "OR" | How to combine multiple tags |
+| `filter.starred` | boolean \| null | Filter by starred status (null = ignore) |
+| `filter.read` | boolean \| null | Filter by read status (null = ignore) |
+| `created_at` | ISO8601 | When the collection was created |
+| `updated_at` | ISO8601 | When the collection was last modified |
+
+### Evaluation Logic
+```javascript
+function matchesCollection(doc, collection) {
+  const { tags, tagMode, starred, read } = collection.filter
+  const docTags = doc.user_data?.tags || []
+
+  // Tag matching
+  const tagMatch = tagMode === 'AND'
+    ? tags.every(t => docTags.includes(t))
+    : tags.some(t => docTags.includes(t))
+
+  // Additional filters
+  const starredMatch = starred === null || doc.user_data?.starred === starred
+  const readMatch = read === null || doc.user_data?.read === read
+
+  return tagMatch && starredMatch && readMatch
+}
+```
+
+---
+
 ## notes.json
 
 Stored at: `/ScholarLib/_system/notes.json`
@@ -147,6 +282,8 @@ Stored at: `/ScholarLib/_system/notes.json`
   }
 }
 ```
+
+**Note:** The `tags` array in notes contains tag slugs that reference the global `tag_registry` in `library.json`. When a tag is deleted from the registry, it is also removed from all note tag arrays.
 
 ---
 

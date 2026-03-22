@@ -14,7 +14,7 @@ A professional academic reference manager web app built for Dr. Ali Pourmousavi 
 
 ## How to Use These Docs
 
-This project is divided into **17 build stages**. Each stage is self-contained with clear inputs, outputs, and a commit instruction.
+This project is divided into **21 build stages**. Each stage is self-contained with clear inputs, outputs, and a commit instruction.
 
 ### ⚠️ Critical Rule: Context Window Management
 
@@ -46,9 +46,13 @@ Then load only the files needed for that stage. Do NOT carry context from previo
 | [14](docs/stages/STAGE_14.md) | Sharing, collaboration, activity dashboard | 3–4h |
 | [15](docs/stages/STAGE_15.md) | Chat history persistence + export | 2h |
 | [16](docs/stages/STAGE_16.md) | PWA setup, service worker, offline | 2h |
-| [17](docs/stages/STAGE_17.md) | Polish, error handling, accessibility, final QA | 3–4h |
+| [17](docs/stages/STAGE_12_to_17.md#stage-17--polish-error-handling-accessibility-final-qa) | Polish, error handling, accessibility, final QA | 3–4h |
+| [18](docs/stages/STAGE_18_to_21.md#stage-18--tag-infrastructure) | Tag Infrastructure — registry, TagInput, document tagging | 4–5h |
+| [19](docs/stages/STAGE_18_to_21.md#stage-19--tag-navigation--filtering) | Tag Navigation — sidebar section, filtering, multi-tag selection | 4–5h |
+| [20](docs/stages/STAGE_18_to_21.md#stage-20--tag-scoped-ai-chat) | Tag-Scoped AI — multi-tag scope with AND/OR operators | 3–4h |
+| [21](docs/stages/STAGE_18_to_21.md#stage-21--smart-collections--tag-management) | Smart Collections & Tag Management — colors, bulk ops, rename/merge | 5–6h |
 
-**Total estimated build time:** 42–58 hours of focused development
+**Total estimated build time:** 58–78 hours of focused development
 
 ---
 
@@ -72,7 +76,10 @@ scholarlib/
 │   ├── USER_SETUP.md
 │   ├── LIBRARY_SCHEMA.md
 │   └── stages/
-│       ├── STAGE_01.md … STAGE_17.md
+│       ├── STAGE_01_to_05.md
+│       ├── STAGE_06_to_11.md
+│       ├── STAGE_12_to_17.md
+│       └── STAGE_18_to_21.md
 ├── public/
 │   ├── manifest.json
 │   └── icons/
@@ -82,20 +89,22 @@ scholarlib/
 │   ├── components/
 │   │   ├── ui/              ← design system components
 │   │   ├── layout/          ← sidebar, panels, shell
-│   │   ├── library/         ← folder tree, doc list, doc card
+│   │   ├── library/         ← folder tree, doc list, doc card, tags list
 │   │   ├── viewer/          ← PDF viewer
 │   │   ├── metadata/        ← extraction modal, form
 │   │   ├── notes/           ← notes editor, export
 │   │   ├── ai/              ← chat, history, scope selector
 │   │   ├── settings/        ← all settings sections
-│   │   └── sharing/         ← share modal, activity dashboard
+│   │   ├── sharing/         ← share modal, activity dashboard
+│   │   └── tags/            ← tag management modals (Stage 21)
 │   ├── hooks/               ← custom React hooks
 │   ├── services/
 │   │   ├── storage/         ← Box, Dropbox adapters
 │   │   ├── metadata/        ← CrossRef, Semantic Scholar, AI extraction
 │   │   ├── ai/              ← Ollama, WebLLM, Claude API, OpenAI
 │   │   ├── indexing/        ← PDF chunking, embeddings, vector search
-│   │   └── library/         ← library.json CRUD
+│   │   ├── library/         ← library.json CRUD
+│   │   └── tags/            ← tag registry, smart collections
 │   ├── store/               ← Zustand state management
 │   ├── styles/
 │   │   └── tokens.css       ← CSS custom properties
