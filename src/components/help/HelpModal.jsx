@@ -395,7 +395,8 @@ export default function HelpModal({ onClose }) {
       <ul>
         <li><strong>Default Format:</strong> Markdown, Text, PDF, or Word</li>
         <li><strong>Clear Chat History:</strong> Delete all saved conversations</li>
-        <li><strong>Re-index:</strong> Rebuild the search index</li>
+        <li><strong>Re-index All:</strong> Rebuild the search index for all documents</li>
+        <li><strong>Remove Orphaned Documents:</strong> Clean up library entries whose PDF files no longer exist in storage</li>
       </ul>
     </div>
   )
