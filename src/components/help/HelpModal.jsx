@@ -5,6 +5,7 @@ import styles from './HelpModal.module.css'
 const SECTIONS = [
   { id: 'getting-started', label: 'Getting Started', icon: 'rocket' },
   { id: 'storage', label: 'Storage Setup', icon: 'cloud' },
+  { id: 'migration', label: 'Switching Providers', icon: 'migrate' },
   { id: 'ai', label: 'AI Setup', icon: 'brain' },
   { id: 'library', label: 'Managing Library', icon: 'folder' },
   { id: 'chat', label: 'AI Chat', icon: 'chat' },
@@ -52,6 +53,14 @@ const SectionIcons = {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <rect x="2" y="4" width="20" height="16" rx="2"/>
       <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"/>
+    </svg>
+  ),
+  migrate: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M17 3l4 4-4 4"/>
+      <path d="M3 11V9a4 4 0 014-4h14"/>
+      <path d="M7 21l-4-4 4-4"/>
+      <path d="M21 13v2a4 4 0 01-4 4H3"/>
     </svg>
   )
 }
@@ -591,10 +600,180 @@ export default function HelpModal({ onClose }) {
     </div>
   )
 
+  const renderMigration = () => (
+    <div className={styles.content}>
+      <h2>Switching Storage Providers</h2>
+      <p className={styles.intro}>
+        Moving from Dropbox to Box, or vice versa? This guide explains how to migrate your
+        entire ScholarLib library to a new storage provider.
+      </p>
+
+      <h3>When to Migrate</h3>
+      <ul>
+        <li>Switching from personal Dropbox to university Box account</li>
+        <li>Moving to a storage provider with more space</li>
+        <li>Consolidating storage across services</li>
+      </ul>
+
+      <h3>What Gets Preserved</h3>
+      <div className={styles.preservedList}>
+        <div className={styles.preservedItem}>
+          <span className={styles.checkmark}>✓</span>
+          <div>
+            <strong>Folder Structure</strong>
+            <p>All your folders and their hierarchy</p>
+          </div>
+        </div>
+        <div className={styles.preservedItem}>
+          <span className={styles.checkmark}>✓</span>
+          <div>
+            <strong>Document Metadata</strong>
+            <p>Titles, authors, DOIs, journals, years</p>
+          </div>
+        </div>
+        <div className={styles.preservedItem}>
+          <span className={styles.checkmark}>✓</span>
+          <div>
+            <strong>Notes & Annotations</strong>
+            <p>All your notes for each document</p>
+          </div>
+        </div>
+        <div className={styles.preservedItem}>
+          <span className={styles.checkmark}>✓</span>
+          <div>
+            <strong>Chat History</strong>
+            <p>All AI conversations with their document references</p>
+          </div>
+        </div>
+        <div className={styles.preservedItem}>
+          <span className={styles.checkmark}>✓</span>
+          <div>
+            <strong>Tags & Stars</strong>
+            <p>Your document tags, stars, and read status</p>
+          </div>
+        </div>
+      </div>
+
+      <h3>What Needs Rebuilding</h3>
+      <p>
+        <strong>Vector search indexes</strong> — These need to be regenerated after import.
+        Use "Re-index all documents" in Settings after importing.
+      </p>
+
+      <h3>Step 1: Export Your Library</h3>
+      <div className={styles.migrationStep}>
+        <ol>
+          <li>Go to <strong>Settings → Storage</strong></li>
+          <li>Scroll down to the <strong>Migration</strong> section</li>
+          <li>Click <strong>Export Library Bundle</strong></li>
+          <li>Review the export summary (folders, documents, notes, conversations)</li>
+          <li>Click <strong>Download Bundle</strong></li>
+          <li>Save the <code>.scholarlib</code> file somewhere safe</li>
+        </ol>
+      </div>
+
+      <h3>Step 2: Transfer Your PDFs</h3>
+      <div className={styles.migrationStep}>
+        <p>PDFs are not included in the bundle to keep the file size manageable. Transfer them separately:</p>
+
+        <div className={styles.transferOption}>
+          <strong>Option A: Desktop Apps (Recommended)</strong>
+          <p>
+            If you have both Dropbox and Box desktop apps installed, simply drag the
+            <code>ScholarLib/PDFs</code> folder from one to the other.
+          </p>
+        </div>
+
+        <div className={styles.transferOption}>
+          <strong>Option B: Web Interface</strong>
+          <p>
+            Download your PDFs folder as a ZIP from the old provider's website,
+            then upload and extract it in the new provider.
+          </p>
+        </div>
+
+        <div className={styles.transferOption}>
+          <strong>Option C: Cloud Transfer Tools</strong>
+          <p>
+            Services like MultCloud, Mover.io, or similar can transfer files
+            directly between cloud providers without downloading locally.
+          </p>
+        </div>
+      </div>
+
+      <h3>Step 3: Connect to New Provider</h3>
+      <div className={styles.migrationStep}>
+        <ol>
+          <li>In ScholarLib, go to <strong>Settings → Storage</strong></li>
+          <li>Click <strong>Disconnect</strong> to sign out of the current provider</li>
+          <li>You'll be taken to the provider selection screen</li>
+          <li>Connect to your new provider (Box or Dropbox)</li>
+          <li>Authorize ScholarLib to access the new account</li>
+        </ol>
+      </div>
+
+      <h3>Step 4: Import Your Library</h3>
+      <div className={styles.migrationStep}>
+        <ol>
+          <li>Make sure your PDFs are in the <code>ScholarLib/PDFs/</code> folder on the new provider</li>
+          <li>Go to <strong>Settings → Storage</strong></li>
+          <li>Click <strong>Import Library Bundle</strong></li>
+          <li>Select your <code>.scholarlib</code> file</li>
+          <li>ScholarLib will scan for PDFs and match them to your documents</li>
+          <li>Review the matching results:
+            <ul>
+              <li><strong>Green</strong> — PDF found, ready to import</li>
+              <li><strong>Yellow</strong> — PDF not found (you can add it later)</li>
+            </ul>
+          </li>
+          <li>Click <strong>Import Library</strong></li>
+        </ol>
+      </div>
+
+      <h3>Step 5: Re-index Documents</h3>
+      <div className={styles.migrationStep}>
+        <p>After importing, rebuild the AI search index:</p>
+        <ol>
+          <li>Go to <strong>Settings → Export & Privacy</strong></li>
+          <li>Click <strong>Re-index all documents</strong></li>
+          <li>Wait for indexing to complete (shown in the sidebar)</li>
+        </ol>
+      </div>
+
+      <h3>Troubleshooting</h3>
+      <div className={styles.troubleshooting}>
+        <div className={styles.troubleItem}>
+          <strong>"No PDFs found"</strong>
+          <p>
+            Make sure your PDFs are in a folder called <code>PDFs</code> inside the <code>ScholarLib</code>
+            folder. The structure should be: <code>ScholarLib/PDFs/your-papers.pdf</code>
+          </p>
+        </div>
+
+        <div className={styles.troubleItem}>
+          <strong>"Some documents missing PDFs"</strong>
+          <p>
+            This is okay! Documents will be imported with their metadata intact.
+            You can upload the missing PDFs later and they'll automatically reconnect.
+          </p>
+        </div>
+
+        <div className={styles.troubleItem}>
+          <strong>"Import replaced my existing library"</strong>
+          <p>
+            Import always replaces existing data. If you need to merge libraries,
+            export your current library first, then manually combine the folders.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+
   const renderSection = () => {
     switch (activeSection) {
       case 'getting-started': return renderGettingStarted()
       case 'storage': return renderStorageSetup()
+      case 'migration': return renderMigration()
       case 'ai': return renderAISetup()
       case 'library': return renderLibrary()
       case 'chat': return renderChat()

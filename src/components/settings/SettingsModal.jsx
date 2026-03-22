@@ -13,6 +13,7 @@ import { claudeService } from '../../services/ai/ClaudeService'
 import { openaiService } from '../../services/ai/OpenAIService'
 import { useToast } from '../../hooks/useToast'
 import Modal from '../ui/Modal'
+import MigrationWizard from '../migration/MigrationWizard'
 import styles from './SettingsModal.module.css'
 
 // SVG Icons for settings sections
@@ -100,6 +101,10 @@ export default function SettingsModal({ onClose }) {
   // Account state
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
+
+  // Migration state
+  const [showMigrationWizard, setShowMigrationWizard] = useState(false)
+  const [migrationMode, setMigrationMode] = useState(null) // 'export' or 'import'
 
   const provider = useAIStore((s) => s.provider)
   const model = useAIStore((s) => s.model)
@@ -872,6 +877,26 @@ export default function SettingsModal({ onClose }) {
     </div>
   )
 
+  const handleOpenExport = () => {
+    setMigrationMode('export')
+    setShowMigrationWizard(true)
+  }
+
+  const handleOpenImport = () => {
+    setMigrationMode('import')
+    setShowMigrationWizard(true)
+  }
+
+  const handleMigrationClose = () => {
+    setShowMigrationWizard(false)
+    setMigrationMode(null)
+  }
+
+  const handleMigrationComplete = () => {
+    // Reload library data after import
+    window.location.reload()
+  }
+
   const renderStorageSection = () => (
     <div className={styles.section}>
       <h3 className={styles.sectionTitle}>Storage Provider</h3>
@@ -908,6 +933,30 @@ export default function SettingsModal({ onClose }) {
         <p className={styles.hint}>
           Disconnecting will sign you out. Your PDFs and library data remain safely in {storageProvider === 'box' ? 'Box' : 'Dropbox'}.
         </p>
+      )}
+
+      {!isDemoMode && (
+        <>
+          <h3 className={styles.sectionTitle} style={{ marginTop: 32 }}>Migration</h3>
+          <p className={styles.hint}>
+            Moving to a different storage provider? Export your library data and import it after connecting to the new provider.
+          </p>
+
+          <div className={styles.actions} style={{ marginTop: 12 }}>
+            <button
+              className={styles.secondaryBtn}
+              onClick={handleOpenExport}
+            >
+              Export Library Bundle
+            </button>
+            <button
+              className={styles.secondaryBtn}
+              onClick={handleOpenImport}
+            >
+              Import Library Bundle
+            </button>
+          </div>
+        </>
       )}
     </div>
   )
@@ -1282,54 +1331,66 @@ export default function SettingsModal({ onClose }) {
   }
 
   return (
-    <Modal onClose={onClose} width={800}>
-      <div className={styles.container}>
-        {/* Header */}
-        <div className={styles.header}>
-          <h2 className={styles.title}>Settings</h2>
-          <button className={styles.closeBtn} onClick={onClose}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-              <path d="M18 6L6 18M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
+    <>
+      <Modal onClose={onClose} width={800}>
+        <div className={styles.container}>
+          {/* Header */}
+          <div className={styles.header}>
+            <h2 className={styles.title}>Settings</h2>
+            <button className={styles.closeBtn} onClick={onClose}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
 
-        {/* Content */}
-        <div className={styles.content}>
-          {/* Nav */}
-          <nav className={styles.nav}>
-            {SECTIONS.map(section => (
-              <button
-                key={section.id}
-                className={`${styles.navItem} ${activeSection === section.id ? styles.active : ''}`}
-                onClick={() => setActiveSection(section.id)}
-              >
-                <span className={styles.navIcon}>{SectionIcons[section.id]}</span>
-                <span className={styles.navLabel}>{section.label}</span>
-              </button>
-            ))}
-          </nav>
+          {/* Content */}
+          <div className={styles.content}>
+            {/* Nav */}
+            <nav className={styles.nav}>
+              {SECTIONS.map(section => (
+                <button
+                  key={section.id}
+                  className={`${styles.navItem} ${activeSection === section.id ? styles.active : ''}`}
+                  onClick={() => setActiveSection(section.id)}
+                >
+                  <span className={styles.navIcon}>{SectionIcons[section.id]}</span>
+                  <span className={styles.navLabel}>{section.label}</span>
+                </button>
+              ))}
+            </nav>
 
-          {/* Section content */}
-          <div className={styles.sectionContent}>
-            {renderSection()}
+            {/* Section content */}
+            <div className={styles.sectionContent}>
+              {renderSection()}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className={styles.footer}>
+            <button className={styles.cancelBtn} onClick={onClose}>
+              Cancel
+            </button>
+            <button
+              className={styles.saveBtn}
+              onClick={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Save'}
+            </button>
           </div>
         </div>
+      </Modal>
 
-        {/* Footer */}
-        <div className={styles.footer}>
-          <button className={styles.cancelBtn} onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className={styles.saveBtn}
-            onClick={handleSave}
-            disabled={isSaving}
-          >
-            {isSaving ? 'Saving...' : 'Save'}
-          </button>
-        </div>
-      </div>
-    </Modal>
+      {showMigrationWizard && (
+        <MigrationWizard
+          mode={migrationMode}
+          adapter={adapter}
+          provider={storageProvider}
+          onClose={handleMigrationClose}
+          onComplete={handleMigrationComplete}
+        />
+      )}
+    </>
   )
 }
