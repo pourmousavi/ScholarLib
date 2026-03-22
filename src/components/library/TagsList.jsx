@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { tagService } from '../../services/tags/TagService'
+import TagEditModal from '../tags/TagEditModal'
+import TagMergeModal from '../tags/TagMergeModal'
 import styles from './TagsList.module.css'
 
 /**
@@ -10,8 +12,14 @@ import styles from './TagsList.module.css'
 export default function TagsList() {
   const [search, setSearch] = useState('')
   const [collapsed, setCollapsed] = useState(false)
+  const [showCreateInput, setShowCreateInput] = useState(false)
+  const [newTagName, setNewTagName] = useState('')
+  const [editingTagSlug, setEditingTagSlug] = useState(null)
+  const [showMergeModal, setShowMergeModal] = useState(false)
+  const [contextMenu, setContextMenu] = useState(null)
 
   const tagRegistry = useLibraryStore((s) => s.tagRegistry)
+  const createTag = useLibraryStore((s) => s.createTag)
   const documents = useLibraryStore((s) => s.documents)
   const selectedTags = useLibraryStore((s) => s.selectedTags)
   const tagFilterMode = useLibraryStore((s) => s.tagFilterMode)
@@ -52,9 +60,13 @@ export default function TagsList() {
     return sortedKeys.map(key => ({ category: key, tags: groups[key] }))
   }, [filteredTags])
 
-  // Don't show section if no tags exist
-  if (Object.keys(tagRegistry).length === 0) {
-    return null
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) return
+    const result = await createTag(newTagName.trim())
+    if (!result.error) {
+      setNewTagName('')
+      setShowCreateInput(false)
+    }
   }
 
   const handleTagClick = (slug, e) => {
@@ -67,19 +79,86 @@ export default function TagsList() {
     }
   }
 
+  const handleTagRightClick = (slug, e) => {
+    e.preventDefault()
+    setContextMenu({ slug, x: e.clientX, y: e.clientY })
+  }
+
+  const closeContextMenu = () => {
+    setContextMenu(null)
+  }
+
+  const hasAnyTags = Object.keys(tagRegistry).length > 0
+
   return (
     <div className={styles.container}>
-      <button
-        className={styles.header}
-        onClick={() => setCollapsed(!collapsed)}
-      >
-        <span className={styles.headerIcon}>{collapsed ? '▸' : '▾'}</span>
-        <span className={styles.headerTitle}>Tags</span>
-        <span className={styles.headerCount}>{tagsWithCounts.length}</span>
-      </button>
+      <div className={styles.headerRow}>
+        <button
+          className={styles.header}
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          <span className={styles.headerIcon}>{collapsed ? '▸' : '▾'}</span>
+          <span className={styles.headerTitle}>Tags</span>
+          <span className={styles.headerCount}>{tagsWithCounts.length}</span>
+        </button>
+        <div className={styles.headerActions}>
+          {hasAnyTags && (
+            <button
+              className={styles.actionBtn}
+              onClick={() => setShowMergeModal(true)}
+              title="Merge tags"
+            >
+              ⎌
+            </button>
+          )}
+          <button
+            className={styles.actionBtn}
+            onClick={() => setShowCreateInput(true)}
+            title="Create new tag"
+          >
+            +
+          </button>
+        </div>
+      </div>
 
       {!collapsed && (
         <>
+          {showCreateInput && (
+            <div className={styles.createWrapper}>
+              <input
+                type="text"
+                className={styles.createInput}
+                placeholder="New tag name..."
+                value={newTagName}
+                onChange={e => setNewTagName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleCreateTag()
+                  if (e.key === 'Escape') {
+                    setShowCreateInput(false)
+                    setNewTagName('')
+                  }
+                }}
+                autoFocus
+              />
+              <button
+                className={styles.createBtn}
+                onClick={handleCreateTag}
+                disabled={!newTagName.trim()}
+              >
+                Add
+              </button>
+              <button
+                className={styles.cancelBtn}
+                onClick={() => {
+                  setShowCreateInput(false)
+                  setNewTagName('')
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {tagsWithCounts.length > 8 && (
             <div className={styles.searchWrapper}>
               <input
@@ -129,7 +208,8 @@ export default function TagsList() {
                     key={tag.slug}
                     className={`${styles.tagItem} ${selectedTags.includes(tag.slug) ? styles.selected : ''}`}
                     onClick={(e) => handleTagClick(tag.slug, e)}
-                    title={`${tag.displayName}${tag.description ? `: ${tag.description}` : ''}`}
+                    onContextMenu={(e) => handleTagRightClick(tag.slug, e)}
+                    title={`${tag.displayName}${tag.description ? `: ${tag.description}` : ''} (right-click to edit)`}
                   >
                     <span
                       className={styles.colorDot}
@@ -145,8 +225,63 @@ export default function TagsList() {
             {filteredTags.length === 0 && search && (
               <div className={styles.noResults}>No tags match "{search}"</div>
             )}
+
+            {!hasAnyTags && !showCreateInput && (
+              <div className={styles.emptyState}>
+                <p>No tags yet</p>
+                <button
+                  className={styles.createFirstBtn}
+                  onClick={() => setShowCreateInput(true)}
+                >
+                  + Create your first tag
+                </button>
+              </div>
+            )}
           </div>
         </>
+      )}
+
+      {/* Context menu for tag actions */}
+      {contextMenu && (
+        <>
+          <div className={styles.contextOverlay} onClick={closeContextMenu} />
+          <div
+            className={styles.contextMenu}
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            <button
+              className={styles.contextItem}
+              onClick={() => {
+                setEditingTagSlug(contextMenu.slug)
+                closeContextMenu()
+              }}
+            >
+              Edit tag...
+            </button>
+            <button
+              className={styles.contextItem}
+              onClick={() => {
+                selectTagFilter(contextMenu.slug)
+                closeContextMenu()
+              }}
+            >
+              Filter by this tag
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Edit tag modal */}
+      {editingTagSlug && (
+        <TagEditModal
+          slug={editingTagSlug}
+          onClose={() => setEditingTagSlug(null)}
+        />
+      )}
+
+      {/* Merge tags modal */}
+      {showMergeModal && (
+        <TagMergeModal onClose={() => setShowMergeModal(false)} />
       )}
     </div>
   )

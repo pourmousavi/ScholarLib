@@ -3,6 +3,38 @@
   margin-top: 8px;
 }
 
+.headerRow {
+  display: flex;
+  align-items: center;
+}
+
+.headerActions {
+  display: flex;
+  gap: 2px;
+  margin-right: 8px;
+}
+
+.actionBtn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.actionBtn:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -178,4 +210,123 @@
   color: var(--text-muted);
   font-size: 12px;
   text-align: center;
+}
+
+.createWrapper {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px 8px;
+}
+
+.createInput {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
+.createInput:focus {
+  outline: none;
+}
+
+.createInput::placeholder {
+  color: var(--text-muted);
+}
+
+.createBtn {
+  padding: 4px 10px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--bg-app);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.createBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancelBtn {
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  color: var(--text-secondary);
+}
+
+.emptyState {
+  padding: 16px 8px;
+  text-align: center;
+}
+
+.emptyState p {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.createFirstBtn {
+  padding: 8px 16px;
+  background: var(--bg-surface);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.createFirstBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.contextOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+
+.contextMenu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 140px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  padding: 4px 0;
+}
+
+.contextItem {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.contextItem:hover {
+  background: var(--bg-hover);
 }
