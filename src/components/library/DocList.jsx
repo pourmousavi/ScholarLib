@@ -6,7 +6,7 @@ import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
 import { useToast } from '../../hooks/useToast'
 import DocCard from './DocCard'
-import PendingNotice from './PendingNotice'
+import IndexingBar from './IndexingBar'
 import UploadZone from '../metadata/UploadZone'
 import styles from './DocList.module.css'
 
@@ -31,12 +31,13 @@ export default function DocList() {
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
 
   const isIndexing = useIndexStore((s) => s.isIndexing)
-  const currentDocId = useIndexStore((s) => s.currentDocId)
-  const indexProgress = useIndexStore((s) => s.progress)
   const startIndexing = useIndexStore((s) => s.startIndexing)
   const setProgress = useIndexStore((s) => s.setProgress)
   const completeIndexing = useIndexStore((s) => s.completeIndexing)
   const failIndexing = useIndexStore((s) => s.failIndexing)
+  const startBatchIndexing = useIndexStore((s) => s.startBatchIndexing)
+  const updateBatchProgress = useIndexStore((s) => s.updateBatchProgress)
+  const completeBatchIndexing = useIndexStore((s) => s.completeBatchIndexing)
 
   const { showToast } = useToast()
 
@@ -62,11 +63,6 @@ export default function DocList() {
     }
   })
 
-  // Count pending docs (including documents without index_status)
-  const pendingCount = allDocs.filter(
-    d => !d.index_status?.status || d.index_status?.status === 'pending' || d.index_status?.status === 'processing'
-  ).length
-
   // Build breadcrumb
   const breadcrumb = []
   let current = folder
@@ -75,6 +71,14 @@ export default function DocList() {
     current = current.parent_id ? folders.find(f => f.id === current.parent_id) : null
   }
 
+  // Get pending documents for this folder
+  const getPendingDocs = () => allDocs.filter(
+    d => !d.index_status?.status ||
+         d.index_status?.status === 'pending' ||
+         d.index_status?.status === 'processing' ||
+         d.index_status?.status === 'failed'
+  )
+
   // Index a single document
   const indexDocument = async (doc) => {
     if (!adapter || !isConnected) {
@@ -82,7 +86,8 @@ export default function DocList() {
       return false
     }
 
-    startIndexing(doc.id)
+    const docName = doc.metadata?.title || doc.filename || 'document'
+    startIndexing(doc.id, docName)
 
     try {
       // Get the actual PDF URL from storage
@@ -101,7 +106,8 @@ export default function DocList() {
     }
   }
 
-  const handleIndexNow = async () => {
+  // Index all pending documents in the folder
+  const handleIndexAll = async () => {
     if (!adapter || !isConnected || isDemoMode) {
       showToast({ message: 'Storage connection required for indexing', type: 'warning' })
       return
@@ -112,27 +118,45 @@ export default function DocList() {
       return
     }
 
-    // Get pending documents
-    const pendingDocs = allDocs.filter(
-      d => d.index_status?.status === 'pending' || d.index_status?.status === 'processing' || !d.index_status?.status
-    )
+    const docsToIndex = getPendingDocs()
 
-    if (pendingDocs.length === 0) {
+    if (docsToIndex.length === 0) {
       showToast({ message: 'No documents to index', type: 'info' })
       return
     }
 
-    // Index first pending document
-    const doc = pendingDocs[0]
-    const success = await indexDocument(doc)
+    // Start batch mode
+    startBatchIndexing(docsToIndex.length)
 
-    if (success) {
-      showToast({ message: `Indexed "${doc.metadata?.title || doc.filename}"`, type: 'success' })
+    let successCount = 0
+    let failCount = 0
 
-      // If more pending, show message
-      if (pendingDocs.length > 1) {
-        showToast({ message: `${pendingDocs.length - 1} more documents pending`, type: 'info' })
+    for (let i = 0; i < docsToIndex.length; i++) {
+      const doc = docsToIndex[i]
+      updateBatchProgress(i)
+
+      const success = await indexDocument(doc)
+      if (success) {
+        successCount++
+      } else {
+        failCount++
       }
+    }
+
+    // Complete batch
+    completeBatchIndexing()
+
+    // Show result
+    if (failCount === 0) {
+      showToast({
+        message: `Successfully indexed ${successCount} document${successCount !== 1 ? 's' : ''}`,
+        type: 'success'
+      })
+    } else if (successCount > 0) {
+      showToast({
+        message: `Indexed ${successCount} document${successCount !== 1 ? 's' : ''}, ${failCount} failed`,
+        type: 'warning'
+      })
     } else {
       showToast({ message: 'Indexing failed', type: 'error' })
     }
@@ -172,10 +196,9 @@ export default function DocList() {
 
       // Auto-index the document for AI chat
       if (!isDemoMode) {
-        showToast({ message: 'Indexing for AI chat...', type: 'info' })
         const success = await indexDocument(doc)
         if (success) {
-          showToast({ message: 'Document ready for AI chat', type: 'success' })
+          showToast({ message: 'Document indexed and ready for AI chat', type: 'success' })
         }
       }
     } catch (error) {
@@ -256,46 +279,11 @@ export default function DocList() {
         )}
       </div>
 
-      {/* Pending notice */}
-      <PendingNotice count={pendingCount} onIndexNow={handleIndexNow} />
-
-      {/* Show index all button only if there are unindexed documents */}
-      {(() => {
-        const unindexedDocs = allDocs.filter(
-          d => !d.index_status?.status ||
-               d.index_status?.status === 'pending' ||
-               d.index_status?.status === 'processing' ||
-               d.index_status?.status === 'failed'
-        )
-        if (unindexedDocs.length === 0) return null
-
-        return (
-          <div className={styles.debugNotice}>
-            <span>{unindexedDocs.length} document{unindexedDocs.length !== 1 ? 's' : ''} need indexing</span>
-            <button
-              className={styles.indexBtn}
-              disabled={isIndexing}
-              onClick={async () => {
-                let successCount = 0
-                for (const doc of unindexedDocs) {
-                  console.log('Indexing:', doc.id, doc.filename)
-                  const success = await indexDocument(doc)
-                  if (success) successCount++
-                }
-                if (successCount === unindexedDocs.length) {
-                  showToast({ message: 'All documents indexed successfully', type: 'success' })
-                } else if (successCount > 0) {
-                  showToast({ message: `Indexed ${successCount} of ${unindexedDocs.length} documents`, type: 'warning' })
-                } else {
-                  showToast({ message: 'Indexing failed', type: 'error' })
-                }
-              }}
-            >
-              {isIndexing ? 'Indexing...' : 'Index All Documents'}
-            </button>
-          </div>
-        )
-      })()}
+      {/* Indexing bar */}
+      <IndexingBar
+        pendingDocs={getPendingDocs()}
+        onIndexAll={handleIndexAll}
+      />
     </div>
   )
 }

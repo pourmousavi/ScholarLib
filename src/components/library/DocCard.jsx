@@ -2,6 +2,7 @@ import { useState, memo, useCallback } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
+import { useIndexStore } from '../../store/indexStore'
 import { useToast } from '../../hooks/useToast'
 import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
@@ -12,6 +13,7 @@ const DocCard = memo(function DocCard({ doc }) {
   const [contextMenu, setContextMenu] = useState(null)
   const [isReindexing, setIsReindexing] = useState(false)
 
+  const isIndexing = useIndexStore((s) => s.isIndexing)
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
   const setSelectedDocId = useLibraryStore((s) => s.setSelectedDocId)
   const updateDocument = useLibraryStore((s) => s.updateDocument)
@@ -112,7 +114,9 @@ const DocCard = memo(function DocCard({ doc }) {
   }
 
   const handleReindex = async () => {
-    if (isReindexing || isDemoMode || !adapter) return
+    const { isIndexing, startIndexing, setProgress, completeIndexing, failIndexing } = useIndexStore.getState()
+
+    if (isReindexing || isIndexing || isDemoMode || !adapter) return
 
     const path = doc.box_path
     if (!path) {
@@ -121,7 +125,8 @@ const DocCard = memo(function DocCard({ doc }) {
     }
 
     setIsReindexing(true)
-    showToast({ message: 'Re-indexing document...', type: 'info' })
+    const docName = doc.metadata?.title || doc.filename || 'document'
+    startIndexing(doc.id, docName)
 
     try {
       // Get PDF URL
@@ -129,14 +134,14 @@ const DocCard = memo(function DocCard({ doc }) {
 
       // Re-index the document
       await indexService.indexDocument(doc.id, pdfUrl, adapter, (progress) => {
-        if (progress.stage === 'embedding') {
-          // Could update a progress indicator here if needed
-        }
+        setProgress(progress)
       })
 
+      completeIndexing(doc.id)
       showToast({ message: 'Document re-indexed successfully', type: 'success' })
     } catch (error) {
       console.error('Re-indexing failed:', error)
+      failIndexing(doc.id, error)
       showToast({ message: error.message || 'Re-indexing failed', type: 'error' })
     } finally {
       setIsReindexing(false)
@@ -172,10 +177,10 @@ const DocCard = memo(function DocCard({ doc }) {
     },
     { separator: true },
     {
-      label: isReindexing ? 'Re-indexing...' : 'Re-index for AI',
+      label: isReindexing || isIndexing ? 'Indexing in progress...' : 'Re-index for AI',
       icon: <RefreshIcon />,
       onClick: handleReindex,
-      disabled: isReindexing || isDemoMode
+      disabled: isReindexing || isIndexing || isDemoMode
     },
     { separator: true },
     {

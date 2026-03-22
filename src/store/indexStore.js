@@ -7,10 +7,16 @@ export const useIndexStore = create((set, get) => ({
   // Indexing state
   isIndexing: false,
   currentDocId: null,
+  currentDocName: null,
   currentStage: null, // extracting | chunking | embedding | saving
   progress: 0,
   currentChunk: 0,
   totalChunks: 0,
+
+  // Batch indexing state
+  batchTotal: 0,
+  batchCurrent: 0,
+  batchMode: false,
 
   // Pending documents
   pendingDocs: [],
@@ -25,7 +31,7 @@ export const useIndexStore = create((set, get) => ({
 
   // Set indexing progress
   setProgress: (progress) => set({
-    stage: progress.stage,
+    currentStage: progress.stage,
     currentDocId: progress.docId,
     progress: progress.progress || 0,
     currentChunk: progress.current || 0,
@@ -33,28 +39,52 @@ export const useIndexStore = create((set, get) => ({
   }),
 
   // Start indexing a document
-  startIndexing: (docId) => set({
+  startIndexing: (docId, docName = null) => set({
     isIndexing: true,
     currentDocId: docId,
+    currentDocName: docName,
     currentStage: 'extracting',
     progress: 0,
     error: null
+  }),
+
+  // Start batch indexing
+  startBatchIndexing: (totalDocs) => set({
+    batchMode: true,
+    batchTotal: totalDocs,
+    batchCurrent: 0,
+    error: null
+  }),
+
+  // Update batch progress
+  updateBatchProgress: (current) => set({
+    batchCurrent: current
   }),
 
   // Complete indexing
   completeIndexing: (docId) => set((state) => ({
     isIndexing: state.queue.length > 0,
     currentDocId: null,
+    currentDocName: null,
     currentStage: null,
     progress: 0,
     pendingDocs: state.pendingDocs.filter(id => id !== docId),
     indexedDocs: [...state.indexedDocs, docId]
   })),
 
+  // Complete batch indexing
+  completeBatchIndexing: () => set({
+    batchMode: false,
+    batchTotal: 0,
+    batchCurrent: 0,
+    isIndexing: false
+  }),
+
   // Fail indexing
   failIndexing: (docId, error) => set({
     isIndexing: false,
     currentDocId: null,
+    currentDocName: null,
     currentStage: null,
     progress: 0,
     error: error?.message || 'Indexing failed'
@@ -84,10 +114,14 @@ export const useIndexStore = create((set, get) => ({
   reset: () => set({
     isIndexing: false,
     currentDocId: null,
+    currentDocName: null,
     currentStage: null,
     progress: 0,
     currentChunk: 0,
     totalChunks: 0,
+    batchMode: false,
+    batchTotal: 0,
+    batchCurrent: 0,
     pendingDocs: [],
     indexedDocs: [],
     queue: [],
