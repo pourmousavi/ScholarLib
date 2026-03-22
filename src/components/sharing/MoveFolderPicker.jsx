@@ -1,16 +1,22 @@
 import { useState } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
+import { useStorageStore } from '../../store/storageStore'
+import { LibraryService } from '../../services/library/LibraryService'
 import { useToast } from '../../hooks/useToast'
 import Modal from '../ui/Modal'
 import styles from './MoveFolderPicker.module.css'
 
 export default function MoveFolderPicker({ onClose }) {
   const [selectedTargetId, setSelectedTargetId] = useState(null)
+  const [isMoving, setIsMoving] = useState(false)
 
   const folders = useLibraryStore((s) => s.folders)
   const documents = useLibraryStore((s) => s.documents)
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
   const updateDocument = useLibraryStore((s) => s.updateDocument)
+
+  const adapter = useStorageStore((s) => s.adapter)
+  const isDemoMode = useStorageStore((s) => s.isDemoMode)
 
   const { showToast } = useToast()
 
@@ -21,17 +27,37 @@ export default function MoveFolderPicker({ onClose }) {
     .filter(f => f.parent_id === null)
     .sort((a, b) => a.sort_order - b.sort_order)
 
-  const handleMove = () => {
+  const handleMove = async () => {
     if (!selectedTargetId || selectedTargetId === currentFolderId) {
       onClose()
       return
     }
 
-    updateDocument(selectedDocId, { folder_id: selectedTargetId })
+    setIsMoving(true)
 
-    const targetFolder = folders.find(f => f.id === selectedTargetId)
-    showToast({ message: `Moved to "${targetFolder?.name}"`, type: 'success' })
-    onClose()
+    try {
+      // Update in store
+      updateDocument(selectedDocId, { folder_id: selectedTargetId })
+
+      // Save to storage
+      if (!isDemoMode && adapter) {
+        const { folders: currentFolders, documents: currentDocs } = useLibraryStore.getState()
+        await LibraryService.saveLibrary(adapter, {
+          version: '1.0',
+          folders: currentFolders,
+          documents: currentDocs
+        })
+      }
+
+      const targetFolder = folders.find(f => f.id === selectedTargetId)
+      showToast({ message: `Moved to "${targetFolder?.name}"`, type: 'success' })
+      onClose()
+    } catch (error) {
+      console.error('Failed to move document:', error)
+      showToast({ message: 'Failed to move document', type: 'error' })
+    } finally {
+      setIsMoving(false)
+    }
   }
 
   if (!doc) {
@@ -79,15 +105,15 @@ export default function MoveFolderPicker({ onClose }) {
 
         {/* Footer */}
         <div className={styles.footer}>
-          <button className={styles.cancelBtn} onClick={onClose}>
+          <button className={styles.cancelBtn} onClick={onClose} disabled={isMoving}>
             Cancel
           </button>
           <button
             className={styles.moveBtn}
             onClick={handleMove}
-            disabled={!selectedTargetId || selectedTargetId === currentFolderId}
+            disabled={!selectedTargetId || selectedTargetId === currentFolderId || isMoving}
           >
-            Move here
+            {isMoving ? 'Moving...' : 'Move here'}
           </button>
         </div>
       </div>

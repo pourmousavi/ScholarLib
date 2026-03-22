@@ -101,8 +101,40 @@ const DocCard = memo(function DocCard({ doc }) {
     setShowModal('move')
   }
 
-  const handleDuplicate = () => {
-    showToast({ message: 'Duplicate not implemented yet', type: 'info' })
+  const handleDuplicate = async () => {
+    // Generate a new ID for the duplicate
+    const newId = `doc_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+
+    // Create duplicate document with new ID
+    const duplicateDoc = {
+      ...doc,
+      id: newId,
+      added_at: new Date().toISOString(),
+      metadata: {
+        ...doc.metadata,
+        title: doc.metadata?.title ? `${doc.metadata.title} (copy)` : `${doc.filename} (copy)`
+      },
+      user_data: {
+        ...doc.user_data,
+        read: false,
+        starred: false,
+        read_at: null
+      },
+      index_status: {
+        status: 'pending',
+        indexed_at: null,
+        chunk_count: 0
+      }
+    }
+
+    // Add to library store
+    const addDocument = useLibraryStore.getState().addDocument
+    addDocument(duplicateDoc)
+
+    // Save to storage
+    await saveLibrary()
+
+    showToast({ message: 'Document duplicated', type: 'success' })
   }
 
   const handleDelete = async () => {
