@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { tagService } from '../services/tags/TagService'
+import { smartCollectionService } from '../services/tags/SmartCollectionService'
 
 // Mock folder data for development/offline mode
 const mockFolders = [
@@ -306,6 +307,13 @@ export const useLibraryStore = create((set, get) => ({
   // Tag filter state
   selectedTags: [],
   tagFilterMode: 'AND', // 'AND' | 'OR'
+
+  // Smart collection state
+  selectedCollectionId: null,
+
+  // Bulk selection state
+  selectedDocIds: [],
+  selectionMode: false,
 
   // Set library data from storage
   setLibraryData: (library) => {
@@ -643,5 +651,72 @@ export const useLibraryStore = create((set, get) => ({
 
     set({ tagRegistry: newRegistry, documents: newDocuments })
     return result
+  },
+
+  // ============================================
+  // Smart Collection Actions
+  // ============================================
+
+  createSmartCollection: (name, filter) => {
+    const { smartCollections } = get()
+    const collection = smartCollectionService.create(name, filter)
+    const newCollections = [...smartCollections, collection]
+    set({ smartCollections: newCollections })
+    return collection
+  },
+
+  updateSmartCollection: (id, updates) => {
+    const { smartCollections } = get()
+    const newCollections = smartCollections.map(c =>
+      c.id === id ? smartCollectionService.update(c, updates) : c
+    )
+    set({ smartCollections: newCollections })
+  },
+
+  deleteSmartCollection: (id) => {
+    const { smartCollections, selectedCollectionId } = get()
+    const newCollections = smartCollections.filter(c => c.id !== id)
+    set({
+      smartCollections: newCollections,
+      selectedCollectionId: selectedCollectionId === id ? null : selectedCollectionId
+    })
+  },
+
+  selectSmartCollection: (id) => {
+    set({
+      selectedCollectionId: id,
+      selectedFolderId: null,
+      selectedTags: [],
+      selectedDocId: null
+    })
+  },
+
+  clearSmartCollectionSelection: () => {
+    set({ selectedCollectionId: null })
+  },
+
+  // ============================================
+  // Bulk Selection Actions
+  // ============================================
+
+  toggleSelectionMode: () => {
+    const { selectionMode } = get()
+    set({ selectionMode: !selectionMode, selectedDocIds: [] })
+  },
+
+  toggleDocSelection: (docId) => {
+    const { selectedDocIds } = get()
+    const newIds = selectedDocIds.includes(docId)
+      ? selectedDocIds.filter(id => id !== docId)
+      : [...selectedDocIds, docId]
+    set({ selectedDocIds: newIds })
+  },
+
+  selectAllVisible: (docIds) => {
+    set({ selectedDocIds: docIds })
+  },
+
+  clearDocSelection: () => {
+    set({ selectedDocIds: [], selectionMode: false })
   },
 }))

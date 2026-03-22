@@ -9,7 +9,7 @@ import { indexService } from '../../services/indexing/IndexService'
 import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon } from '../ui'
 import styles from './DocCard.module.css'
 
-const DocCard = memo(function DocCard({ doc }) {
+const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: isSelectedForBulk = false }) {
   const [contextMenu, setContextMenu] = useState(null)
   const [isReindexing, setIsReindexing] = useState(false)
 
@@ -21,6 +21,7 @@ const DocCard = memo(function DocCard({ doc }) {
   const folders = useLibraryStore((s) => s.folders)
   const documents = useLibraryStore((s) => s.documents)
   const tagRegistry = useLibraryStore((s) => s.tagRegistry)
+  const toggleDocSelection = useLibraryStore((s) => s.toggleDocSelection)
 
   const adapter = useStorageStore((s) => s.adapter)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
@@ -57,7 +58,11 @@ const DocCard = memo(function DocCard({ doc }) {
   const tags = doc.user_data?.tags || []
 
   const handleClick = () => {
-    setSelectedDocId(doc.id)
+    if (selectionMode) {
+      toggleDocSelection(doc.id)
+    } else {
+      setSelectedDocId(doc.id)
+    }
   }
 
   const handleContextMenu = (e) => {
@@ -236,16 +241,25 @@ const DocCard = memo(function DocCard({ doc }) {
   return (
     <>
       <article
-        className={`${styles.card} ${isSelected ? styles.selected : ''}`}
+        className={`${styles.card} ${isSelected ? styles.selected : ''} ${isSelectedForBulk ? styles.bulkSelected : ''}`}
         onClick={handleClick}
-        onContextMenu={handleContextMenu}
+        onContextMenu={selectionMode ? undefined : handleContextMenu}
         onKeyDown={handleKeyDown}
         tabIndex={0}
         role="button"
-        aria-selected={isSelected}
+        aria-selected={isSelected || isSelectedForBulk}
         aria-label={`${title} by ${authorText}${isUnread ? ', unread' : ''}${isStarred ? ', starred' : ''}`}
       >
         <div className={styles.header}>
+          {selectionMode && (
+            <input
+              type="checkbox"
+              className={styles.selectCheckbox}
+              checked={isSelectedForBulk}
+              onChange={() => toggleDocSelection(doc.id)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
           <StatusDot status={status} />
           <h3 className={`${styles.title} ${isUnread ? styles.unread : ''}`}>
             {title}

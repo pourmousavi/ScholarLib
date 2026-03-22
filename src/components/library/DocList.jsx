@@ -8,6 +8,7 @@ import { useToast } from '../../hooks/useToast'
 import DocCard from './DocCard'
 import IndexingBar from './IndexingBar'
 import ActiveFilters from './ActiveFilters'
+import BulkActionsBar from './BulkActionsBar'
 import UploadZone from '../metadata/UploadZone'
 import styles from './DocList.module.css'
 
@@ -29,6 +30,10 @@ export default function DocList() {
   const selectedTags = useLibraryStore((s) => s.selectedTags)
   const tagFilterMode = useLibraryStore((s) => s.tagFilterMode)
   const tagRegistry = useLibraryStore((s) => s.tagRegistry)
+  const selectionMode = useLibraryStore((s) => s.selectionMode)
+  const selectedDocIds = useLibraryStore((s) => s.selectedDocIds)
+  const toggleSelectionMode = useLibraryStore((s) => s.toggleSelectionMode)
+  const selectAllVisible = useLibraryStore((s) => s.selectAllVisible)
 
   const adapter = useStorageStore((s) => s.adapter)
   const isConnected = useStorageStore((s) => s.isConnected)
@@ -277,19 +282,38 @@ export default function DocList() {
         </div>
         <div className={styles.headerMeta}>
           <span className={styles.docCount}>{allDocs.length} documents</span>
-          {!isTagView && (
+          <div className={styles.headerActions}>
+            {!selectionMode && !isTagView && (
+              <button
+                className={styles.addBtn}
+                onClick={() => setShowUpload(!showUpload)}
+              >
+                {showUpload ? '✕ Cancel' : '+ Add'}
+              </button>
+            )}
             <button
-              className={styles.addBtn}
-              onClick={() => setShowUpload(!showUpload)}
+              className={styles.selectBtn}
+              onClick={toggleSelectionMode}
             >
-              {showUpload ? '✕ Cancel' : '+ Add'}
+              {selectionMode ? 'Done' : 'Select'}
             </button>
-          )}
+            {selectionMode && (
+              <button
+                className={styles.selectAllBtn}
+                onClick={() => selectAllVisible(filteredDocs.map(d => d.id))}
+              >
+                Select All
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Active tag filters */}
       <ActiveFilters />
+
+      {/* Bulk actions bar */}
+      {selectionMode && <BulkActionsBar />}
 
       {/* Upload zone */}
       {showUpload && (
@@ -325,7 +349,12 @@ export default function DocList() {
           </div>
         ) : (
           filteredDocs.map((doc) => (
-            <DocCard key={doc.id} doc={doc} />
+            <DocCard
+              key={doc.id}
+              doc={doc}
+              selectionMode={selectionMode}
+              isSelected={selectedDocIds.includes(doc.id)}
+            />
           ))
         )}
       </div>

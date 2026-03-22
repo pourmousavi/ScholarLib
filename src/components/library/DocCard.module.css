@@ -16,6 +16,19 @@
   border-left-color: var(--accent);
 }
 
+.card.bulkSelected {
+  background: var(--accent-dim);
+  border-left-color: var(--accent);
+}
+
+.selectCheckbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 .header {
   display: flex;
   align-items: flex-start;

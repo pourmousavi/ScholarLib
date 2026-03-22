@@ -67,6 +67,47 @@
   background: var(--accent-dim);
 }
 
+.headerActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.selectBtn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.selectBtn:hover {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+.selectAllBtn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.selectAllBtn:hover {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
 .uploadSection {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
