@@ -31,9 +31,11 @@ export const useAIStore = create((set, get) => ({
 
   // Scope for RAG (Stage 11)
   scope: {
-    type: 'document', // document | folder | library
+    type: 'document', // document | folder | library | tags
     docId: null,
     folderId: null,
+    tags: [],
+    tagMode: 'AND', // AND | OR
     description: 'current document',
     docCount: 1
   },
@@ -59,9 +61,66 @@ export const useAIStore = create((set, get) => ({
         type,
         docId: type === 'document' ? docId : null,
         folderId: type === 'folder' ? folderId : null,
+        tags: type === 'tags' ? scope.tags : [],
+        tagMode: type === 'tags' ? scope.tagMode : 'AND',
         description: type === 'document' ? 'current document'
           : type === 'folder' ? 'current folder'
+          : type === 'tags' ? 'documents with tags'
           : 'entire library'
+      }
+    })
+  },
+
+  // Tag scope actions
+  setScopeTags: (tags) => {
+    const { scope } = get()
+    set({
+      scope: {
+        ...scope,
+        type: 'tags',
+        tags,
+        description: `documents with ${tags.length} tag${tags.length !== 1 ? 's' : ''}`
+      }
+    })
+  },
+
+  toggleScopeTag: (slug) => {
+    const { scope } = get()
+    const currentTags = scope.tags || []
+    const newTags = currentTags.includes(slug)
+      ? currentTags.filter(t => t !== slug)
+      : [...currentTags, slug]
+    set({
+      scope: {
+        ...scope,
+        type: 'tags',
+        tags: newTags,
+        description: newTags.length > 0
+          ? `documents with ${newTags.length} tag${newTags.length !== 1 ? 's' : ''}`
+          : 'select tags'
+      }
+    })
+  },
+
+  setScopeTagMode: (mode) => {
+    const { scope } = get()
+    set({
+      scope: {
+        ...scope,
+        tagMode: mode
+      }
+    })
+  },
+
+  clearScopeTags: () => {
+    const { scope } = get()
+    set({
+      scope: {
+        ...scope,
+        type: 'library',
+        tags: [],
+        tagMode: 'AND',
+        description: 'entire library'
       }
     })
   },
@@ -113,6 +172,8 @@ export const useAIStore = create((set, get) => ({
       type: 'document',
       docId: null,
       folderId: null,
+      tags: [],
+      tagMode: 'AND',
       description: 'current document',
       docCount: 1
     }
@@ -138,6 +199,8 @@ export const useAIStore = create((set, get) => ({
       type: 'document',
       docId: null,
       folderId: null,
+      tags: [],
+      tagMode: 'AND',
       description: 'current document',
       docCount: 1
     }
