@@ -168,85 +168,244 @@ export default function HelpModal({ onClose }) {
     <div className={styles.content}>
       <h2>AI Setup</h2>
       <p className={styles.intro}>
-        ScholarLib offers multiple AI options. Choose based on your privacy needs and budget.
+        ScholarLib offers multiple AI options. Choose based on your privacy needs, budget, and hardware.
       </p>
 
-      <h3>AI Providers</h3>
+      <h3>Provider Comparison</h3>
+      <table className={styles.comparisonTable}>
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>Quality</th>
+            <th>Privacy</th>
+            <th>Cost</th>
+            <th>Hardware</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>WebLLM</strong></td>
+            <td><span className={styles.qualityBasic}>Basic</span></td>
+            <td>100% Local</td>
+            <td>Free</td>
+            <td>WebGPU browser</td>
+          </tr>
+          <tr>
+            <td><strong>Ollama (1-3B)</strong></td>
+            <td><span className={styles.qualityBasic}>Basic</span></td>
+            <td>100% Local</td>
+            <td>Free</td>
+            <td>4-6 GB RAM</td>
+          </tr>
+          <tr>
+            <td><strong>Ollama (7-8B)</strong></td>
+            <td><span className={styles.qualityGood}>Good</span></td>
+            <td>100% Local</td>
+            <td>Free</td>
+            <td>8-10 GB RAM</td>
+          </tr>
+          <tr>
+            <td><strong>Ollama (70B)</strong></td>
+            <td><span className={styles.qualityExcellent}>Excellent</span></td>
+            <td>100% Local</td>
+            <td>Free</td>
+            <td>48-64 GB RAM</td>
+          </tr>
+          <tr>
+            <td><strong>Claude API</strong></td>
+            <td><span className={styles.qualityExcellent}>Excellent</span></td>
+            <td>Cloud</td>
+            <td>$0.80-15/M tokens</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td><strong>OpenAI</strong></td>
+            <td><span className={styles.qualityExcellent}>Excellent</span></td>
+            <td>Cloud</td>
+            <td>$0.15-10/M tokens</td>
+            <td>None</td>
+          </tr>
+        </tbody>
+      </table>
 
+      <h3>Quality Expectations</h3>
+      <div className={styles.qualityGuide}>
+        <div className={styles.qualityItem}>
+          <strong><span className={styles.qualityBasic}>Basic</span> (1-3B models)</strong>
+          <p>Simple summaries and basic Q&A. May miss nuances or complex relationships between concepts. Good for quick lookups.</p>
+        </div>
+        <div className={styles.qualityItem}>
+          <strong><span className={styles.qualityGood}>Good</span> (7-8B models)</strong>
+          <p>Solid comprehension of academic papers. Handles most research questions well. Recommended for most users.</p>
+        </div>
+        <div className={styles.qualityItem}>
+          <strong><span className={styles.qualityExcellent}>Excellent</span> (70B+ / APIs)</strong>
+          <p>Deep understanding with nuanced analysis. Best for complex research synthesis and detailed explanations.</p>
+        </div>
+      </div>
+
+      <h3>Hardware Requirements</h3>
+      <table className={styles.hardwareTable}>
+        <thead>
+          <tr>
+            <th>Model Size</th>
+            <th>RAM Needed</th>
+            <th>Example Hardware</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1-3B</td>
+            <td>4-6 GB</td>
+            <td>MacBook Air M1, any modern laptop</td>
+          </tr>
+          <tr>
+            <td>7-8B</td>
+            <td>8-10 GB</td>
+            <td>MacBook Pro M1/M2, 16GB laptop</td>
+          </tr>
+          <tr>
+            <td>70B</td>
+            <td>48-64 GB</td>
+            <td>Mac Studio, high-end workstation</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Setup: WebLLM (Browser)</h3>
       <div className={styles.aiOption}>
         <div className={styles.aiHeader}>
-          <strong>WebLLM (Recommended for Privacy)</strong>
+          <strong>WebLLM</strong>
           <span className={styles.badge}>Free</span>
         </div>
-        <p>Runs AI entirely in your browser using WebGPU. No data leaves your device.</p>
+        <p>Runs entirely in your browser using WebGPU. No data leaves your device.</p>
         <div className={styles.aiSetup}>
           <strong>Setup:</strong>
           <ol>
             <li>Go to Settings → AI & Models</li>
             <li>Select "WebLLM (Browser)"</li>
+            <li>Choose a model (Llama 3.2 3B recommended)</li>
             <li>Click "Download Model" (~2GB, one-time)</li>
-            <li>Wait for download to complete</li>
           </ol>
-          <p className={styles.note}>Requires Chrome 113+, Edge 113+, or Safari 18+ with WebGPU support.</p>
+          <p className={styles.note}>Requires Chrome 113+, Edge 113+, or Safari 18+ with WebGPU.</p>
+        </div>
+        <div className={styles.privacyHighlight}>
+          <strong>100% Private</strong>
+          <p>All processing happens locally in your browser. No data ever leaves your device.</p>
         </div>
       </div>
 
+      <h3>Setup: Ollama (Local)</h3>
       <div className={styles.aiOption}>
         <div className={styles.aiHeader}>
-          <strong>Ollama (Local Server)</strong>
+          <strong>Ollama</strong>
           <span className={styles.badge}>Free</span>
         </div>
-        <p>Runs AI on your computer via a local server. Fast and private.</p>
+        <p>Runs AI on your computer via a local server. Fast, private, and supports larger models.</p>
         <div className={styles.aiSetup}>
           <strong>Setup:</strong>
           <ol>
             <li>Download Ollama from <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">ollama.ai</a></li>
-            <li>Open Terminal and run: <code>ollama serve</code></li>
-            <li>Download a model: <code>ollama pull llama3.2</code></li>
-            <li>In ScholarLib, select "Ollama (Local)" in Settings</li>
+            <li>Start Ollama with CORS enabled (see below)</li>
+            <li>In ScholarLib Settings, select "Ollama (Local)"</li>
+            <li>Click "Test connection" to verify</li>
+            <li>Use "Download New Model" to get models directly from Settings</li>
           </ol>
+        </div>
+        <div className={styles.aiSetup} style={{ marginTop: 12 }}>
+          <strong>CORS Configuration (Required):</strong>
+          <p className={styles.note} style={{ marginTop: 8 }}>Ollama needs CORS enabled to work with web apps.</p>
+          <p style={{ marginTop: 8, marginBottom: 4 }}><strong>macOS (temporary):</strong></p>
+          <code>OLLAMA_ORIGINS="*" ollama serve</code>
+          <p style={{ marginTop: 8, marginBottom: 4 }}><strong>macOS (permanent):</strong></p>
+          <code>launchctl setenv OLLAMA_ORIGINS "*"</code>
+          <p style={{ marginTop: 8, marginBottom: 4 }}><strong>Linux:</strong></p>
+          <code>OLLAMA_ORIGINS="*" ollama serve</code>
+          <p style={{ marginTop: 8, marginBottom: 4 }}><strong>Windows (PowerShell):</strong></p>
+          <code>$env:OLLAMA_ORIGINS="*"; ollama serve</code>
+        </div>
+        <div className={styles.privacyHighlight}>
+          <strong>100% Private</strong>
+          <p>All processing runs locally on your machine. Your documents never leave your computer.</p>
         </div>
       </div>
 
+      <h3>Setup: Claude API</h3>
       <div className={styles.aiOption}>
         <div className={styles.aiHeader}>
           <strong>Claude API (Anthropic)</strong>
           <span className={styles.badge}>Paid</span>
         </div>
-        <p>High-quality responses using Anthropic's Claude models.</p>
+        <p>High-quality responses using Anthropic's Claude models. Best-in-class for academic work.</p>
         <div className={styles.aiSetup}>
           <strong>Setup:</strong>
           <ol>
-            <li>Get an API key from <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a></li>
-            <li>Go to Settings → AI & Models</li>
-            <li>Select "Claude API" and enter your key</li>
-            <li>Click "Test key" to verify</li>
+            <li>Create account at <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a></li>
+            <li>Add billing and generate an API key</li>
+            <li>Go to Settings → AI & Models → Claude API</li>
+            <li>Enter your API key and click "Test key"</li>
           </ol>
-          <p className={styles.note}>Your API key is stored locally and never sent to our servers.</p>
+        </div>
+        <div className={styles.pricingNote}>
+          <strong>Pricing (approximate):</strong>
+          <p>Haiku: ~$0.80/M tokens (cheapest) • Sonnet: ~$3/M input • Opus: ~$15/M input</p>
+          <p>Typical Q&A session uses 1-5K tokens (~$0.01-0.05 for Haiku)</p>
         </div>
       </div>
 
+      <h3>Setup: OpenAI API</h3>
       <div className={styles.aiOption}>
         <div className={styles.aiHeader}>
-          <strong>OpenAI API</strong>
+          <strong>OpenAI</strong>
           <span className={styles.badge}>Paid</span>
         </div>
         <p>Access GPT-4o and other OpenAI models.</p>
         <div className={styles.aiSetup}>
           <strong>Setup:</strong>
           <ol>
-            <li>Get an API key from <a href="https://platform.openai.com" target="_blank" rel="noopener noreferrer">platform.openai.com</a></li>
-            <li>Go to Settings → AI & Models</li>
-            <li>Select "OpenAI API" and enter your key</li>
-            <li>Click "Test key" to verify</li>
+            <li>Create account at <a href="https://platform.openai.com" target="_blank" rel="noopener noreferrer">platform.openai.com</a></li>
+            <li>Add billing and generate an API key</li>
+            <li>Go to Settings → AI & Models → OpenAI API</li>
+            <li>Enter your API key and click "Test key"</li>
           </ol>
+        </div>
+        <div className={styles.pricingNote}>
+          <strong>Pricing (approximate):</strong>
+          <p>GPT-4o-mini: ~$0.15/M input • GPT-4o: ~$2.50/M input</p>
+        </div>
+      </div>
+
+      <h3>Troubleshooting</h3>
+      <div className={styles.troubleshooting}>
+        <div className={styles.troubleItem}>
+          <strong>"Cannot reach Ollama"</strong>
+          <p>This usually means CORS is not configured. Make sure to start Ollama with:</p>
+          <code>OLLAMA_ORIGINS="*" ollama serve</code>
+          <p>If Ollama is already running, quit it completely first, then restart with the command above.</p>
+        </div>
+
+        <div className={styles.troubleItem}>
+          <strong>"WebGPU not supported"</strong>
+          <p>Your browser doesn't support WebGPU. Try:</p>
+          <p>• Chrome 113+ or Edge 113+ (enable at chrome://flags → WebGPU)</p>
+          <p>• Safari 18+ on macOS (enable in Developer menu)</p>
+        </div>
+
+        <div className={styles.troubleItem}>
+          <strong>"API key invalid"</strong>
+          <p>Check that you copied the full API key without extra spaces. For Claude, keys start with "sk-ant-". For OpenAI, keys start with "sk-".</p>
+        </div>
+
+        <div className={styles.troubleItem}>
+          <strong>"Out of memory" / Slow responses</strong>
+          <p>The model is too large for your hardware. Try a smaller model:</p>
+          <p>• For 8GB RAM: Use 3B models (llama3.2)</p>
+          <p>• For 16GB RAM: Use 7-8B models (llama3.1:8b)</p>
         </div>
       </div>
 
       <h3>AI Status Indicator</h3>
-      <p>
-        The bottom of the sidebar shows your current AI status:
-      </p>
+      <p>The bottom of the sidebar shows your current AI status:</p>
       <ul>
         <li><span className={styles.dotGreen}></span> <strong>Green dot</strong> — AI is ready</li>
         <li><span className={styles.dotRed}></span> <strong>Red/gray dot</strong> — AI is offline or not configured</li>

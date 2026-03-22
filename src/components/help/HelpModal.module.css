@@ -417,3 +417,194 @@
   color: var(--text-primary);
   margin-right: 4px;
 }
+
+/* Provider Comparison Table */
+.comparisonTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-4) 0;
+  font-size: 12px;
+}
+
+.comparisonTable th {
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.comparisonTable td {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.comparisonTable tr:hover td {
+  background: var(--bg-surface);
+}
+
+/* Quality badges for comparison table */
+.qualityBasic,
+.qualityGood,
+.qualityExcellent {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.qualityBasic {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.qualityGood {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.qualityExcellent {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* Quality Guide */
+.qualityGuide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.qualityItem {
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.qualityItem strong {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.qualityItem p {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Hardware Requirements Table */
+.hardwareTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-3) 0;
+  font-size: 12px;
+}
+
+.hardwareTable th {
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.hardwareTable td {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+/* Troubleshooting */
+.troubleshooting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.troubleItem {
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.troubleItem strong {
+  display: block;
+  font-size: 13px;
+  color: var(--error);
+  margin-bottom: var(--space-2);
+}
+
+.troubleItem p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-2);
+  line-height: 1.5;
+}
+
+.troubleItem p:last-child {
+  margin-bottom: 0;
+}
+
+.troubleItem code {
+  display: block;
+  padding: var(--space-2);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: var(--space-2);
+  word-break: break-all;
+}
+
+/* Pricing info */
+.pricingNote {
+  padding: var(--space-3);
+  background: var(--warning-bg);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-2);
+}
+
+.pricingNote strong {
+  font-size: 12px;
+  color: var(--warning);
+}
+
+.pricingNote p {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+}
+
+/* Privacy note */
+.privacyHighlight {
+  padding: var(--space-3);
+  background: var(--success-bg);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-2);
+}
+
+.privacyHighlight strong {
+  font-size: 12px;
+  color: var(--success);
+}
+
+.privacyHighlight p {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+}

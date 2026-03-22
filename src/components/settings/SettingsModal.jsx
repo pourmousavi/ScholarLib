@@ -90,6 +90,13 @@ export default function SettingsModal({ onClose }) {
   const [webllmProgressText, setWebllmProgressText] = useState('')
   const [selectedWebllmModel, setSelectedWebllmModel] = useState('Llama-3.2-3B-Instruct-q4f32_1-MLC')
 
+  // Ollama model browser state
+  const [showOllamaModelBrowser, setShowOllamaModelBrowser] = useState(false)
+  const [selectedOllamaModel, setSelectedOllamaModel] = useState('llama3.1:8b')
+  const [ollamaPulling, setOllamaPulling] = useState(false)
+  const [ollamaPullProgress, setOllamaPullProgress] = useState(0)
+  const [ollamaPullText, setOllamaPullText] = useState('')
+
   // Account state
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
@@ -207,6 +214,46 @@ export default function SettingsModal({ onClose }) {
       }
     } finally {
       setTestingOllama(false)
+    }
+  }
+
+  const handlePullOllamaModel = async () => {
+    if (ollamaPulling) return
+
+    setOllamaPulling(true)
+    setOllamaPullProgress(0)
+    setOllamaPullText('Starting download...')
+
+    try {
+      await ollamaService.pullModel(selectedOllamaModel, (progress) => {
+        setOllamaPullProgress(progress.progress)
+        if (progress.status === 'pulling manifest') {
+          setOllamaPullText('Fetching model info...')
+        } else if (progress.status === 'downloading') {
+          const completed = (progress.completed / (1024 * 1024 * 1024)).toFixed(2)
+          const total = (progress.total / (1024 * 1024 * 1024)).toFixed(2)
+          setOllamaPullText(`Downloading: ${completed} GB / ${total} GB`)
+        } else if (progress.status === 'verifying sha256 digest') {
+          setOllamaPullText('Verifying download...')
+        } else if (progress.status === 'writing manifest') {
+          setOllamaPullText('Finalizing...')
+        } else if (progress.status === 'success') {
+          setOllamaPullText('Complete!')
+        } else {
+          setOllamaPullText(progress.status || `${Math.round(progress.progress)}%`)
+        }
+      })
+
+      // Refresh model list
+      const models = await ollamaService.getModels()
+      setOllamaStatus({ available: true, models })
+      setShowOllamaModelBrowser(false)
+      showToast({ message: `Model ${selectedOllamaModel} downloaded successfully!`, type: 'success' })
+    } catch (error) {
+      console.error('Ollama pull failed:', error)
+      showToast({ message: error.message || 'Failed to download model', type: 'error' })
+    } finally {
+      setOllamaPulling(false)
     }
   }
 
@@ -523,7 +570,7 @@ export default function SettingsModal({ onClose }) {
         <div className={styles.providerConfig}>
           <div className={styles.statusRow}>
             <span className={`${styles.statusDot} ${ollamaStatus.available ? styles.available : ''}`} />
-            <span>{ollamaStatus.available ? `Connected - ${ollamaStatus.models.length} models` : 'Not connected'}</span>
+            <span>{ollamaStatus.available ? `Connected - ${ollamaStatus.models.length} model${ollamaStatus.models.length !== 1 ? 's' : ''}` : 'Not connected'}</span>
             <button
               className={styles.testBtn}
               onClick={handleTestOllama}
@@ -547,16 +594,116 @@ export default function SettingsModal({ onClose }) {
             </div>
           )}
 
+          {ollamaStatus.available && (
+            <>
+              <button
+                className={styles.toggleBrowserBtn}
+                onClick={() => setShowOllamaModelBrowser(!showOllamaModelBrowser)}
+                style={{ marginTop: 12 }}
+              >
+                {showOllamaModelBrowser ? 'Hide Model Browser' : 'Download New Model'}
+              </button>
+
+              {showOllamaModelBrowser && (
+                <div className={styles.modelBrowser}>
+                  <div className={styles.modelBrowserHeader}>
+                    <strong>Download Model</strong>
+                  </div>
+
+                  <div className={styles.field}>
+                    <label>Select Model</label>
+                    <select
+                      value={selectedOllamaModel}
+                      onChange={(e) => setSelectedOllamaModel(e.target.value)}
+                      disabled={ollamaPulling}
+                    >
+                      {ollamaService.getPopularModels().map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({m.size})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {(() => {
+                    const selectedModel = ollamaService.getPopularModels().find(m => m.id === selectedOllamaModel)
+                    if (!selectedModel) return null
+                    return (
+                      <div className={styles.modelInfo}>
+                        <div className={styles.modelInfoRow}>
+                          <div className={styles.modelInfoItem}>
+                            <span className={styles.modelInfoLabel}>Download Size</span>
+                            <span className={styles.modelInfoValue}>{selectedModel.size}</span>
+                          </div>
+                          <div className={styles.modelInfoItem}>
+                            <span className={styles.modelInfoLabel}>RAM Required</span>
+                            <span className={styles.modelInfoValue}>{selectedModel.ram}</span>
+                          </div>
+                          <div className={styles.modelInfoItem}>
+                            <span className={styles.modelInfoLabel}>Quality</span>
+                            <span className={`${styles.qualityBadge} ${
+                              selectedModel.quality === 'excellent' ? styles.qualityExcellent :
+                              selectedModel.quality === 'good' ? styles.qualityGood :
+                              styles.qualityBasic
+                            }`}>
+                              {selectedModel.quality}
+                            </span>
+                          </div>
+                        </div>
+                        <div className={styles.modelDescription}>
+                          {selectedModel.description}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {!ollamaPulling && (
+                    <button
+                      className={styles.primaryBtn}
+                      onClick={handlePullOllamaModel}
+                      style={{ marginTop: 12 }}
+                    >
+                      Download Model
+                    </button>
+                  )}
+
+                  {ollamaPulling && (
+                    <div className={styles.progressContainer}>
+                      <div className={styles.progressBar}>
+                        <div
+                          className={styles.progressFill}
+                          style={{ width: `${ollamaPullProgress}%` }}
+                        />
+                      </div>
+                      <span className={styles.progressText}>{ollamaPullText}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
           {!ollamaStatus.available && (
-            <div className={styles.hint}>
-              Start Ollama with: <code>ollama serve</code>
-              <br />
-              Then run: <code>ollama pull llama3.2</code>
-              <br />
-              <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">
-                Download Ollama
-              </a>
-            </div>
+            <>
+              <div className={styles.hint}>
+                <strong>Setup Instructions:</strong>
+                <ol style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+                  <li>Download Ollama from <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">ollama.ai</a></li>
+                  <li>Start with CORS enabled (see command below)</li>
+                  <li>Click "Test connection" above</li>
+                </ol>
+              </div>
+
+              <div className={styles.corsHint}>
+                <strong>CORS Configuration Required</strong>
+                <p>To allow ScholarLib to connect, start Ollama with:</p>
+                <code>OLLAMA_ORIGINS="*" ollama serve</code>
+                <p style={{ marginTop: 8 }}>
+                  On macOS, you can set this permanently with:
+                </p>
+                <code>launchctl setenv OLLAMA_ORIGINS "*"</code>
+              </div>
+            </>
           )}
         </div>
       )}

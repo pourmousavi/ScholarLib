@@ -510,3 +510,137 @@
   font-size: 12px;
   color: var(--text-tertiary);
 }
+
+/* Model Browser for Ollama */
+.modelBrowser {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.modelBrowserHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.modelBrowserHeader strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.modelInfo {
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-3);
+}
+
+.modelInfoRow {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+.modelInfoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modelInfoLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modelInfoValue {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.modelDescription {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.qualityBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.qualityBasic {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.qualityGood {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.qualityExcellent {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.toggleBrowserBtn {
+  padding: var(--space-1) var(--space-3);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.toggleBrowserBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.corsHint {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--warning-bg);
+  border-radius: var(--radius-sm);
+}
+
+.corsHint strong {
+  display: block;
+  font-size: 12px;
+  color: var(--warning);
+  margin-bottom: var(--space-2);
+}
+
+.corsHint p {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-2);
+  line-height: 1.5;
+}
+
+.corsHint code {
+  display: block;
+  padding: var(--space-2);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  font-family: 'SF Mono', 'Monaco', monospace;
+  font-size: 11px;
+  color: var(--text-primary);
+  word-break: break-all;
+}
