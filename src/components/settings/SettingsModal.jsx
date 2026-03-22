@@ -6,6 +6,7 @@ import { useLibraryStore } from '../../store/libraryStore'
 import { useIndexStore } from '../../store/indexStore'
 import { settingsService } from '../../services/settings/SettingsService'
 import { LibraryService } from '../../services/library/LibraryService'
+import { indexService } from '../../services/indexing/IndexService'
 import { ollamaService } from '../../services/ai/OllamaService'
 import { webllmService } from '../../services/ai/WebLLMService'
 import { claudeService } from '../../services/ai/ClaudeService'
@@ -126,6 +127,15 @@ export default function SettingsModal({ onClose }) {
         // Load user profile
         setUserName(settingsService.getUserName())
         setUserEmail(settingsService.getUserEmail())
+
+        // Sync export options to localStorage for ChatExporter
+        if (remote?.global?.export) {
+          const exportOptions = {
+            includeCitations: remote.global.export.chat_include_citations ?? true,
+            includeTimestamps: remote.global.export.chat_include_timestamps ?? false
+          }
+          localStorage.setItem('sv_chat_export_options', JSON.stringify(exportOptions))
+        }
       } catch (error) {
         console.error('Failed to load settings:', error)
         setSettings(settingsService.defaults())
@@ -324,9 +334,50 @@ export default function SettingsModal({ onClose }) {
     }
   }
 
-  const handleReindexAll = () => {
-    if (confirm('Re-index all documents? This may take a while.')) {
-      showToast({ message: 'Re-indexing started (not yet implemented)', type: 'info' })
+  const handleReindexAll = async () => {
+    if (isDemoMode || !adapter) {
+      showToast({ message: 'Not available in demo mode', type: 'warning' })
+      return
+    }
+
+    const documents = useLibraryStore.getState().documents
+    const docIds = Object.keys(documents)
+
+    if (docIds.length === 0) {
+      showToast({ message: 'No documents to re-index', type: 'info' })
+      return
+    }
+
+    if (!confirm(`Re-index all ${docIds.length} documents? This may take a while.`)) {
+      return
+    }
+
+    showToast({ message: `Re-indexing ${docIds.length} documents...`, type: 'info' })
+
+    let successCount = 0
+    let failCount = 0
+
+    for (const docId of docIds) {
+      const doc = documents[docId]
+      if (!doc.box_path) {
+        failCount++
+        continue
+      }
+
+      try {
+        const pdfUrl = await adapter.getFileStreamURL(doc.box_path)
+        await indexService.indexDocument(docId, pdfUrl, adapter)
+        successCount++
+      } catch (error) {
+        console.error(`Failed to re-index ${docId}:`, error)
+        failCount++
+      }
+    }
+
+    if (failCount === 0) {
+      showToast({ message: `Re-indexed ${successCount} documents`, type: 'success' })
+    } else {
+      showToast({ message: `Re-indexed ${successCount} documents, ${failCount} failed`, type: 'warning' })
     }
   }
 
@@ -1000,7 +1051,13 @@ export default function SettingsModal({ onClose }) {
             <input
               type="checkbox"
               checked={settings?.global?.export?.chat_include_citations ?? true}
-              onChange={(e) => updateGlobalSetting('export.chat_include_citations', e.target.checked)}
+              onChange={(e) => {
+                updateGlobalSetting('export.chat_include_citations', e.target.checked)
+                // Also save to localStorage for ChatExporter to read
+                const options = JSON.parse(localStorage.getItem('sv_chat_export_options') || '{}')
+                options.includeCitations = e.target.checked
+                localStorage.setItem('sv_chat_export_options', JSON.stringify(options))
+              }}
             />
             <span>Include citations</span>
           </label>
@@ -1009,7 +1066,13 @@ export default function SettingsModal({ onClose }) {
             <input
               type="checkbox"
               checked={settings?.global?.export?.chat_include_timestamps ?? false}
-              onChange={(e) => updateGlobalSetting('export.chat_include_timestamps', e.target.checked)}
+              onChange={(e) => {
+                updateGlobalSetting('export.chat_include_timestamps', e.target.checked)
+                // Also save to localStorage for ChatExporter to read
+                const options = JSON.parse(localStorage.getItem('sv_chat_export_options') || '{}')
+                options.includeTimestamps = e.target.checked
+                localStorage.setItem('sv_chat_export_options', JSON.stringify(options))
+              }}
             />
             <span>Include timestamps</span>
           </label>

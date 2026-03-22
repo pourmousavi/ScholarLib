@@ -1,9 +1,35 @@
 import jsPDF from 'jspdf'
+import { settingsService } from '../settings/SettingsService'
 
 /**
  * ChatExporter - Export chat conversations in multiple formats
  */
 class ChatExporter {
+  /**
+   * Get export options from settings
+   */
+  getOptions() {
+    // Read from localStorage since settings might not be loaded
+    const stored = localStorage.getItem('sv_chat_export_options')
+    if (stored) {
+      try {
+        return JSON.parse(stored)
+      } catch {
+        // Use defaults
+      }
+    }
+    return {
+      includeCitations: true,
+      includeTimestamps: false
+    }
+  }
+
+  /**
+   * Save export options to localStorage
+   */
+  setOptions(options) {
+    localStorage.setItem('sv_chat_export_options', JSON.stringify(options))
+  }
   /**
    * Format a date for display
    */
@@ -24,6 +50,7 @@ class ChatExporter {
    * @returns {string}
    */
   exportAsMarkdown(conversation) {
+    const options = this.getOptions()
     const lines = [
       `# ${conversation.title}`,
       '',
@@ -43,10 +70,15 @@ class ChatExporter {
     for (const msg of conversation.messages) {
       const role = msg.role === 'user' ? 'You' : 'AI'
       lines.push(`## ${role}`)
+
+      if (options.includeTimestamps && msg.timestamp) {
+        lines.push(`*${this.formatDate(msg.timestamp)}*`)
+      }
+
       lines.push('')
       lines.push(msg.content)
 
-      if (msg.citations?.length) {
+      if (options.includeCitations && msg.citations?.length) {
         lines.push('')
         lines.push(`*References: ${msg.citations.map(c => c.citation).join(', ')}*`)
       }
@@ -63,6 +95,7 @@ class ChatExporter {
    * @returns {string}
    */
   exportAsText(conversation) {
+    const options = this.getOptions()
     const lines = [
       conversation.title,
       '='.repeat(conversation.title.length),
@@ -77,8 +110,17 @@ class ChatExporter {
 
     for (const msg of conversation.messages) {
       const role = msg.role === 'user' ? 'You' : 'AI'
-      lines.push(`[${role}]`)
+      let header = `[${role}]`
+      if (options.includeTimestamps && msg.timestamp) {
+        header += ` ${this.formatDate(msg.timestamp)}`
+      }
+      lines.push(header)
       lines.push(msg.content)
+
+      if (options.includeCitations && msg.citations?.length) {
+        lines.push(`References: ${msg.citations.map(c => c.citation).join(', ')}`)
+      }
+
       lines.push('')
     }
 
