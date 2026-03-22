@@ -14,6 +14,19 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
+
+/* Large font size - scale up all text using CSS zoom */
+[data-font-size="large"] #root {
+  font-size: 115%;
+}
+
+/* Ensure inputs and buttons also scale */
+[data-font-size="large"] input,
+[data-font-size="large"] textarea,
+[data-font-size="large"] button,
+[data-font-size="large"] select {
+  font-size: inherit;
+}
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 5px; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.35); border-radius: 5px; }
