@@ -13,17 +13,14 @@ const AI_PROMPTS = [
 ]
 
 const EXPORT_OPTIONS = [
-  { id: 'markdown', label: 'Markdown (.md)', icon: '#' },
-  { id: 'text', label: 'Plain text (.txt)', icon: 'T' },
-  { id: 'pdf', label: 'PDF (.pdf)', icon: 'P' },
-  { id: 'docx', label: 'Word (.docx)', icon: 'W' },
-  { id: 'clipboard', label: 'Copy to clipboard', icon: 'C' }
+  { id: 'markdown', label: 'Markdown (.md)' },
+  { id: 'text', label: 'Plain text (.txt)' },
+  { id: 'pdf', label: 'PDF (.pdf)' },
+  { id: 'clipboard', label: 'Copy to clipboard' }
 ]
 
 export default function NotesPanel() {
   const [content, setContent] = useState('')
-  const [tags, setTags] = useState([])
-  const [tagInput, setTagInput] = useState('')
   const [saveStatus, setSaveStatus] = useState('saved') // saved | saving | error
   const [lastSaved, setLastSaved] = useState(null)
   const [showExport, setShowExport] = useState(false)
@@ -52,7 +49,6 @@ export default function NotesPanel() {
   useEffect(() => {
     if (!selectedDocId || !adapter || !isConnected) {
       setContent('')
-      setTags([])
       setIsLoading(false)
       return
     }
@@ -70,7 +66,6 @@ export default function NotesPanel() {
         await NotesService.loadNotes(adapter)
         const note = NotesService.getNoteForDoc(selectedDocId)
         setContent(note.content || '')
-        setTags(note.tags || [])
         setLastSaved(note.updated_at ? new Date(note.updated_at) : null)
         setSaveStatus('saved')
       } catch (error) {
@@ -84,15 +79,14 @@ export default function NotesPanel() {
     loadNote()
   }, [selectedDocId, adapter, isConnected])
 
-  // Auto-save on content/tags change
+  // Auto-save on content change
   const handleContentChange = useCallback((newContent) => {
     setContent(newContent)
 
     if (!selectedDocId || !adapter || !isConnected) return
 
     NotesService.saveNote(adapter, selectedDocId, {
-      content: newContent,
-      tags
+      content: newContent
     }, {
       onSaveStart: () => setSaveStatus('saving'),
       onSaveComplete: () => {
@@ -101,50 +95,13 @@ export default function NotesPanel() {
       },
       onSaveError: () => setSaveStatus('error')
     })
-  }, [selectedDocId, adapter, isConnected, tags])
-
-  const handleTagsChange = useCallback((newTags) => {
-    setTags(newTags)
-
-    if (!selectedDocId || !adapter || !isConnected) return
-
-    NotesService.saveNote(adapter, selectedDocId, {
-      content,
-      tags: newTags
-    }, {
-      onSaveStart: () => setSaveStatus('saving'),
-      onSaveComplete: () => {
-        setSaveStatus('saved')
-        setLastSaved(new Date())
-      },
-      onSaveError: () => setSaveStatus('error')
-    })
-  }, [selectedDocId, adapter, isConnected, content])
-
-  // Add tag on Enter
-  const handleTagKeyDown = (e) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault()
-      const newTag = tagInput.trim().toLowerCase()
-      if (!tags.includes(newTag)) {
-        handleTagsChange([...tags, newTag])
-      }
-      setTagInput('')
-    } else if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
-      handleTagsChange(tags.slice(0, -1))
-    }
-  }
-
-  // Remove tag
-  const removeTag = (tagToRemove) => {
-    handleTagsChange(tags.filter(t => t !== tagToRemove))
-  }
+  }, [selectedDocId, adapter, isConnected])
 
   // Export handlers
   const handleExport = async (format) => {
     setShowExport(false)
 
-    const note = { content, tags }
+    const note = { content }
     const safeTitle = docTitle.replace(/[^a-z0-9]/gi, '-').slice(0, 50)
 
     try {
@@ -162,11 +119,6 @@ export default function NotesPanel() {
         case 'pdf': {
           const blob = NoteExporter.exportAsPDF(note, docTitle)
           NoteExporter.downloadFile(blob, `${safeTitle}-notes.pdf`)
-          break
-        }
-        case 'docx': {
-          const blob = NoteExporter.exportAsDOCX(note, docTitle)
-          NoteExporter.downloadFile(blob, `${safeTitle}-notes.docx`)
           break
         }
         case 'clipboard': {
@@ -191,8 +143,7 @@ export default function NotesPanel() {
     if (!selectedDocId || !adapter || !isConnected) return
 
     NotesService.saveNote(adapter, selectedDocId, {
-      content,
-      tags
+      content
     }, {
       onSaveStart: () => setSaveStatus('saving'),
       onSaveComplete: () => {
@@ -284,7 +235,6 @@ export default function NotesPanel() {
                       className={styles.exportOption}
                       onClick={() => handleExport(option.id)}
                     >
-                      <span className={styles.exportIcon}>{option.icon}</span>
                       {option.label}
                     </button>
                   ))}
@@ -306,32 +256,6 @@ export default function NotesPanel() {
           onChange={(e) => handleContentChange(e.target.value)}
           placeholder="Write your notes here... Markdown formatting supported."
         />
-
-        {/* Tags section */}
-        <div className={styles.tagsSection}>
-          <span className={styles.tagsLabel}>Tags</span>
-          <div className={styles.tags}>
-            {tags.map(tag => (
-              <span key={tag} className={styles.tag}>
-                {tag}
-                <button
-                  className={styles.tagRemove}
-                  onClick={() => removeTag(tag)}
-                >
-                  x
-                </button>
-              </span>
-            ))}
-            <input
-              type="text"
-              className={styles.tagInput}
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={handleTagKeyDown}
-              placeholder={tags.length === 0 ? 'Add tags...' : ''}
-            />
-          </div>
-        </div>
       </div>
 
       {/* AI assistance strip */}
