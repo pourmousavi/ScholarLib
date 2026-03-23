@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
+import { useAIStore } from '../../store/aiStore'
 import { NotesService } from '../../services/notes/NotesService'
 import { NoteExporter } from '../../services/notes/NoteExporter'
+import { aiService } from '../../services/ai/AIService'
 import { useToast } from '../../hooks/useToast'
 import styles from './NotesPanel.module.css'
 
 const AI_PROMPTS = [
-  { id: 'summarise', label: 'Summarise' },
-  { id: 'equations', label: 'Key equations' },
-  { id: 'related', label: 'Related papers' }
+  { id: 'summarise', label: 'Summarise', prompt: 'Please provide a concise summary of the following notes, highlighting the main points and key takeaways:' },
+  { id: 'equations', label: 'Key equations', prompt: 'Extract and explain the key equations, formulas, or mathematical concepts mentioned in these notes. If none are explicitly stated, identify any quantitative relationships or calculations discussed:' },
+  { id: 'related', label: 'Related papers', prompt: 'Based on the topics and concepts in these notes, suggest related academic papers or research areas that might be relevant for further reading:' }
 ]
 
 const EXPORT_OPTIONS = [
@@ -25,6 +27,7 @@ export default function NotesPanel() {
   const [lastSaved, setLastSaved] = useState(null)
   const [showExport, setShowExport] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [aiLoading, setAiLoading] = useState(null) // null or prompt id
 
   const exportRef = useRef(null)
   const lastDocId = useRef(null)
@@ -34,6 +37,8 @@ export default function NotesPanel() {
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
   const adapter = useStorageStore((s) => s.adapter)
   const isConnected = useStorageStore((s) => s.isConnected)
+  const aiAvailable = useAIStore((s) => s.isAvailable)
+  const aiProvider = useAIStore((s) => s.provider)
 
   const { showToast } = useToast()
 
@@ -133,9 +138,61 @@ export default function NotesPanel() {
     }
   }
 
-  // AI assistance (placeholder - will be connected in Stage 09)
-  const handleAIPrompt = (promptId) => {
-    showToast({ message: 'AI assistance coming in Stage 09', type: 'info' })
+  // AI assistance
+  const handleAIPrompt = async (promptId) => {
+    // Check if notes have content
+    if (!content.trim()) {
+      showToast({ message: 'Write some notes first before using AI assistance', type: 'info' })
+      return
+    }
+
+    // Check AI availability
+    const isAvailable = await aiService.checkAvailability()
+    if (!isAvailable) {
+      showToast({
+        message: `AI not available. Configure ${aiProvider === 'ollama' ? 'Ollama' : aiProvider} in Settings.`,
+        type: 'error'
+      })
+      return
+    }
+
+    const promptConfig = AI_PROMPTS.find(p => p.id === promptId)
+    if (!promptConfig) return
+
+    setAiLoading(promptId)
+
+    try {
+      const messages = [
+        {
+          role: 'system',
+          content: `You are ScholarLib AI, an academic research assistant helping with personal notes about "${docTitle}". Be concise and academically precise. Format your response with markdown.`
+        },
+        {
+          role: 'user',
+          content: `${promptConfig.prompt}\n\n---\n\n${content}`
+        }
+      ]
+
+      let response = ''
+      for await (const chunk of aiService.streamChat(messages)) {
+        response += chunk
+      }
+
+      // Append AI response to notes
+      const separator = content.endsWith('\n') ? '\n' : '\n\n'
+      const newContent = `${content}${separator}---\n\n**AI: ${promptConfig.label}**\n\n${response}`
+      handleContentChange(newContent)
+
+      showToast({ message: 'AI assistance added to notes', type: 'success' })
+    } catch (error) {
+      console.error('AI assistance failed:', error)
+      showToast({
+        message: error.message || 'AI assistance failed',
+        type: 'error'
+      })
+    } finally {
+      setAiLoading(null)
+    }
   }
 
   // Retry save on error
@@ -260,15 +317,23 @@ export default function NotesPanel() {
 
       {/* AI assistance strip */}
       <div className={styles.aiStrip}>
-        <span className={styles.aiLabel}>AI Assistance</span>
+        <div className={styles.aiHeader}>
+          <span className={styles.aiLabel}>AI Assistance</span>
+          {aiLoading && (
+            <span className={`${styles.aiStatus} ${styles.generating}`}>
+              Generating...
+            </span>
+          )}
+        </div>
         <div className={styles.aiButtons}>
           {AI_PROMPTS.map(prompt => (
             <button
               key={prompt.id}
-              className={styles.aiBtn}
+              className={`${styles.aiBtn} ${aiLoading === prompt.id ? styles.loading : ''}`}
               onClick={() => handleAIPrompt(prompt.id)}
+              disabled={aiLoading !== null}
             >
-              {prompt.label}
+              {aiLoading === prompt.id ? 'Generating...' : prompt.label}
             </button>
           ))}
         </div>
