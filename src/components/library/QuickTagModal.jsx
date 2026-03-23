@@ -63,8 +63,11 @@ export default function QuickTagModal({ docId, onClose }) {
     } else {
       addTagToDocument(docId, slug)
     }
-    // Save changes to storage
-    await saveLibrary()
+    // Save changes to storage after state update settles
+    // Use setTimeout to ensure Zustand state is fully updated before reading
+    setTimeout(async () => {
+      await saveLibrary()
+    }, 0)
   }
 
   if (!doc) return null
