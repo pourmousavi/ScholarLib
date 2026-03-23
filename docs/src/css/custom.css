@@ -208,7 +208,7 @@ pre {
 }
 
 /* Back to app button styling */
-.navbar__item.navbar__link[href="https://pourmousavi.github.io/ScholarLib/"] {
+.navbar__item.navbar__link[href="https://alipourmousavi.com/ScholarLib/"] {
   background-color: var(--ifm-color-primary);
   color: #0a0d12;
   border-radius: 6px;
@@ -216,7 +216,7 @@ pre {
   font-weight: 500;
 }
 
-.navbar__item.navbar__link[href="https://pourmousavi.github.io/ScholarLib/"]:hover {
+.navbar__item.navbar__link[href="https://alipourmousavi.com/ScholarLib/"]:hover {
   background-color: var(--ifm-color-primary-light);
   color: #0a0d12;
 }

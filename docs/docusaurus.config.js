@@ -7,7 +7,7 @@ const config = {
   tagline: 'Private Academic Reference Manager',
   favicon: 'img/favicon.ico',
 
-  url: 'https://pourmousavi.github.io',
+  url: 'https://alipourmousavi.com',
   baseUrl: '/ScholarLib/docs/',
 
   organizationName: 'pourmousavi',
@@ -73,7 +73,7 @@ const config = {
             label: 'Documentation',
           },
           {
-            href: 'https://pourmousavi.github.io/ScholarLib/',
+            href: 'https://alipourmousavi.com/ScholarLib/',
             label: 'Back to App',
             position: 'right',
           },
@@ -113,7 +113,7 @@ const config = {
               },
               {
                 label: 'Back to App',
-                href: 'https://pourmousavi.github.io/ScholarLib/',
+                href: 'https://alipourmousavi.com/ScholarLib/',
               },
             ],
           },
