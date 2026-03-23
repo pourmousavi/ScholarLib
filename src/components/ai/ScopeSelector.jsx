@@ -1,6 +1,7 @@
 import { useAIStore } from '../../store/aiStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import TagScopeSelector from './TagScopeSelector'
+import CollectionScopeSelector from './CollectionScopeSelector'
 import styles from './ScopeSelector.module.css'
 
 export default function ScopeSelector() {
@@ -11,6 +12,7 @@ export default function ScopeSelector() {
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
   const documents = useLibraryStore((s) => s.documents)
   const tagRegistry = useLibraryStore((s) => s.tagRegistry)
+  const collectionRegistry = useLibraryStore((s) => s.collectionRegistry)
 
   // Count docs in current folder
   const folderDocCount = Object.values(documents).filter(
@@ -22,6 +24,9 @@ export default function ScopeSelector() {
 
   // Check if tags exist
   const hasAnyTags = Object.keys(tagRegistry).length > 0
+
+  // Check if collections exist
+  const hasAnyCollections = Object.keys(collectionRegistry).length > 0
 
   const handleScopeChange = (type) => {
     setScopeType(type, selectedDocId, selectedFolderId)
@@ -62,11 +67,26 @@ export default function ScopeSelector() {
             Tags
           </button>
         )}
+        {hasAnyCollections && (
+          <button
+            className={`${styles.option} ${scope.type === 'collections' ? styles.active : ''}`}
+            onClick={() => handleScopeChange('collections')}
+            title="Search documents in specific collections"
+          >
+            Collections
+          </button>
+        )}
       </div>
 
       {scope.type === 'tags' && (
         <div className={styles.tagScopeWrapper}>
           <TagScopeSelector />
+        </div>
+      )}
+
+      {scope.type === 'collections' && (
+        <div className={styles.tagScopeWrapper}>
+          <CollectionScopeSelector />
         </div>
       )}
     </div>

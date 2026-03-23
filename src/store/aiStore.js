@@ -31,11 +31,13 @@ export const useAIStore = create((set, get) => ({
 
   // Scope for RAG (Stage 11)
   scope: {
-    type: 'document', // document | folder | library | tags
+    type: 'document', // document | folder | library | tags | collections
     docId: null,
     folderId: null,
     tags: [],
     tagMode: 'AND', // AND | OR
+    collections: [],
+    collectionMode: 'AND', // AND | OR
     description: 'current document',
     docCount: 1
   },
@@ -63,9 +65,12 @@ export const useAIStore = create((set, get) => ({
         folderId: type === 'folder' ? folderId : null,
         tags: type === 'tags' ? scope.tags : [],
         tagMode: type === 'tags' ? scope.tagMode : 'AND',
+        collections: type === 'collections' ? scope.collections : [],
+        collectionMode: type === 'collections' ? scope.collectionMode : 'AND',
         description: type === 'document' ? 'current document'
           : type === 'folder' ? 'current folder'
           : type === 'tags' ? 'documents with tags'
+          : type === 'collections' ? 'documents in collections'
           : 'entire library'
       }
     })
@@ -125,6 +130,60 @@ export const useAIStore = create((set, get) => ({
     })
   },
 
+  // Collection scope actions
+  setScopeCollections: (collections) => {
+    const { scope } = get()
+    set({
+      scope: {
+        ...scope,
+        type: 'collections',
+        collections,
+        description: `documents in ${collections.length} collection${collections.length !== 1 ? 's' : ''}`
+      }
+    })
+  },
+
+  toggleScopeCollection: (slug) => {
+    const { scope } = get()
+    const currentCollections = scope.collections || []
+    const newCollections = currentCollections.includes(slug)
+      ? currentCollections.filter(c => c !== slug)
+      : [...currentCollections, slug]
+    set({
+      scope: {
+        ...scope,
+        type: 'collections',
+        collections: newCollections,
+        description: newCollections.length > 0
+          ? `documents in ${newCollections.length} collection${newCollections.length !== 1 ? 's' : ''}`
+          : 'select collections'
+      }
+    })
+  },
+
+  setScopeCollectionMode: (mode) => {
+    const { scope } = get()
+    set({
+      scope: {
+        ...scope,
+        collectionMode: mode
+      }
+    })
+  },
+
+  clearScopeCollections: () => {
+    const { scope } = get()
+    set({
+      scope: {
+        ...scope,
+        type: 'library',
+        collections: [],
+        collectionMode: 'AND',
+        description: 'entire library'
+      }
+    })
+  },
+
   // Chat actions
   addMessage: (message) => set((state) => ({
     messages: [...state.messages, {
@@ -174,6 +233,8 @@ export const useAIStore = create((set, get) => ({
       folderId: null,
       tags: [],
       tagMode: 'AND',
+      collections: [],
+      collectionMode: 'AND',
       description: 'current document',
       docCount: 1
     }
@@ -201,6 +262,8 @@ export const useAIStore = create((set, get) => ({
       folderId: null,
       tags: [],
       tagMode: 'AND',
+      collections: [],
+      collectionMode: 'AND',
       description: 'current document',
       docCount: 1
     }

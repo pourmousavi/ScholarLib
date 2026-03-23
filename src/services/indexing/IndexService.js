@@ -8,6 +8,7 @@ import { textChunker } from './TextChunker'
 import { embeddingService } from './EmbeddingService'
 import { useLibraryStore } from '../../store/libraryStore'
 import { LibraryService } from '../library/LibraryService'
+import { collectionService } from '../tags/CollectionService'
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}pdf.worker.min.mjs`
@@ -330,13 +331,15 @@ class IndexService {
    * @returns {number[]}
    */
   getScopeIndices(scope, meta) {
-    const documents = useLibraryStore.getState().documents
+    const { documents, collectionRegistry } = useLibraryStore.getState()
     const indices = []
 
     console.log('getScopeIndices:', {
       scopeType: scope.type,
       scopeDocId: scope.docId,
       scopeFolderId: scope.folderId,
+      scopeTags: scope.tags,
+      scopeCollections: scope.collections,
       indexedDocs: Object.keys(meta.docs),
       libraryDocs: Object.keys(documents)
     })
@@ -358,6 +361,34 @@ class IndexService {
         case 'folder':
           include = doc.folder_id === scope.folderId
           console.log(`Folder scope check: ${doc.folder_id} === ${scope.folderId} = ${include}`)
+          break
+        case 'tags':
+          // Filter by tags using AND/OR mode
+          if (scope.tags && scope.tags.length > 0) {
+            const docTags = doc.user_data?.tags || []
+            if (scope.tagMode === 'AND') {
+              include = scope.tags.every(t => docTags.includes(t))
+            } else {
+              include = scope.tags.some(t => docTags.includes(t))
+            }
+          } else {
+            include = true // No tags selected = include all
+          }
+          break
+        case 'collections':
+          // Filter by collections using AND/OR mode
+          if (scope.collections && scope.collections.length > 0) {
+            const selectedCollectionObjects = scope.collections
+              .map(slug => collectionRegistry[slug])
+              .filter(Boolean)
+            include = collectionService.documentMatchesCollections(
+              doc,
+              selectedCollectionObjects,
+              scope.collectionMode || 'AND'
+            )
+          } else {
+            include = true // No collections selected = include all
+          }
           break
         case 'library':
           include = true
