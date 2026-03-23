@@ -16,8 +16,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Exclude docs folder from precaching
+        globIgnores: ['docs/**/*'],
         // Increase limit for WebLLM bundle (8MB)
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        // Don't handle navigation to /docs/ - let it load the Docusaurus site
+        navigateFallbackDenylist: [/^\/ScholarLib\/docs/],
         runtimeCaching: [
           {
             // Cache Google Fonts
