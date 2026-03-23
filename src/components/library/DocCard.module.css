@@ -1,10 +1,17 @@
 .card {
+  position: relative;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: background var(--transition-fast);
   border-left: 2px solid transparent;
   margin-bottom: 2px;
+}
+
+/* When card has collections, add padding for the stripe */
+.card.hasCollections {
+  padding-left: calc(var(--space-4) + 6px);
+  border-left: none;
 }
 
 .card:hover {
@@ -16,9 +23,19 @@
   border-left-color: var(--accent);
 }
 
+/* When selected card has collections, stripe handles the visual */
+.card.selected.hasCollections {
+  border-left: none;
+}
+
 .card.bulkSelected {
   background: var(--accent-dim);
   border-left-color: var(--accent);
+}
+
+/* When bulk selected card has collections, stripe handles the visual */
+.card.bulkSelected.hasCollections {
+  border-left: none;
 }
 
 .selectCheckbox {
@@ -125,18 +142,3 @@
   color: var(--text-muted);
 }
 
-.collections {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding-left: 15px;
-  margin-top: var(--space-1);
-}
-
-.moreCollections {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-}

@@ -8,7 +8,7 @@ import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
 import { settingsService } from '../../services/settings/SettingsService'
 import { collectionService } from '../../services/tags/CollectionService'
-import { StatusDot, Tag, CollectionBadge, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon, FolderIcon, ExportIcon } from '../ui'
+import { StatusDot, Tag, CollectionStripe, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon, FolderIcon, ExportIcon } from '../ui'
 import QuickTagModal from './QuickTagModal'
 import AddToCollectionModal from './AddToCollectionModal'
 import styles from './DocCard.module.css'
@@ -326,7 +326,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   return (
     <>
       <article
-        className={`${styles.card} ${isSelected ? styles.selected : ''} ${isSelectedForBulk ? styles.bulkSelected : ''}`}
+        className={`${styles.card} ${isSelected ? styles.selected : ''} ${isSelectedForBulk ? styles.bulkSelected : ''} ${showCollections && docCollections.length > 0 ? styles.hasCollections : ''}`}
         onClick={handleClick}
         onContextMenu={selectionMode ? undefined : handleContextMenu}
         onKeyDown={handleKeyDown}
@@ -335,6 +335,13 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
         aria-selected={isSelected || isSelectedForBulk}
         aria-label={`${title} by ${authorText}${isUnread ? ', unread' : ''}${isStarred ? ', starred' : ''}`}
       >
+        {/* Collection stripe on left edge */}
+        {showCollections && docCollections.length > 0 && (
+          <CollectionStripe
+            collections={docCollections}
+            onCollectionClick={selectCollectionFilter}
+          />
+        )}
         <div className={styles.header}>
           {selectionMode && (
             <input
@@ -370,23 +377,6 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
             })}
             {tags.length > 3 && (
               <span className={styles.moreTags}>+{tags.length - 3}</span>
-            )}
-          </div>
-        )}
-
-        {/* Collections (computed from tags) */}
-        {showCollections && docCollections.length > 0 && (
-          <div className={styles.collections} aria-label={`Collections: ${docCollections.map(c => c.displayName).join(', ')}`}>
-            {docCollections.slice(0, 2).map((collection) => (
-              <CollectionBadge
-                key={collection.slug}
-                label={collection.displayName}
-                color={collection.color}
-                onClick={() => selectCollectionFilter(collection.slug)}
-              />
-            ))}
-            {docCollections.length > 2 && (
-              <span className={styles.moreCollections}>+{docCollections.length - 2}</span>
             )}
           </div>
         )}
