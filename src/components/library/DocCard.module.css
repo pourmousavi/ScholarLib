@@ -124,3 +124,19 @@
   font-size: 9px;
   color: var(--text-muted);
 }
+
+.collections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-left: 15px;
+  margin-top: var(--space-1);
+}
+
+.moreCollections {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}

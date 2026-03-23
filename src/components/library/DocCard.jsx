@@ -1,4 +1,4 @@
-import { useState, memo, useCallback } from 'react'
+import { useState, useMemo, memo, useCallback } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
@@ -7,18 +7,22 @@ import { useToast } from '../../hooks/useToast'
 import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
 import { settingsService } from '../../services/settings/SettingsService'
-import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon } from '../ui'
+import { collectionService } from '../../services/tags/CollectionService'
+import { StatusDot, Tag, CollectionBadge, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon, FolderIcon } from '../ui'
 import QuickTagModal from './QuickTagModal'
+import AddToCollectionModal from './AddToCollectionModal'
 import styles from './DocCard.module.css'
 
 const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: isSelectedForBulk = false }) {
   const [contextMenu, setContextMenu] = useState(null)
   const [isReindexing, setIsReindexing] = useState(false)
   const [showTagModal, setShowTagModal] = useState(false)
+  const [showAddToCollectionModal, setShowAddToCollectionModal] = useState(false)
 
   // Display settings
   const showTags = settingsService.getShowTags()
   const showKeywords = settingsService.getShowKeywords()
+  const showCollections = settingsService.getShowCollections?.() ?? true
 
   const isIndexing = useIndexStore((s) => s.isIndexing)
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
@@ -28,6 +32,8 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   const folders = useLibraryStore((s) => s.folders)
   const documents = useLibraryStore((s) => s.documents)
   const tagRegistry = useLibraryStore((s) => s.tagRegistry)
+  const collectionRegistry = useLibraryStore((s) => s.collectionRegistry)
+  const selectCollectionFilter = useLibraryStore((s) => s.selectCollectionFilter)
   const toggleDocSelection = useLibraryStore((s) => s.toggleDocSelection)
 
   const adapter = useStorageStore((s) => s.adapter)
@@ -41,12 +47,13 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   const saveLibrary = useCallback(async () => {
     if (isDemoMode || !adapter) return
     try {
-      const { folders, documents, tagRegistry, smartCollections } = useLibraryStore.getState()
+      const { folders, documents, tagRegistry, collectionRegistry, smartCollections } = useLibraryStore.getState()
       await LibraryService.saveLibrary(adapter, {
-        version: '1.0',
+        version: '1.1',
         folders,
         documents,
         tag_registry: tagRegistry,
+        collection_registry: collectionRegistry,
         smart_collections: smartCollections
       })
     } catch (e) {
@@ -70,6 +77,11 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
 
   const tags = doc.user_data?.tags || []
   const keywords = doc.metadata?.keywords || []
+
+  // Get collections this document belongs to (based on its tags)
+  const docCollections = useMemo(() => {
+    return collectionService.getCollectionsForDocument(collectionRegistry, doc)
+  }, [collectionRegistry, doc])
 
   const handleClick = () => {
     if (selectionMode) {
@@ -205,6 +217,11 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
     handleCloseContextMenu()
   }
 
+  const handleAddToCollection = () => {
+    setShowAddToCollectionModal(true)
+    handleCloseContextMenu()
+  }
+
   const contextMenuItems = [
     {
       label: 'Edit metadata...',
@@ -215,6 +232,11 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
       label: 'Manage tags...',
       icon: <TagIcon />,
       onClick: handleManageTags
+    },
+    {
+      label: 'Add to collection...',
+      icon: <FolderIcon />,
+      onClick: handleAddToCollection
     },
     {
       label: 'Move to folder...',
@@ -313,6 +335,23 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
           </div>
         )}
 
+        {/* Collections (computed from tags) */}
+        {showCollections && docCollections.length > 0 && (
+          <div className={styles.collections} aria-label={`Collections: ${docCollections.map(c => c.displayName).join(', ')}`}>
+            {docCollections.slice(0, 2).map((collection) => (
+              <CollectionBadge
+                key={collection.slug}
+                label={collection.displayName}
+                color={collection.color}
+                onClick={() => selectCollectionFilter(collection.slug)}
+              />
+            ))}
+            {docCollections.length > 2 && (
+              <span className={styles.moreCollections}>+{docCollections.length - 2}</span>
+            )}
+          </div>
+        )}
+
         {/* Keywords (from paper metadata) */}
         {showKeywords && keywords.length > 0 && (
           <div className={styles.keywords} aria-label={`Keywords: ${keywords.join(', ')}`}>
@@ -339,6 +378,13 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
         <QuickTagModal
           docId={doc.id}
           onClose={() => setShowTagModal(false)}
+        />
+      )}
+
+      {showAddToCollectionModal && (
+        <AddToCollectionModal
+          docId={doc.id}
+          onClose={() => setShowAddToCollectionModal(false)}
         />
       )}
     </>

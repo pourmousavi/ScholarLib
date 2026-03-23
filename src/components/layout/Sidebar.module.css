@@ -172,12 +172,17 @@
 
 .foldersSection {
   overflow-y: auto;
-  min-height: 80px;
+  min-height: 60px;
+}
+
+.collectionsSection {
+  overflow-y: auto;
+  min-height: 50px;
 }
 
 .tagsSection {
   overflow-y: auto;
-  min-height: 60px;
+  min-height: 50px;
 }
 
 /* Resizable divider */

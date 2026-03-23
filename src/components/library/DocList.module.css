@@ -38,6 +38,19 @@
   font-size: 14px;
 }
 
+.collectionViewTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.viewIcon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
 .headerMeta {
   display: flex;
   align-items: center;

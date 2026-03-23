@@ -4,6 +4,7 @@ import { useStorageStore } from '../../store/storageStore'
 import { useIndexStore } from '../../store/indexStore'
 import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
+import { collectionService } from '../../services/tags/CollectionService'
 import { useToast } from '../../hooks/useToast'
 import DocCard from './DocCard'
 import IndexingBar from './IndexingBar'
@@ -30,6 +31,9 @@ export default function DocList() {
   const selectedTags = useLibraryStore((s) => s.selectedTags)
   const tagFilterMode = useLibraryStore((s) => s.tagFilterMode)
   const tagRegistry = useLibraryStore((s) => s.tagRegistry)
+  const selectedCollections = useLibraryStore((s) => s.selectedCollections)
+  const collectionFilterMode = useLibraryStore((s) => s.collectionFilterMode)
+  const collectionRegistry = useLibraryStore((s) => s.collectionRegistry)
   const selectionMode = useLibraryStore((s) => s.selectionMode)
   const selectedDocIds = useLibraryStore((s) => s.selectedDocIds)
   const toggleSelectionMode = useLibraryStore((s) => s.toggleSelectionMode)
@@ -55,9 +59,17 @@ export default function DocList() {
   // Check if we're viewing by tags (no folder selected, but tags selected)
   const isTagView = selectedTags.length > 0 && !selectedFolderId
 
-  // Get all docs - either for folder or filtered by tags
+  // Check if we're viewing by collections (no folder selected, but collections selected)
+  const isCollectionView = selectedCollections.length > 0 && !selectedFolderId
+
+  // Get all docs - either for folder, filtered by tags, or filtered by collections
   const allDocs = Object.values(documents)
     .filter(d => {
+      // If viewing by collections, show docs from all folders that match collection tags
+      if (isCollectionView) {
+        const collections = selectedCollections.map(slug => collectionRegistry[slug]).filter(Boolean)
+        return collectionService.documentMatchesCollections(d, collections, collectionFilterMode)
+      }
       // If viewing by tags, show docs from all folders that match tags
       if (isTagView) {
         const docTags = d.user_data?.tags || []
@@ -88,7 +100,7 @@ export default function DocList() {
   })
 
   // If in folder view but tags are also selected, apply tag filter too
-  if (!isTagView && selectedTags.length > 0) {
+  if (!isTagView && !isCollectionView && selectedTags.length > 0) {
     filteredDocs = filteredDocs.filter(doc => {
       const docTags = doc.user_data?.tags || []
       if (tagFilterMode === 'AND') {
@@ -96,6 +108,14 @@ export default function DocList() {
       } else {
         return selectedTags.some(t => docTags.includes(t))
       }
+    })
+  }
+
+  // If in folder view but collections are also selected, apply collection filter too
+  if (!isCollectionView && !isTagView && selectedCollections.length > 0) {
+    filteredDocs = filteredDocs.filter(doc => {
+      const collections = selectedCollections.map(slug => collectionRegistry[slug]).filter(Boolean)
+      return collectionService.documentMatchesCollections(doc, collections, collectionFilterMode)
     })
   }
 
@@ -251,10 +271,18 @@ export default function DocList() {
     return tagNames.join(connector)
   }
 
-  if (!folder && !isTagView) {
+  // Build collection view title
+  const getCollectionViewTitle = () => {
+    if (selectedCollections.length === 0) return ''
+    const collectionNames = selectedCollections.map(slug => collectionRegistry[slug]?.displayName || slug)
+    const connector = collectionFilterMode === 'AND' ? ' & ' : ' | '
+    return collectionNames.join(connector)
+  }
+
+  if (!folder && !isTagView && !isCollectionView) {
     return (
       <div className={styles.docList}>
-        <div className={styles.empty}>Select a folder or tag</div>
+        <div className={styles.empty}>Select a folder, collection, or tag</div>
       </div>
     )
   }
@@ -264,7 +292,14 @@ export default function DocList() {
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.breadcrumb}>
-          {isTagView ? (
+          {isCollectionView ? (
+            <span className={styles.collectionViewTitle}>
+              <svg className={styles.viewIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+              </svg>
+              {getCollectionViewTitle()}
+            </span>
+          ) : isTagView ? (
             <span className={styles.tagViewTitle}>
               <span className={styles.tagIcon}>🏷</span>
               {getTagViewTitle()}
@@ -283,7 +318,7 @@ export default function DocList() {
         <div className={styles.headerMeta}>
           <span className={styles.docCount}>{allDocs.length} documents</span>
           <div className={styles.headerActions}>
-            {!selectionMode && !isTagView && (
+            {!selectionMode && !isTagView && !isCollectionView && (
               <button
                 className={styles.addBtn}
                 onClick={() => setShowUpload(!showUpload)}

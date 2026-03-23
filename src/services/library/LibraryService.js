@@ -2,23 +2,54 @@ import { nanoid } from 'nanoid'
 
 const LIBRARY_PATH = '_system/library.json'
 
+const CURRENT_VERSION = '1.1'
+
 function createEmptyLibrary() {
   return {
-    version: '1.0',
+    version: CURRENT_VERSION,
     schema_updated: new Date().toISOString().split('T')[0],
     last_modified: new Date().toISOString(),
     last_modified_by: 'local',
     folders: [],
     documents: {},
     tag_registry: {},
+    collection_registry: {},
     smart_collections: [],
   }
+}
+
+/**
+ * Migrate library data from older versions to current version
+ */
+function migrateLibrary(library) {
+  const version = library.version || '1.0'
+
+  // v1.0 → v1.1: Add collection_registry
+  if (version === '1.0') {
+    library.collection_registry = library.collection_registry || {}
+    library.version = '1.1'
+    library.schema_updated = new Date().toISOString().split('T')[0]
+    console.log('Migrated library from v1.0 to v1.1 (added collection_registry)')
+  }
+
+  return library
 }
 
 export const LibraryService = {
   async loadLibrary(adapter) {
     try {
-      return await adapter.readJSON(LIBRARY_PATH)
+      let library = await adapter.readJSON(LIBRARY_PATH)
+
+      // Migrate if needed
+      const originalVersion = library.version
+      library = migrateLibrary(library)
+
+      // Save if migration occurred
+      if (library.version !== originalVersion) {
+        await this.saveLibrary(adapter, library)
+      }
+
+      return library
     } catch (e) {
       if (e.code === 'STORAGE_NOT_FOUND') {
         // First run - create empty library

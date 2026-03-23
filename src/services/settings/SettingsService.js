@@ -241,6 +241,23 @@ class SettingsService {
   setShowKeywords(show) {
     localStorage.setItem('sv_show_keywords', show.toString())
   }
+
+  /**
+   * Get whether to show collections on document cards
+   * @returns {boolean}
+   */
+  getShowCollections() {
+    const val = localStorage.getItem('sv_show_collections')
+    return val === null ? true : val === 'true'
+  }
+
+  /**
+   * Set whether to show collections on document cards
+   * @param {boolean} show
+   */
+  setShowCollections(show) {
+    localStorage.setItem('sv_show_collections', show.toString())
+  }
 }
 
 export const settingsService = new SettingsService()

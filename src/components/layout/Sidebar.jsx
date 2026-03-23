@@ -9,6 +9,7 @@ import { claudeService } from '../../services/ai/ClaudeService'
 import { openaiService } from '../../services/ai/OpenAIService'
 import { settingsService } from '../../services/settings/SettingsService'
 import FolderTree from '../library/FolderTree'
+import CollectionsList from '../library/CollectionsList'
 import TagsList from '../library/TagsList'
 import styles from './Sidebar.module.css'
 
@@ -17,12 +18,20 @@ export default function Sidebar() {
   const [searchResults, setSearchResults] = useState([])
   const [showResults, setShowResults] = useState(false)
 
-  // Resizable divider state
-  const [folderHeight, setFolderHeight] = useState(() => {
-    const saved = localStorage.getItem('sv_folder_height')
-    return saved ? parseInt(saved, 10) : 60 // Default 60% for folders
+  // Resizable divider state for three-section layout
+  // Heights are percentages: [folders, collections] - tags gets the remainder
+  const [sectionHeights, setSectionHeights] = useState(() => {
+    const saved = localStorage.getItem('sv_section_heights')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        return { folders: 40, collections: 30 } // Default: 40% folders, 30% collections, 30% tags
+      }
+    }
+    return { folders: 40, collections: 30 }
   })
-  const [isDragging, setIsDragging] = useState(false)
+  const [draggingDivider, setDraggingDivider] = useState(null) // 'folders' or 'collections'
   const treeContainerRef = useRef(null)
 
   const setShowModal = useUIStore((s) => s.setShowModal)
@@ -188,14 +197,14 @@ export default function Sidebar() {
 
   const providerInfo = getProviderInfo()
 
-  // Resizable divider handlers
-  const handleDividerMouseDown = useCallback((e) => {
+  // Resizable divider handlers for three-section layout
+  const handleDividerMouseDown = useCallback((divider) => (e) => {
     e.preventDefault()
-    setIsDragging(true)
+    setDraggingDivider(divider)
   }, [])
 
   useEffect(() => {
-    if (!isDragging) return
+    if (!draggingDivider) return
 
     const handleMouseMove = (e) => {
       if (!treeContainerRef.current) return
@@ -203,15 +212,38 @@ export default function Sidebar() {
       const container = treeContainerRef.current
       const rect = container.getBoundingClientRect()
       const relativeY = e.clientY - rect.top
-      const percentage = Math.min(Math.max((relativeY / rect.height) * 100, 20), 80)
+      const percentage = (relativeY / rect.height) * 100
 
-      setFolderHeight(percentage)
+      setSectionHeights(prev => {
+        if (draggingDivider === 'folders') {
+          // Moving first divider - adjust folders height
+          // Collections stays same, tags adjusts
+          const newFolders = Math.min(Math.max(percentage, 15), 60)
+          // Ensure collections + tags still have room
+          const maxFolders = 100 - prev.collections - 15
+          return {
+            folders: Math.min(newFolders, maxFolders),
+            collections: prev.collections
+          }
+        } else {
+          // Moving second divider - adjust collections height
+          // Folders stays same, tags adjusts
+          const collectionsEnd = percentage
+          const newCollections = collectionsEnd - prev.folders
+          // Ensure tags still has room (min 15%)
+          const maxCollections = 85 - prev.folders
+          return {
+            folders: prev.folders,
+            collections: Math.min(Math.max(newCollections, 15), maxCollections)
+          }
+        }
+      })
     }
 
     const handleMouseUp = () => {
-      setIsDragging(false)
+      setDraggingDivider(null)
       // Save to localStorage
-      localStorage.setItem('sv_folder_height', folderHeight.toString())
+      localStorage.setItem('sv_section_heights', JSON.stringify(sectionHeights))
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -221,7 +253,10 @@ export default function Sidebar() {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isDragging, folderHeight])
+  }, [draggingDivider, sectionHeights])
+
+  // Calculate tags height
+  const tagsHeight = 100 - sectionHeights.folders - sectionHeights.collections
 
   return (
     <div className={styles.sidebar}>
@@ -282,19 +317,29 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Folder tree and Tags with resizable divider */}
+      {/* Folder tree, Collections, and Tags with resizable dividers */}
       <div className={styles.tree} ref={treeContainerRef}>
-        <div className={styles.foldersSection} style={{ height: `${folderHeight}%` }}>
+        <div className={styles.foldersSection} style={{ height: `${sectionHeights.folders}%` }}>
           <FolderTree />
         </div>
         <div
-          className={`${styles.divider} ${isDragging ? styles.dragging : ''}`}
-          onMouseDown={handleDividerMouseDown}
+          className={`${styles.divider} ${draggingDivider === 'folders' ? styles.dragging : ''}`}
+          onMouseDown={handleDividerMouseDown('folders')}
         >
           <div className={styles.dividerLine} />
           <div className={styles.dividerHandle} />
         </div>
-        <div className={styles.tagsSection} style={{ height: `${100 - folderHeight}%` }}>
+        <div className={styles.collectionsSection} style={{ height: `${sectionHeights.collections}%` }}>
+          <CollectionsList />
+        </div>
+        <div
+          className={`${styles.divider} ${draggingDivider === 'collections' ? styles.dragging : ''}`}
+          onMouseDown={handleDividerMouseDown('collections')}
+        >
+          <div className={styles.dividerLine} />
+          <div className={styles.dividerHandle} />
+        </div>
+        <div className={styles.tagsSection} style={{ height: `${tagsHeight}%` }}>
           <TagsList />
         </div>
       </div>

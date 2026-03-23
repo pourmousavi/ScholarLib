@@ -10,7 +10,7 @@ Stored at: `/ScholarLib/_system/library.json` in Box/Dropbox.
 
 ```json
 {
-  "version": "1.0",
+  "version": "1.1",
   "schema_updated": "2026-03-23",
   "last_modified": "ISO8601 timestamp",
   "last_modified_by": "device-id or email",
@@ -20,6 +20,9 @@ Stored at: `/ScholarLib/_system/library.json` in Box/Dropbox.
   },
   "tag_registry": {
     "[tag-slug]": TagRecord
+  },
+  "collection_registry": {
+    "[collection-slug]": CollectionRecord
   },
   "smart_collections": [SmartCollection]
 }
@@ -205,6 +208,132 @@ const TAG_COLORS = [
   '#3498DB', // Sky
 ]
 ```
+
+---
+
+## CollectionRecord
+
+Collections are logical groupings of tags that enable better organization, filtering, and sharing of related documents. A collection references tags by slug, and a tag can appear in multiple collections.
+
+```json
+{
+  "thesis-ch3": {
+    "displayName": "Thesis Chapter 3",
+    "description": "Methodology sources for thesis chapter 3",
+    "color": "#7C3AED",
+    "tags": ["battery-thermal", "literature-review", "methodology"],
+    "shared_with": [
+      {
+        "email": "student@adelaide.edu.au",
+        "permission": "viewer",
+        "share_id": "sh_abc123",
+        "shared_at": "2026-03-15T14:00:00Z"
+      }
+    ],
+    "created_at": "2026-03-10T09:00:00Z",
+    "updated_at": "2026-03-15T10:30:00Z"
+  },
+  "review-queue": {
+    "displayName": "Review Queue",
+    "description": "Papers to review this week",
+    "color": "#0EA5E9",
+    "tags": ["to-read", "needs-review"],
+    "shared_with": [],
+    "created_at": "2026-03-12T11:00:00Z",
+    "updated_at": "2026-03-12T11:00:00Z"
+  }
+}
+```
+
+### Collection Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `displayName` | string | Original user input for display (e.g., "Thesis Chapter 3") |
+| `description` | string | Optional description of the collection's purpose |
+| `color` | string | Hex color code for visual distinction (from collection palette) |
+| `tags` | string[] | Array of tag slugs that belong to this collection |
+| `shared_with` | array | Sharing configuration (same structure as folders) |
+| `created_at` | ISO8601 | When the collection was created |
+| `updated_at` | ISO8601 | When the collection was last modified |
+
+### Collection Slug Rules
+- The key (slug) is derived from `displayName`
+- Lowercase only
+- Spaces replaced with hyphens
+- Special characters removed
+- Must be unique across registry
+- Example: "Thesis Chapter 3" → `thesis-ch3`
+
+### Collection Color Palette
+Collections use a distinct, more saturated palette than tags:
+```javascript
+const COLLECTION_COLORS = [
+  '#7C3AED', // Violet
+  '#0EA5E9', // Sky
+  '#10B981', // Emerald
+  '#F97316', // Orange
+  '#EC4899', // Pink
+  '#6366F1', // Indigo
+  '#84CC16', // Lime
+  '#14B8A6', // Teal
+]
+```
+
+### Collection-Tag Relationship
+- Collections reference tags via the `tags` array (tag slugs)
+- A tag can appear in multiple collections (flexible grouping)
+- When a tag is deleted from `tag_registry`, it is automatically removed from all collection `tags` arrays
+- Collections do NOT own tags — they are a logical grouping layer
+
+### Collection Filtering Logic
+
+**Single collection selected:**
+Show documents that have ANY tag in that collection's `tags[]` array.
+```javascript
+// Collection "Thesis Ch3" has tags [A, B, C]
+// Show docs with tag A OR tag B OR tag C
+const matchesCollection = (doc, collection) => {
+  const docTags = doc.user_data?.tags || []
+  return collection.tags.some(t => docTags.includes(t))
+}
+```
+
+**Multiple collections selected:**
+- **OR mode:** Doc has any tag from any selected collection
+- **AND mode:** Doc has at least one tag from EACH selected collection
+
+```javascript
+// "Thesis Ch3" has [A, B, C], "Review Queue" has [D, E]
+// OR: Show docs with (A OR B OR C OR D OR E)
+// AND: Show docs with (A OR B OR C) AND (D OR E)
+const matchesMultipleCollections = (doc, collections, mode) => {
+  const docTags = doc.user_data?.tags || []
+
+  if (mode === 'OR') {
+    // Any tag from any collection
+    const allTags = collections.flatMap(c => c.tags)
+    return allTags.some(t => docTags.includes(t))
+  } else {
+    // At least one tag from EACH collection
+    return collections.every(collection =>
+      collection.tags.some(t => docTags.includes(t))
+    )
+  }
+}
+```
+
+### Collection Deletion Behavior
+When a collection is deleted:
+1. Remove the collection entry from `collection_registry`
+2. Tags remain unchanged (collections don't own tags)
+3. Documents are unaffected (they reference tags, not collections)
+
+### Collection Merge Behavior
+When merging collections A and B into target C:
+1. C.tags = [...C.tags, ...A.tags, ...B.tags] (deduplicated)
+2. Delete collections A and B from registry
+3. Tags remain unchanged
 
 ---
 

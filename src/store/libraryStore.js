@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { tagService } from '../services/tags/TagService'
 import { smartCollectionService } from '../services/tags/SmartCollectionService'
+import { collectionService } from '../services/tags/CollectionService'
 
 // Mock folder data for development/offline mode
 const mockFolders = [
@@ -290,11 +291,34 @@ const mockTagRegistry = {
   }
 }
 
+// Mock collection registry for development
+const mockCollectionRegistry = {
+  'battery-research': {
+    displayName: 'Battery Research',
+    description: 'Core battery research papers',
+    color: '#7C3AED',
+    tags: ['degradation', 'thermal', 'cycling', 'capacity'],
+    shared_with: [],
+    created_at: '2024-01-15T10:00:00Z',
+    updated_at: '2024-01-15T10:00:00Z'
+  },
+  'ml-methods': {
+    displayName: 'ML Methods',
+    description: 'Machine learning methodology papers',
+    color: '#0EA5E9',
+    tags: ['ml', 'lstm', 'forecasting'],
+    shared_with: [],
+    created_at: '2024-01-20T10:00:00Z',
+    updated_at: '2024-01-20T10:00:00Z'
+  }
+}
+
 export const useLibraryStore = create((set, get) => ({
   // Library data
   folders: mockFolders,
   documents: mockDocuments,
   tagRegistry: mockTagRegistry,
+  collectionRegistry: mockCollectionRegistry,
   smartCollections: [],
   libraryVersion: null,
   lastModified: null,
@@ -308,6 +332,10 @@ export const useLibraryStore = create((set, get) => ({
   selectedTags: [],
   tagFilterMode: 'AND', // 'AND' | 'OR'
 
+  // Collection filter state
+  selectedCollections: [],
+  collectionFilterMode: 'OR', // 'AND' | 'OR'
+
   // Smart collection state
   selectedCollectionId: null,
 
@@ -320,6 +348,7 @@ export const useLibraryStore = create((set, get) => ({
     const folders = library.folders || []
     const documents = library.documents || {}
     let tagRegistry = library.tag_registry || {}
+    const collectionRegistry = library.collection_registry || {}
     const smartCollections = library.smart_collections || []
 
     // Sync orphan tags: find tags used in documents but not in registry
@@ -340,12 +369,14 @@ export const useLibraryStore = create((set, get) => ({
       folders,
       documents,
       tagRegistry,
+      collectionRegistry,
       smartCollections,
       libraryVersion: library.version,
       lastModified: library.last_modified,
       expandedFolders: rootFolderIds,
       selectedFolderId: firstRootId,
       selectedDocId: null,
+      selectedCollections: [],
     })
 
     // Return syncedTags count so caller can save if needed
@@ -358,12 +389,14 @@ export const useLibraryStore = create((set, get) => ({
       folders: [],
       documents: {},
       tagRegistry: {},
+      collectionRegistry: {},
       smartCollections: [],
       libraryVersion: null,
       lastModified: null,
       selectedFolderId: null,
       selectedDocId: null,
       expandedFolders: [],
+      selectedCollections: [],
     })
   },
 
@@ -373,9 +406,11 @@ export const useLibraryStore = create((set, get) => ({
       folders: mockFolders,
       documents: mockDocuments,
       tagRegistry: mockTagRegistry,
+      collectionRegistry: mockCollectionRegistry,
       smartCollections: [],
       expandedFolders: ['f_root1', 'f_bess1', 'f_root2'],
       selectedFolderId: 'f_bess1',
+      selectedCollections: [],
     })
   },
 
@@ -497,9 +532,9 @@ export const useLibraryStore = create((set, get) => ({
     return result
   },
 
-  // Delete tag from registry and all documents
+  // Delete tag from registry, all documents, and all collections
   deleteTag: (slug) => {
-    const { tagRegistry, documents } = get()
+    const { tagRegistry, documents, collectionRegistry } = get()
     const result = tagService.deleteTag(tagRegistry, documents, {}, slug)
 
     if (result.error) {
@@ -519,7 +554,22 @@ export const useLibraryStore = create((set, get) => ({
       }
     }
 
-    set({ tagRegistry: newRegistry, documents: newDocuments })
+    // Remove tag from all collections
+    const collectionUpdates = collectionService.removeTagFromAllCollections(collectionRegistry, slug)
+    const newCollectionRegistry = { ...collectionRegistry }
+    for (const { collectionSlug, newTags } of collectionUpdates) {
+      newCollectionRegistry[collectionSlug] = {
+        ...newCollectionRegistry[collectionSlug],
+        tags: newTags,
+        updated_at: new Date().toISOString()
+      }
+    }
+
+    set({
+      tagRegistry: newRegistry,
+      documents: newDocuments,
+      collectionRegistry: newCollectionRegistry
+    })
     return result
   },
 
@@ -728,4 +778,173 @@ export const useLibraryStore = create((set, get) => ({
   clearDocSelection: () => {
     set({ selectedDocIds: [], selectionMode: false })
   },
+
+  // ============================================
+  // Collection Registry Actions
+  // ============================================
+
+  // Create a new collection in the registry
+  createCollection: async (displayName, options = {}) => {
+    const { collectionRegistry } = get()
+    const result = collectionService.createCollection(collectionRegistry, displayName, options)
+
+    if (result.error) {
+      return result
+    }
+
+    const newRegistry = { ...collectionRegistry, [result.slug]: result.collection }
+    set({ collectionRegistry: newRegistry })
+
+    return result
+  },
+
+  // Update collection metadata (color, description, displayName, tags)
+  updateCollection: (slug, updates) => {
+    const { collectionRegistry } = get()
+    const result = collectionService.updateCollection(collectionRegistry, slug, updates)
+
+    if (result.error) {
+      return result
+    }
+
+    // Update registry
+    const newRegistry = { ...collectionRegistry }
+    delete newRegistry[result.oldSlug]
+    newRegistry[result.newSlug] = result.collection
+
+    // Update selectedCollections if slug changed
+    let newSelectedCollections = get().selectedCollections
+    if (result.slugChanged && newSelectedCollections.includes(result.oldSlug)) {
+      newSelectedCollections = newSelectedCollections.map(s =>
+        s === result.oldSlug ? result.newSlug : s
+      )
+    }
+
+    set({ collectionRegistry: newRegistry, selectedCollections: newSelectedCollections })
+    return result
+  },
+
+  // Delete collection from registry
+  deleteCollection: (slug) => {
+    const { collectionRegistry, selectedCollections } = get()
+    const result = collectionService.deleteCollection(collectionRegistry, slug)
+
+    if (result.error) {
+      return result
+    }
+
+    // Remove from registry
+    const newRegistry = { ...collectionRegistry }
+    delete newRegistry[slug]
+
+    // Remove from selection if selected
+    const newSelectedCollections = selectedCollections.filter(s => s !== slug)
+
+    set({ collectionRegistry: newRegistry, selectedCollections: newSelectedCollections })
+    return result
+  },
+
+  // Merge multiple collections into one
+  mergeCollections: (sourceSlugs, targetSlug) => {
+    const { collectionRegistry, selectedCollections } = get()
+    const result = collectionService.mergeCollections(collectionRegistry, sourceSlugs, targetSlug)
+
+    if (result.error) {
+      return result
+    }
+
+    // Update target collection's tags
+    const newRegistry = { ...collectionRegistry }
+    newRegistry[targetSlug] = {
+      ...newRegistry[targetSlug],
+      tags: result.mergedTags,
+      updated_at: new Date().toISOString()
+    }
+
+    // Remove source collections
+    for (const slug of result.collectionsToDelete) {
+      delete newRegistry[slug]
+    }
+
+    // Update selected collections
+    const newSelectedCollections = selectedCollections.filter(
+      s => !result.collectionsToDelete.includes(s)
+    )
+
+    set({ collectionRegistry: newRegistry, selectedCollections: newSelectedCollections })
+    return result
+  },
+
+  // Add a tag to a collection
+  addTagToCollection: (collectionSlug, tagSlug) => {
+    const { collectionRegistry } = get()
+    const result = collectionService.addTagToCollection(collectionRegistry, collectionSlug, tagSlug)
+
+    if (result.error) {
+      return result
+    }
+
+    const newRegistry = {
+      ...collectionRegistry,
+      [collectionSlug]: {
+        ...collectionRegistry[collectionSlug],
+        tags: result.newTags,
+        updated_at: new Date().toISOString()
+      }
+    }
+
+    set({ collectionRegistry: newRegistry })
+    return { success: true }
+  },
+
+  // Remove a tag from a collection
+  removeTagFromCollection: (collectionSlug, tagSlug) => {
+    const { collectionRegistry } = get()
+    const result = collectionService.removeTagFromCollection(collectionRegistry, collectionSlug, tagSlug)
+
+    if (result.error) {
+      return result
+    }
+
+    const newRegistry = {
+      ...collectionRegistry,
+      [collectionSlug]: {
+        ...collectionRegistry[collectionSlug],
+        tags: result.newTags,
+        updated_at: new Date().toISOString()
+      }
+    }
+
+    set({ collectionRegistry: newRegistry })
+    return { success: true }
+  },
+
+  // ============================================
+  // Collection Filter Actions
+  // ============================================
+
+  // Select a single collection for filtering (clears folder and tag selection)
+  selectCollectionFilter: (slug) => set({
+    selectedCollections: [slug],
+    selectedFolderId: null,
+    selectedTags: [],
+    collectionFilterMode: 'OR'
+  }),
+
+  // Toggle collection selection (multi-select)
+  toggleCollectionSelection: (slug) => set((state) => {
+    const newCollections = state.selectedCollections.includes(slug)
+      ? state.selectedCollections.filter(s => s !== slug)
+      : [...state.selectedCollections, slug]
+    return { selectedCollections: newCollections }
+  }),
+
+  // Set multiple collections at once
+  setSelectedCollections: (collections) => set({ selectedCollections: collections }),
+
+  // Set collection filter mode
+  setCollectionFilterMode: (mode) => set({ collectionFilterMode: mode }),
+
+  // Clear collection filter
+  clearCollectionFilter: () => set({ selectedCollections: [], collectionFilterMode: 'OR' }),
 }))
