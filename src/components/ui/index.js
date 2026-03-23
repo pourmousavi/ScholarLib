@@ -1,7 +1,6 @@
 export { default as Btn } from './Btn'
 export { default as Tag } from './Tag'
 export { default as CollectionBadge } from './CollectionBadge'
-export { default as CollectionStripe } from './CollectionStripe'
 export { default as TagInput } from './TagInput'
 export { default as StatusDot } from './StatusDot'
 export { default as ConfBar } from './ConfBar'

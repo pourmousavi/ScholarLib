@@ -8,7 +8,7 @@ import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
 import { settingsService } from '../../services/settings/SettingsService'
 import { collectionService } from '../../services/tags/CollectionService'
-import { StatusDot, Tag, CollectionStripe, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon, FolderIcon, ExportIcon } from '../ui'
+import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon, FolderIcon, ExportIcon } from '../ui'
 import QuickTagModal from './QuickTagModal'
 import AddToCollectionModal from './AddToCollectionModal'
 import styles from './DocCard.module.css'
@@ -326,7 +326,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   return (
     <>
       <article
-        className={`${styles.card} ${isSelected ? styles.selected : ''} ${isSelectedForBulk ? styles.bulkSelected : ''} ${showCollections && docCollections.length > 0 ? styles.hasCollections : ''}`}
+        className={`${styles.card} ${isSelected ? styles.selected : ''} ${isSelectedForBulk ? styles.bulkSelected : ''}`}
         onClick={handleClick}
         onContextMenu={selectionMode ? undefined : handleContextMenu}
         onKeyDown={handleKeyDown}
@@ -335,13 +335,6 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
         aria-selected={isSelected || isSelectedForBulk}
         aria-label={`${title} by ${authorText}${isUnread ? ', unread' : ''}${isStarred ? ', starred' : ''}`}
       >
-        {/* Collection stripe on left edge */}
-        {showCollections && docCollections.length > 0 && (
-          <CollectionStripe
-            collections={docCollections}
-            onCollectionClick={selectCollectionFilter}
-          />
-        )}
         <div className={styles.header}>
           {selectionMode && (
             <input
@@ -390,6 +383,32 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
             {keywords.length > 4 && (
               <span className={styles.moreKeywords}>+{keywords.length - 4}</span>
             )}
+          </div>
+        )}
+
+        {/* Collection footer */}
+        {showCollections && docCollections.length > 0 && (
+          <div
+            className={styles.collectionFooter}
+            onClick={(e) => {
+              e.stopPropagation()
+              selectCollectionFilter(docCollections[0].slug)
+            }}
+            role="button"
+            tabIndex={-1}
+            aria-label={`Collections: ${docCollections.map(c => c.displayName).join(', ')}`}
+          >
+            {docCollections.slice(0, 3).map((collection, idx) => (
+              <span
+                key={collection.slug}
+                className={styles.collectionDot}
+                style={{ backgroundColor: collection.color || 'var(--accent)' }}
+                title={collection.displayName}
+              />
+            ))}
+            <span className={styles.collectionNames}>
+              {docCollections.map(c => c.displayName).join(', ')}
+            </span>
           </div>
         )}
       </article>
