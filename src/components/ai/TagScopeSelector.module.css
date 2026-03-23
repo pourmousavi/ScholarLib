@@ -6,15 +6,15 @@
 .trigger {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 8px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-family: 'DM Mono', monospace;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   text-align: left;
 }
@@ -32,7 +32,7 @@
 
 .docCount {
   color: var(--accent);
-  font-size: 10px;
+  font-size: 9px;
 }
 
 .arrow {
@@ -41,22 +41,18 @@
 }
 
 .dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
+  position: fixed;
   margin-top: 4px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-lg);
-  z-index: 100;
-  max-height: 320px;
-  min-width: 200px;
+  z-index: 1000;
+  max-height: 280px;
+  min-width: 180px;
+  width: 220px;
   display: flex;
   flex-direction: column;
-  /* Ensure dropdown doesn't overflow viewport */
-  max-width: calc(100vw - 32px);
 }
 
 .controls {

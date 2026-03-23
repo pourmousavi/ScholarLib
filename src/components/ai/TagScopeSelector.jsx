@@ -11,7 +11,9 @@ import styles from './TagScopeSelector.module.css'
 export default function TagScopeSelector() {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [dropdownStyle, setDropdownStyle] = useState({})
   const containerRef = useRef(null)
+  const triggerRef = useRef(null)
 
   const tagRegistry = useLibraryStore((s) => s.tagRegistry)
   const documents = useLibraryStore((s) => s.documents)
@@ -62,6 +64,27 @@ export default function TagScopeSelector() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Calculate dropdown position when opening
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      const viewportWidth = window.innerWidth
+      const dropdownWidth = 220
+
+      // Calculate left position, ensure it doesn't overflow right edge
+      let left = rect.left
+      if (left + dropdownWidth > viewportWidth - 16) {
+        left = viewportWidth - dropdownWidth - 16
+      }
+      if (left < 16) left = 16
+
+      setDropdownStyle({
+        top: rect.bottom + 4,
+        left: left,
+      })
+    }
+  }, [isOpen])
+
   // Build display text
   const getDisplayText = () => {
     if (scopeTags.length === 0) {
@@ -77,6 +100,7 @@ export default function TagScopeSelector() {
   return (
     <div className={styles.container} ref={containerRef}>
       <button
+        ref={triggerRef}
         className={styles.trigger}
         onClick={() => setIsOpen(!isOpen)}
       >
@@ -88,7 +112,7 @@ export default function TagScopeSelector() {
       </button>
 
       {isOpen && (
-        <div className={styles.dropdown}>
+        <div className={styles.dropdown} style={dropdownStyle}>
           <div className={styles.controls}>
             <input
               type="text"
