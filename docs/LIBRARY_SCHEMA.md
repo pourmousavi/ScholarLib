@@ -137,7 +137,7 @@ Stored at: `/ScholarLib/_system/library.json` in Box/Dropbox.
 
 ## TagRecord
 
-Tags are stored in a global registry with metadata. Documents reference tags by slug only.
+Tags are stored in a global registry with metadata. Documents reference tags by slug only. Tags can be shared with collaborators independently of folders.
 
 ```json
 {
@@ -146,6 +146,14 @@ Tags are stored in a global registry with metadata. Documents reference tags by 
     "color": "#4A90D9",
     "category": null,
     "description": "",
+    "shared_with": [
+      {
+        "email": "student@adelaide.edu.au",
+        "permission": "viewer",
+        "share_id": "sh_tag123",
+        "shared_at": "2026-03-15T14:00:00Z"
+      }
+    ],
     "created_at": "2026-01-15T10:30:00Z",
     "updated_at": "2026-01-15T10:30:00Z"
   },
@@ -154,6 +162,7 @@ Tags are stored in a global registry with metadata. Documents reference tags by 
     "color": "#E85D75",
     "category": "status",
     "description": "Papers to cite in current manuscript",
+    "shared_with": [],
     "created_at": "2026-02-20T14:00:00Z",
     "updated_at": "2026-02-20T14:00:00Z"
   },
@@ -162,6 +171,7 @@ Tags are stored in a global registry with metadata. Documents reference tags by 
     "color": "#50C878",
     "category": "workflow",
     "description": "",
+    "shared_with": [],
     "created_at": "2026-03-01T09:00:00Z",
     "updated_at": "2026-03-01T09:00:00Z"
   }
@@ -176,6 +186,7 @@ Tags are stored in a global registry with metadata. Documents reference tags by 
 | `color` | string | Hex color code for visual distinction (default: system assigns from palette) |
 | `category` | string \| null | Optional grouping (e.g., "topics", "status", "workflow", "projects") |
 | `description` | string | Optional description of what this tag represents |
+| `shared_with` | array | Sharing configuration (same structure as folders) |
 | `created_at` | ISO8601 | When the tag was first created |
 | `updated_at` | ISO8601 | When the tag metadata was last modified |
 
@@ -213,7 +224,7 @@ const TAG_COLORS = [
 
 ## CollectionRecord
 
-Collections are logical groupings of tags that enable better organization, filtering, and sharing of related documents. A collection references tags by slug, and a tag can appear in multiple collections.
+Collections are logical groupings of tags that enable better organization, filtering, and sharing of related documents. A collection references tags by slug, and a tag can appear in multiple collections. Documents can be explicitly excluded from a collection even if they have matching tags.
 
 ```json
 {
@@ -222,6 +233,7 @@ Collections are logical groupings of tags that enable better organization, filte
     "description": "Methodology sources for thesis chapter 3",
     "color": "#7C3AED",
     "tags": ["battery-thermal", "literature-review", "methodology"],
+    "excluded_docs": ["d_abc123"],
     "shared_with": [
       {
         "email": "student@adelaide.edu.au",
@@ -238,6 +250,7 @@ Collections are logical groupings of tags that enable better organization, filte
     "description": "Papers to review this week",
     "color": "#0EA5E9",
     "tags": ["to-read", "needs-review"],
+    "excluded_docs": [],
     "shared_with": [],
     "created_at": "2026-03-12T11:00:00Z",
     "updated_at": "2026-03-12T11:00:00Z"
@@ -253,6 +266,7 @@ Collections are logical groupings of tags that enable better organization, filte
 | `description` | string | Optional description of the collection's purpose |
 | `color` | string | Hex color code for visual distinction (from collection palette) |
 | `tags` | string[] | Array of tag slugs that belong to this collection |
+| `excluded_docs` | string[] | Document IDs explicitly excluded from this collection (even if they have matching tags) |
 | `shared_with` | array | Sharing configuration (same structure as folders) |
 | `created_at` | ISO8601 | When the collection was created |
 | `updated_at` | ISO8601 | When the collection was last modified |
@@ -289,31 +303,41 @@ const COLLECTION_COLORS = [
 ### Collection Filtering Logic
 
 **Single collection selected:**
-Show documents that have ANY tag in that collection's `tags[]` array.
+Show documents that have ANY tag in that collection's `tags[]` array, excluding documents in `excluded_docs[]`.
 ```javascript
-// Collection "Thesis Ch3" has tags [A, B, C]
-// Show docs with tag A OR tag B OR tag C
+// Collection "Thesis Ch3" has tags [A, B, C] and excluded_docs [d_123]
+// Show docs with (tag A OR tag B OR tag C) AND NOT in excluded_docs
 const matchesCollection = (doc, collection) => {
+  // Check if explicitly excluded
+  if (collection.excluded_docs?.includes(doc.id)) {
+    return false
+  }
+  // Check if has any matching tag
   const docTags = doc.user_data?.tags || []
   return collection.tags.some(t => docTags.includes(t))
 }
 ```
 
 **Multiple collections selected:**
-- **OR mode:** Doc has any tag from any selected collection
-- **AND mode:** Doc has at least one tag from EACH selected collection
+- **OR mode:** Doc has any tag from any selected collection (not excluded from any)
+- **AND mode:** Doc has at least one tag from EACH selected collection (not excluded from any)
 
 ```javascript
 // "Thesis Ch3" has [A, B, C], "Review Queue" has [D, E]
-// OR: Show docs with (A OR B OR C OR D OR E)
-// AND: Show docs with (A OR B OR C) AND (D OR E)
+// OR: Show docs with (A OR B OR C OR D OR E) AND not excluded
+// AND: Show docs with (A OR B OR C) AND (D OR E) AND not excluded
 const matchesMultipleCollections = (doc, collections, mode) => {
   const docTags = doc.user_data?.tags || []
 
+  // Check if excluded from ANY selected collection
+  const isExcluded = collections.some(c => c.excluded_docs?.includes(doc.id))
+  if (isExcluded) return false
+
   if (mode === 'OR') {
     // Any tag from any collection
-    const allTags = collections.flatMap(c => c.tags)
-    return allTags.some(t => docTags.includes(t))
+    return collections.some(collection =>
+      collection.tags.some(t => docTags.includes(t))
+    )
   } else {
     // At least one tag from EACH collection
     return collections.every(collection =>
@@ -323,17 +347,25 @@ const matchesMultipleCollections = (doc, collections, mode) => {
 }
 ```
 
+### Document Exclusion
+Documents can be explicitly excluded from a collection while retaining their tags:
+- Right-click a document → "Remove from [Collection]" adds the doc ID to `excluded_docs`
+- The document keeps its tags but won't appear in that collection
+- To re-include, remove the doc ID from `excluded_docs`
+
 ### Collection Deletion Behavior
 When a collection is deleted:
 1. Remove the collection entry from `collection_registry`
 2. Tags remain unchanged (collections don't own tags)
 3. Documents are unaffected (they reference tags, not collections)
+4. Exclusions are discarded (they were specific to the deleted collection)
 
 ### Collection Merge Behavior
 When merging collections A and B into target C:
 1. C.tags = [...C.tags, ...A.tags, ...B.tags] (deduplicated)
-2. Delete collections A and B from registry
-3. Tags remain unchanged
+2. C.excluded_docs = [...C.excluded_docs, ...A.excluded_docs, ...B.excluded_docs] (deduplicated)
+3. Delete collections A and B from registry
+4. Tags remain unchanged
 
 ---
 

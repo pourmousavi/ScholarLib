@@ -5,6 +5,7 @@ import { collectionService } from '../../services/tags/CollectionService'
 import { LibraryService } from '../../services/library/LibraryService'
 import CollectionEditModal from '../tags/CollectionEditModal'
 import CollectionMergeModal from '../tags/CollectionMergeModal'
+import CollectionShareModal from '../sharing/CollectionShareModal'
 import styles from './CollectionsList.module.css'
 
 /**
@@ -18,6 +19,7 @@ export default function CollectionsList() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingCollectionSlug, setEditingCollectionSlug] = useState(null)
   const [showMergeModal, setShowMergeModal] = useState(false)
+  const [sharingCollectionSlug, setSharingCollectionSlug] = useState(null)
   const [contextMenu, setContextMenu] = useState(null)
 
   const collectionRegistry = useLibraryStore((s) => s.collectionRegistry)
@@ -228,6 +230,15 @@ export default function CollectionsList() {
             >
               Filter by this collection
             </button>
+            <button
+              className={styles.contextItem}
+              onClick={() => {
+                setSharingCollectionSlug(contextMenu.slug)
+                closeContextMenu()
+              }}
+            >
+              Share collection...
+            </button>
           </div>
         </>
       )}
@@ -249,6 +260,14 @@ export default function CollectionsList() {
         <CollectionMergeModal
           onClose={() => setShowMergeModal(false)}
           onSave={saveLibrary}
+        />
+      )}
+
+      {/* Share collection modal */}
+      {sharingCollectionSlug && (
+        <CollectionShareModal
+          collectionSlug={sharingCollectionSlug}
+          onClose={() => setSharingCollectionSlug(null)}
         />
       )}
     </div>

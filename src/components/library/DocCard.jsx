@@ -35,6 +35,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   const collectionRegistry = useLibraryStore((s) => s.collectionRegistry)
   const selectCollectionFilter = useLibraryStore((s) => s.selectCollectionFilter)
   const toggleDocSelection = useLibraryStore((s) => s.toggleDocSelection)
+  const excludeDocFromCollection = useLibraryStore((s) => s.excludeDocFromCollection)
 
   const adapter = useStorageStore((s) => s.adapter)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
@@ -222,6 +223,29 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
     handleCloseContextMenu()
   }
 
+  const handleExcludeFromCollection = async (collectionSlug, collectionName) => {
+    const result = excludeDocFromCollection(collectionSlug, doc.id)
+    if (result.error) {
+      showToast({ message: result.error, type: 'error' })
+    } else {
+      showToast({ message: `Removed from "${collectionName}"`, type: 'success' })
+      await saveLibrary()
+    }
+    handleCloseContextMenu()
+  }
+
+  // Build collection exclusion menu items
+  const collectionExclusionItems = docCollections.length > 0
+    ? [
+        { separator: true },
+        ...docCollections.map(collection => ({
+          label: `Remove from "${collection.displayName}"`,
+          icon: <FolderIcon />,
+          onClick: () => handleExcludeFromCollection(collection.slug, collection.displayName)
+        }))
+      ]
+    : []
+
   const contextMenuItems = [
     {
       label: 'Edit metadata...',
@@ -238,6 +262,8 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
       icon: <FolderIcon />,
       onClick: handleAddToCollection
     },
+    ...collectionExclusionItems,
+    { separator: true },
     {
       label: 'Move to folder...',
       icon: <MoveIcon />,

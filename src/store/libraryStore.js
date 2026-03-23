@@ -298,6 +298,7 @@ const mockCollectionRegistry = {
     description: 'Core battery research papers',
     color: '#7C3AED',
     tags: ['degradation', 'thermal', 'cycling', 'capacity'],
+    excluded_docs: [],
     shared_with: [],
     created_at: '2024-01-15T10:00:00Z',
     updated_at: '2024-01-15T10:00:00Z'
@@ -307,6 +308,7 @@ const mockCollectionRegistry = {
     description: 'Machine learning methodology papers',
     color: '#0EA5E9',
     tags: ['ml', 'lstm', 'forecasting'],
+    excluded_docs: [],
     shared_with: [],
     created_at: '2024-01-20T10:00:00Z',
     updated_at: '2024-01-20T10:00:00Z'
@@ -853,11 +855,12 @@ export const useLibraryStore = create((set, get) => ({
       return result
     }
 
-    // Update target collection's tags
+    // Update target collection's tags and excluded_docs
     const newRegistry = { ...collectionRegistry }
     newRegistry[targetSlug] = {
       ...newRegistry[targetSlug],
       tags: result.mergedTags,
+      excluded_docs: result.mergedExcludedDocs || [],
       updated_at: new Date().toISOString()
     }
 
@@ -911,6 +914,50 @@ export const useLibraryStore = create((set, get) => ({
       [collectionSlug]: {
         ...collectionRegistry[collectionSlug],
         tags: result.newTags,
+        updated_at: new Date().toISOString()
+      }
+    }
+
+    set({ collectionRegistry: newRegistry })
+    return { success: true }
+  },
+
+  // Exclude a document from a collection (document keeps its tags but won't appear in collection)
+  excludeDocFromCollection: (collectionSlug, docId) => {
+    const { collectionRegistry } = get()
+    const result = collectionService.excludeDocumentFromCollection(collectionRegistry, collectionSlug, docId)
+
+    if (result.error) {
+      return result
+    }
+
+    const newRegistry = {
+      ...collectionRegistry,
+      [collectionSlug]: {
+        ...collectionRegistry[collectionSlug],
+        excluded_docs: result.newExcludedDocs,
+        updated_at: new Date().toISOString()
+      }
+    }
+
+    set({ collectionRegistry: newRegistry })
+    return { success: true }
+  },
+
+  // Include a document in a collection (remove from exclusion list)
+  includeDocInCollection: (collectionSlug, docId) => {
+    const { collectionRegistry } = get()
+    const result = collectionService.includeDocumentInCollection(collectionRegistry, collectionSlug, docId)
+
+    if (result.error) {
+      return result
+    }
+
+    const newRegistry = {
+      ...collectionRegistry,
+      [collectionSlug]: {
+        ...collectionRegistry[collectionSlug],
+        excluded_docs: result.newExcludedDocs,
         updated_at: new Date().toISOString()
       }
     }

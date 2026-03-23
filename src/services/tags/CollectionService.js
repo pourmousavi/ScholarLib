@@ -77,6 +77,7 @@ class CollectionService {
       description: options.description || '',
       color: options.color || this.getNextColor(collectionRegistry),
       tags: options.tags || [],
+      excluded_docs: [],
       shared_with: [],
       created_at: now,
       updated_at: now
@@ -94,13 +95,15 @@ class CollectionService {
 
   /**
    * Get all collections with computed document counts
-   * Document count = unique documents that have ANY tag in the collection
+   * Document count = unique documents that have ANY tag in the collection (excluding excluded_docs)
    */
   getAllCollectionsWithCounts(collectionRegistry = {}, tagRegistry = {}, documents = {}) {
     return Object.entries(collectionRegistry).map(([slug, collection]) => {
-      // Count documents that have at least one tag from this collection
+      // Count documents that have at least one tag from this collection (not excluded)
       let documentCount = 0
+      const excludedDocs = collection.excluded_docs || []
       for (const doc of Object.values(documents)) {
+        if (excludedDocs.includes(doc.id)) continue
         const docTags = doc.user_data?.tags || []
         if (collection.tags.some(t => docTags.includes(t))) {
           documentCount++
@@ -111,7 +114,8 @@ class CollectionService {
         slug,
         ...collection,
         documentCount,
-        tagCount: collection.tags.length
+        tagCount: collection.tags.length,
+        excludedCount: excludedDocs.length
       }
     }).sort((a, b) => a.displayName.localeCompare(b.displayName))
   }
@@ -144,6 +148,8 @@ class CollectionService {
     if (updates.color !== undefined) collection.color = updates.color
     if (updates.description !== undefined) collection.description = updates.description
     if (updates.tags !== undefined) collection.tags = [...updates.tags]
+    if (updates.shared_with !== undefined) collection.shared_with = updates.shared_with
+    if (updates.excluded_docs !== undefined) collection.excluded_docs = [...updates.excluded_docs]
     collection.updated_at = new Date().toISOString()
 
     return {
@@ -168,7 +174,7 @@ class CollectionService {
 
   /**
    * Merge multiple source collections into a target collection
-   * Target gets all tags from sources (deduplicated)
+   * Target gets all tags and excluded_docs from sources (deduplicated)
    */
   mergeCollections(collectionRegistry, sourceSlugs, targetSlug) {
     // Validate target exists
@@ -194,9 +200,18 @@ class CollectionService {
       }
     }
 
+    // Collect all excluded_docs from sources
+    const allExcluded = new Set(collectionRegistry[targetSlug].excluded_docs || [])
+    for (const slug of sourceSlugs) {
+      for (const docId of collectionRegistry[slug].excluded_docs || []) {
+        allExcluded.add(docId)
+      }
+    }
+
     return {
       targetSlug,
       mergedTags: [...allTags],
+      mergedExcludedDocs: [...allExcluded],
       collectionsToDelete: [...sourceSlugs]
     }
   }
@@ -268,24 +283,33 @@ class CollectionService {
 
   /**
    * Get all collections that a document belongs to
-   * (based on the document's tags)
+   * (based on the document's tags, respecting exclusions)
    */
   getCollectionsForDocument(collectionRegistry, document) {
     const docTags = document.user_data?.tags || []
     if (docTags.length === 0) return []
 
     return Object.entries(collectionRegistry)
-      .filter(([_, collection]) =>
-        collection.tags.some(t => docTags.includes(t))
-      )
+      .filter(([_, collection]) => {
+        // Check if explicitly excluded
+        if ((collection.excluded_docs || []).includes(document.id)) {
+          return false
+        }
+        // Check if has any matching tag
+        return collection.tags.some(t => docTags.includes(t))
+      })
       .map(([slug, collection]) => ({ slug, ...collection }))
   }
 
   /**
    * Check if a document matches a collection filter
-   * Returns true if document has ANY tag from the collection
+   * Returns true if document has ANY tag from the collection and is not excluded
    */
   documentMatchesCollection(document, collection) {
+    // Check if explicitly excluded
+    if ((collection.excluded_docs || []).includes(document.id)) {
+      return false
+    }
     const docTags = document.user_data?.tags || []
     return collection.tags.some(t => docTags.includes(t))
   }
@@ -296,6 +320,12 @@ class CollectionService {
    */
   documentMatchesCollections(document, collections, mode = 'OR') {
     const docTags = document.user_data?.tags || []
+
+    // Check if excluded from ANY selected collection
+    const isExcluded = collections.some(c =>
+      (c.excluded_docs || []).includes(document.id)
+    )
+    if (isExcluded) return false
 
     if (mode === 'OR') {
       // Any tag from any collection
@@ -308,6 +338,59 @@ class CollectionService {
         collection.tags.some(t => docTags.includes(t))
       )
     }
+  }
+
+  /**
+   * Exclude a document from a collection
+   * Document will not appear in collection even if it has matching tags
+   */
+  excludeDocumentFromCollection(collectionRegistry, collectionSlug, docId) {
+    if (!collectionRegistry[collectionSlug]) {
+      return { error: 'Collection not found' }
+    }
+
+    const collection = collectionRegistry[collectionSlug]
+    const excludedDocs = collection.excluded_docs || []
+
+    if (excludedDocs.includes(docId)) {
+      return { error: 'Document already excluded from collection' }
+    }
+
+    return {
+      collectionSlug,
+      newExcludedDocs: [...excludedDocs, docId]
+    }
+  }
+
+  /**
+   * Include a document in a collection (remove from exclusion list)
+   * Document will appear in collection again if it has matching tags
+   */
+  includeDocumentInCollection(collectionRegistry, collectionSlug, docId) {
+    if (!collectionRegistry[collectionSlug]) {
+      return { error: 'Collection not found' }
+    }
+
+    const collection = collectionRegistry[collectionSlug]
+    const excludedDocs = collection.excluded_docs || []
+
+    if (!excludedDocs.includes(docId)) {
+      return { error: 'Document is not excluded from collection' }
+    }
+
+    return {
+      collectionSlug,
+      newExcludedDocs: excludedDocs.filter(id => id !== docId)
+    }
+  }
+
+  /**
+   * Check if a document is excluded from a specific collection
+   */
+  isDocumentExcluded(collectionRegistry, collectionSlug, docId) {
+    const collection = collectionRegistry[collectionSlug]
+    if (!collection) return false
+    return (collection.excluded_docs || []).includes(docId)
   }
 
   /**

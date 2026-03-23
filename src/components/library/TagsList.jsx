@@ -5,6 +5,7 @@ import { tagService } from '../../services/tags/TagService'
 import { LibraryService } from '../../services/library/LibraryService'
 import TagEditModal from '../tags/TagEditModal'
 import TagMergeModal from '../tags/TagMergeModal'
+import TagShareModal from '../sharing/TagShareModal'
 import styles from './TagsList.module.css'
 
 /**
@@ -18,6 +19,7 @@ export default function TagsList() {
   const [newTagName, setNewTagName] = useState('')
   const [editingTagSlug, setEditingTagSlug] = useState(null)
   const [showMergeModal, setShowMergeModal] = useState(false)
+  const [sharingTagSlug, setSharingTagSlug] = useState(null)
   const [contextMenu, setContextMenu] = useState(null)
 
   const tagRegistry = useLibraryStore((s) => s.tagRegistry)
@@ -292,6 +294,15 @@ export default function TagsList() {
             >
               Filter by this tag
             </button>
+            <button
+              className={styles.contextItem}
+              onClick={() => {
+                setSharingTagSlug(contextMenu.slug)
+                closeContextMenu()
+              }}
+            >
+              Share tag...
+            </button>
           </div>
         </>
       )}
@@ -307,6 +318,14 @@ export default function TagsList() {
       {/* Merge tags modal */}
       {showMergeModal && (
         <TagMergeModal onClose={() => setShowMergeModal(false)} />
+      )}
+
+      {/* Share tag modal */}
+      {sharingTagSlug && (
+        <TagShareModal
+          tagSlug={sharingTagSlug}
+          onClose={() => setSharingTagSlug(null)}
+        />
       )}
     </div>
   )

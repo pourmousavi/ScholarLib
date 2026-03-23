@@ -143,6 +143,7 @@ class TagService {
     if (updates.color !== undefined) tag.color = updates.color
     if (updates.category !== undefined) tag.category = updates.category
     if (updates.description !== undefined) tag.description = updates.description
+    if (updates.shared_with !== undefined) tag.shared_with = updates.shared_with
     tag.updated_at = new Date().toISOString()
 
     // If slug changed, need to update all document and note references
