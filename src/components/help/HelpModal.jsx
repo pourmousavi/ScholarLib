@@ -8,6 +8,7 @@ const SECTIONS = [
   { id: 'migration', label: 'Switching Providers', icon: 'migrate' },
   { id: 'ai', label: 'AI Setup', icon: 'brain' },
   { id: 'library', label: 'Managing Library', icon: 'folder' },
+  { id: 'citations', label: 'Citation Export', icon: 'citation' },
   { id: 'tags', label: 'Tags', icon: 'tag' },
   { id: 'collections', label: 'Collections', icon: 'collection' },
   { id: 'chat', label: 'AI Chat', icon: 'chat' },
@@ -78,6 +79,14 @@ const SectionIcons = {
       <rect x="3" y="14" width="7" height="7" rx="1"/>
       <rect x="14" y="14" width="7" height="7" rx="1"/>
     </svg>
+  ),
+  citation: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="12" y1="18" x2="12" y2="12"/>
+      <polyline points="9 15 12 12 15 15"/>
+    </svg>
   )
 }
 
@@ -137,6 +146,7 @@ export default function HelpModal({ onClose }) {
         <li><strong>Smart Metadata</strong> — Automatic extraction via GROBID, CrossRef, and AI</li>
         <li><strong>Flexible Organization</strong> — Folders for storage, tags for topics, collections for projects</li>
         <li><strong>AI Chat</strong> — Ask questions scoped to documents, folders, tags, or collections</li>
+        <li><strong>Citation Export</strong> — Export to BibTeX, RIS, APA, MLA, Chicago, and more</li>
         <li><strong>Collaboration</strong> — Share folders, tags, or collections with others</li>
         <li><strong>Notes</strong> — Take notes on papers with export to Markdown, PDF, or Word</li>
         <li><strong>PWA Support</strong> — Install as an app on Mac, Windows, or iPad</li>
@@ -493,6 +503,157 @@ export default function HelpModal({ onClose }) {
         Use the search box at the top of the sidebar to find documents by title,
         author, journal, or keywords.
       </p>
+    </div>
+  )
+
+  const renderCitations = () => (
+    <div className={styles.content}>
+      <h2>Citation Export</h2>
+      <p className={styles.intro}>
+        Export citations for your documents in multiple academic formats. Whether you're
+        writing in LaTeX, using a reference manager, or need formatted citations for
+        Word documents, ScholarLib has you covered.
+      </p>
+
+      <h3>Supported Formats</h3>
+      <table className={styles.comparisonTable}>
+        <thead>
+          <tr>
+            <th>Format</th>
+            <th>Extension</th>
+            <th>Best For</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>BibTeX</strong></td>
+            <td>.bib</td>
+            <td>LaTeX, Overleaf, JabRef</td>
+          </tr>
+          <tr>
+            <td><strong>RIS</strong></td>
+            <td>.ris</td>
+            <td>Zotero, Mendeley, EndNote (universal)</td>
+          </tr>
+          <tr>
+            <td><strong>CSL-JSON</strong></td>
+            <td>.json</td>
+            <td>Pandoc, modern markdown workflows</td>
+          </tr>
+          <tr>
+            <td><strong>EndNote XML</strong></td>
+            <td>.xml</td>
+            <td>EndNote, institutional systems</td>
+          </tr>
+          <tr>
+            <td><strong>APA 7th</strong></td>
+            <td>.txt</td>
+            <td>Psychology, social sciences</td>
+          </tr>
+          <tr>
+            <td><strong>MLA 9th</strong></td>
+            <td>.txt</td>
+            <td>Humanities, literature</td>
+          </tr>
+          <tr>
+            <td><strong>Chicago 17th</strong></td>
+            <td>.txt</td>
+            <td>History, arts, publishing</td>
+          </tr>
+          <tr>
+            <td><strong>Harvard</strong></td>
+            <td>.txt</td>
+            <td>UK/Australian universities</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>How to Export Citations</h3>
+      <p>You can export citations from multiple places in ScholarLib:</p>
+
+      <div className={styles.exportMethods}>
+        <div className={styles.exportMethod}>
+          <strong>Single Document</strong>
+          <p>Right-click any document → "Export citation..."</p>
+        </div>
+        <div className={styles.exportMethod}>
+          <strong>Multiple Documents (Bulk)</strong>
+          <p>Select multiple documents using checkboxes, then click "Export Citations" in the action bar</p>
+        </div>
+        <div className={styles.exportMethod}>
+          <strong>Entire Folder</strong>
+          <p>Right-click a folder → "Export all citations..."</p>
+        </div>
+        <div className={styles.exportMethod}>
+          <strong>All Documents with a Tag</strong>
+          <p>Right-click a tag → "Export citations..."</p>
+        </div>
+        <div className={styles.exportMethod}>
+          <strong>All Documents in a Collection</strong>
+          <p>Right-click a collection → "Export citations..."</p>
+        </div>
+      </div>
+
+      <h3>Using the Export Modal</h3>
+      <ol className={styles.steps}>
+        <li>Choose your desired format using the format tabs at the top</li>
+        <li>Preview the generated citations in the preview area</li>
+        <li>Click <strong>Copy to Clipboard</strong> to copy the citations</li>
+        <li>Or click <strong>Download</strong> to save as a file</li>
+      </ol>
+
+      <h3>Format Details</h3>
+
+      <h4>BibTeX (.bib)</h4>
+      <p>
+        Standard format for LaTeX documents. Each entry includes a cite key (e.g., <code>zhang2024calendar</code>)
+        that you can use with <code>\cite{'{'}zhang2024calendar{'}'}</code> in your LaTeX source.
+      </p>
+      <pre className={styles.code}>{`@article{zhang2024calendar,
+  author = {Zhang, Y. and Chen, L.},
+  title = {Calendar Aging Model...},
+  journal = {Applied Energy},
+  year = {2024},
+  doi = {10.1016/j.apenergy.2024.01.042}
+}`}</pre>
+
+      <h4>RIS (.ris)</h4>
+      <p>
+        Universal format supported by virtually all reference managers including Zotero,
+        Mendeley, EndNote, and Papers. Best choice when sharing with collaborators who
+        use different tools.
+      </p>
+
+      <h4>CSL-JSON (.json)</h4>
+      <p>
+        Modern JSON-based format used by Pandoc and citation.js. Ideal for automated
+        workflows and markdown-based writing systems.
+      </p>
+
+      <h4>Formatted Citations (APA, MLA, Chicago, Harvard)</h4>
+      <p>
+        Ready-to-use formatted text citations. Perfect for pasting directly into Word
+        documents, Google Docs, or any text editor. Each citation is fully formatted
+        according to the style guide.
+      </p>
+
+      <h3>Tips</h3>
+      <ul>
+        <li>For best results, ensure your documents have complete metadata (authors, year, journal, DOI)</li>
+        <li>Use "Edit Metadata" to fix any missing or incorrect information before exporting</li>
+        <li>BibTeX and RIS files can be imported directly into Zotero, Mendeley, or EndNote</li>
+        <li>When exporting many documents, the preview may take a moment to generate</li>
+        <li>DOIs are automatically converted to URLs in formatted citation styles</li>
+      </ul>
+
+      <h3>Missing Metadata Handling</h3>
+      <p>When metadata is incomplete, ScholarLib uses sensible defaults:</p>
+      <ul>
+        <li><strong>Missing authors:</strong> "Unknown Author"</li>
+        <li><strong>Missing year:</strong> "n.d." (no date)</li>
+        <li><strong>Missing title:</strong> Filename (without .pdf extension)</li>
+        <li><strong>Missing DOI:</strong> DOI field is omitted</li>
+      </ul>
     </div>
   )
 
@@ -1120,6 +1281,7 @@ export default function HelpModal({ onClose }) {
       case 'migration': return renderMigration()
       case 'ai': return renderAISetup()
       case 'library': return renderLibrary()
+      case 'citations': return renderCitations()
       case 'tags': return renderTags()
       case 'collections': return renderCollections()
       case 'chat': return renderChat()
