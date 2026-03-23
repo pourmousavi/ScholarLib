@@ -95,6 +95,37 @@
   cursor: not-allowed;
 }
 
+.splitViewBtn {
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.splitViewBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.splitViewBtn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.splitViewBtn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
 .tabs {
   display: flex;
   gap: var(--space-1);

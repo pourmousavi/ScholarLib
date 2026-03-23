@@ -59,6 +59,19 @@ const getInitialPanelWidths = () => {
 
 const initialWidths = getInitialPanelWidths()
 
+// Get initial split view settings from localStorage
+const getInitialSplitViewSettings = () => {
+  return {
+    splitViewEnabled: localStorage.getItem('sv_split_view_enabled') === 'true',
+    splitViewRatio: parseFloat(localStorage.getItem('sv_split_view_ratio')) || 0.7,
+    splitViewRightTab: localStorage.getItem('sv_split_view_right_tab') || 'ai',
+    splitViewDefaultEnabled: localStorage.getItem('sv_split_view_default') === 'true',
+    fullscreenOverlayWidth: parseInt(localStorage.getItem('sv_fullscreen_overlay_width')) || 350
+  }
+}
+
+const initialSplitView = getInitialSplitViewSettings()
+
 export const useUIStore = create((set) => ({
   activePanel: 'pdf',
   showModal: null,
@@ -78,6 +91,14 @@ export const useUIStore = create((set) => ({
   // Panel widths (resizable)
   sidebarWidth: initialWidths.sidebarWidth,
   docListWidth: initialWidths.docListWidth,
+
+  // Split view settings
+  splitViewEnabled: initialSplitView.splitViewEnabled,
+  splitViewRatio: initialSplitView.splitViewRatio,
+  splitViewRightTab: initialSplitView.splitViewRightTab,
+  splitViewDefaultEnabled: initialSplitView.splitViewDefaultEnabled,
+  fullscreenOverlayVisible: false,
+  fullscreenOverlayWidth: initialSplitView.fullscreenOverlayWidth,
 
   setActivePanel: (panel) => set({ activePanel: panel }),
   setShowModal: (modal) => set({ showModal: modal }),
@@ -131,5 +152,38 @@ export const useUIStore = create((set) => ({
   setPdfDefaultZoom: (zoom) => {
     localStorage.setItem('sv_pdf_default_zoom', zoom.toString())
     set({ pdfDefaultZoom: zoom })
+  },
+
+  // Split view actions
+  setSplitViewEnabled: (enabled) => {
+    localStorage.setItem('sv_split_view_enabled', enabled.toString())
+    set({ splitViewEnabled: enabled })
+  },
+  toggleSplitView: () => set((s) => {
+    const newEnabled = !s.splitViewEnabled
+    localStorage.setItem('sv_split_view_enabled', newEnabled.toString())
+    return { splitViewEnabled: newEnabled }
+  }),
+  setSplitViewRatio: (ratio) => {
+    const clampedRatio = Math.max(0.4, Math.min(0.85, ratio))
+    localStorage.setItem('sv_split_view_ratio', clampedRatio.toString())
+    set({ splitViewRatio: clampedRatio })
+  },
+  setSplitViewRightTab: (tab) => {
+    localStorage.setItem('sv_split_view_right_tab', tab)
+    set({ splitViewRightTab: tab })
+  },
+  setSplitViewDefaultEnabled: (enabled) => {
+    localStorage.setItem('sv_split_view_default', enabled.toString())
+    set({ splitViewDefaultEnabled: enabled })
+  },
+  toggleFullscreenOverlay: () => set((s) => ({
+    fullscreenOverlayVisible: !s.fullscreenOverlayVisible
+  })),
+  setFullscreenOverlayVisible: (visible) => set({ fullscreenOverlayVisible: visible }),
+  setFullscreenOverlayWidth: (width) => {
+    const clampedWidth = Math.max(250, Math.min(500, width))
+    localStorage.setItem('sv_fullscreen_overlay_width', clampedWidth.toString())
+    set({ fullscreenOverlayWidth: clampedWidth })
   }
 }))

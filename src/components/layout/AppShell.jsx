@@ -20,6 +20,7 @@ export default function AppShell() {
   const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed)
   const setDocListCollapsed = useUIStore((s) => s.setDocListCollapsed)
   const setActivePanel = useUIStore((s) => s.setActivePanel)
+  const toggleSplitView = useUIStore((s) => s.toggleSplitView)
 
   // Panel widths
   const sidebarWidth = useUIStore((s) => s.sidebarWidth)
@@ -100,6 +101,20 @@ export default function AppShell() {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [setSidebarCollapsed, setDocListCollapsed])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Cmd/Ctrl + Shift + S: Toggle split view
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        toggleSplitView()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [toggleSplitView])
 
   return (
     <>

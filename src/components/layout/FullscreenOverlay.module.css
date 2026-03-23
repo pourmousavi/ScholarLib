@@ -1,0 +1,153 @@
+/* Toggle Button */
+.toggleButton {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1001;
+  width: 28px;
+  height: 56px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-right: none;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+}
+
+.toggleButton:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.toggleButton.open {
+  /* Position is set via inline style based on overlay width */
+}
+
+.toggleButton svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Overlay Panel */
+.overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  background: var(--bg-base);
+  border-left: 1px solid var(--border-default);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  min-width: 250px;
+  max-width: 500px;
+}
+
+.overlay.visible {
+  transform: translateX(0);
+}
+
+.overlay.resizing {
+  transition: none;
+  user-select: none;
+}
+
+/* Resize Handle */
+.resizeHandle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 10;
+}
+
+.resizeHandle:hover {
+  background: var(--accent-dim);
+}
+
+.resizeHandle:active {
+  background: var(--accent);
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+
+.tabBar {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.tab {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: none;
+  border: none;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.tab.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.closeBtn {
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.closeBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.closeBtn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Content */
+.content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}

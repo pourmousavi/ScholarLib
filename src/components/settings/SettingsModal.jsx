@@ -129,6 +129,12 @@ export default function SettingsModal({ onClose }) {
   const setFontSize = useUIStore((s) => s.setFontSize)
   const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
   const setPdfDefaultZoom = useUIStore((s) => s.setPdfDefaultZoom)
+  const splitViewDefaultEnabled = useUIStore((s) => s.splitViewDefaultEnabled)
+  const setSplitViewDefaultEnabled = useUIStore((s) => s.setSplitViewDefaultEnabled)
+  const splitViewRatio = useUIStore((s) => s.splitViewRatio)
+  const setSplitViewRatio = useUIStore((s) => s.setSplitViewRatio)
+  const fullscreenOverlayWidth = useUIStore((s) => s.fullscreenOverlayWidth)
+  const setFullscreenOverlayWidth = useUIStore((s) => s.setFullscreenOverlayWidth)
 
   const { showToast } = useToast()
 
@@ -1223,6 +1229,67 @@ export default function SettingsModal({ onClose }) {
           <option value={125}>125%</option>
           <option value={150}>150%</option>
         </select>
+      </div>
+
+      <h3 className={styles.sectionTitle} style={{ marginTop: 24 }}>Split View</h3>
+
+      <div className={styles.field}>
+        <label className={styles.toggle}>
+          <input
+            type="checkbox"
+            checked={splitViewDefaultEnabled}
+            onChange={(e) => {
+              setSplitViewDefaultEnabled(e.target.checked)
+              updateGlobalSetting('appearance.split_view_default', e.target.checked)
+            }}
+          />
+          <span>Enable split view by default</span>
+        </label>
+        <span className={styles.fieldHint}>
+          Split view shows PDF and Notes/AI Chat side by side
+        </span>
+      </div>
+
+      <div className={styles.field}>
+        <label>Default Split Ratio</label>
+        <div className={styles.sliderRow}>
+          <span className={styles.sliderLabel}>PDF {Math.round(splitViewRatio * 100)}%</span>
+          <input
+            type="range"
+            min="40"
+            max="85"
+            value={splitViewRatio * 100}
+            onChange={(e) => {
+              const ratio = parseInt(e.target.value) / 100
+              setSplitViewRatio(ratio)
+              updateGlobalSetting('appearance.split_view_ratio', ratio)
+            }}
+            className={styles.slider}
+          />
+          <span className={styles.sliderLabel}>Panel {Math.round((1 - splitViewRatio) * 100)}%</span>
+        </div>
+      </div>
+
+      <div className={styles.field}>
+        <label>Fullscreen Overlay Width</label>
+        <div className={styles.sliderRow}>
+          <span className={styles.sliderLabel}>{fullscreenOverlayWidth}px</span>
+          <input
+            type="range"
+            min="250"
+            max="500"
+            value={fullscreenOverlayWidth}
+            onChange={(e) => {
+              const width = parseInt(e.target.value)
+              setFullscreenOverlayWidth(width)
+              updateGlobalSetting('appearance.fullscreen_overlay_width', width)
+            }}
+            className={styles.slider}
+          />
+        </div>
+        <span className={styles.fieldHint}>
+          Width of Notes/AI panel when PDF is in fullscreen mode
+        </span>
       </div>
 
       <h3 className={styles.sectionTitle} style={{ marginTop: 24 }}>Document Cards</h3>

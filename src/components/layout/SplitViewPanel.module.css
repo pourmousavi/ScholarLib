@@ -1,0 +1,139 @@
+.container {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+.container.vertical {
+  flex-direction: column;
+}
+
+.container.resizing {
+  user-select: none;
+  cursor: col-resize;
+}
+
+.container.vertical.resizing {
+  cursor: row-resize;
+}
+
+/* PDF Section */
+.pdfSection {
+  flex-shrink: 0;
+  overflow: hidden;
+  min-width: 40%;
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+}
+
+.container.vertical .pdfSection {
+  min-width: unset;
+  max-width: unset;
+  min-height: 40%;
+  max-height: 75%;
+  width: 100%;
+}
+
+/* Resize Handle */
+.resizeHandle {
+  width: 6px;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast);
+  position: relative;
+}
+
+.resizeHandle:hover {
+  background: var(--accent-dim);
+}
+
+.resizeHandle:active {
+  background: var(--accent);
+}
+
+.resizeGrip {
+  width: 2px;
+  height: 40px;
+  background: var(--border-default);
+  border-radius: 1px;
+  transition: background var(--transition-fast);
+}
+
+.resizeHandle:hover .resizeGrip {
+  background: var(--accent);
+}
+
+.container.vertical .resizeHandle {
+  width: 100%;
+  height: 6px;
+  cursor: row-resize;
+}
+
+.container.vertical .resizeGrip {
+  width: 40px;
+  height: 2px;
+}
+
+/* Right Section */
+.rightSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+.container.vertical .rightSection {
+  min-width: unset;
+  min-height: 100px;
+}
+
+/* Tab Bar */
+.tabBar {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+
+.tab {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: none;
+  border: none;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.tab.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* Tab Content */
+.tabContent {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}

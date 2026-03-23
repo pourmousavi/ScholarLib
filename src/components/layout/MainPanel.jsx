@@ -4,6 +4,7 @@ import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { LibraryService } from '../../services/library/LibraryService'
 import PDFViewer from '../viewer/PDFViewer'
+import SplitViewPanel from './SplitViewPanel'
 import { NotesPanel } from '../notes'
 import { ChatPanel } from '../ai'
 import styles from './MainPanel.module.css'
@@ -19,6 +20,8 @@ export default function MainPanel() {
   const toggleDocList = useUIStore((s) => s.toggleDocList)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const docListCollapsed = useUIStore((s) => s.docListCollapsed)
+  const splitViewEnabled = useUIStore((s) => s.splitViewEnabled)
+  const toggleSplitView = useUIStore((s) => s.toggleSplitView)
 
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
@@ -141,6 +144,16 @@ export default function MainPanel() {
         </div>
         <div className={styles.actions}>
           <button
+            className={`${styles.splitViewBtn} ${splitViewEnabled ? styles.active : ''}`}
+            onClick={toggleSplitView}
+            title={splitViewEnabled ? 'Exit split view' : 'Enter split view'}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <line x1="12" y1="3" x2="12" y2="21"/>
+            </svg>
+          </button>
+          <button
             className={styles.shareBtn}
             onClick={handleShare}
             disabled={!selectedFolderId}
@@ -154,34 +167,47 @@ export default function MainPanel() {
             </svg>
           </button>
         </div>
-        <div className={styles.tabs}>
-          {panels.map((p) => (
-            <button
-              key={p.id}
-              className={`${styles.tab} ${activePanel === p.id ? styles.active : ''}`}
-              onClick={() => setActivePanel(p.id)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        {!splitViewEnabled && (
+          <div className={styles.tabs}>
+            {panels.map((p) => (
+              <button
+                key={p.id}
+                className={`${styles.tab} ${activePanel === p.id ? styles.active : ''}`}
+                onClick={() => setActivePanel(p.id)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Panel content */}
       <div className={styles.content}>
-        {activePanel === 'pdf' && (
-          <PDFViewer
-            url={pdfUrl}
+        {splitViewEnabled ? (
+          <SplitViewPanel
+            pdfUrl={pdfUrl}
             docId={selectedDocId}
             onTextExtracted={handleTextExtracted}
-            error={pdfError}
+            pdfError={pdfError}
           />
-        )}
-        {activePanel === 'ai' && (
-          <ChatPanel />
-        )}
-        {activePanel === 'notes' && (
-          <NotesPanel />
+        ) : (
+          <>
+            {activePanel === 'pdf' && (
+              <PDFViewer
+                url={pdfUrl}
+                docId={selectedDocId}
+                onTextExtracted={handleTextExtracted}
+                error={pdfError}
+              />
+            )}
+            {activePanel === 'ai' && (
+              <ChatPanel />
+            )}
+            {activePanel === 'notes' && (
+              <NotesPanel />
+            )}
+          </>
         )}
       </div>
     </div>

@@ -3,10 +3,13 @@ import { usePDFLoader } from '../../hooks/usePDFLoader'
 import { useUIStore } from '../../store/uiStore'
 import { Spinner, Btn } from '../ui'
 import PDFToolbar from './PDFToolbar'
+import FullscreenOverlay from '../layout/FullscreenOverlay'
 import styles from './PDFViewer.module.css'
 
 export default function PDFViewer({ url, docId, onTextExtracted }) {
   const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
+  const splitViewEnabled = useUIStore((s) => s.splitViewEnabled)
+  const setFullscreenOverlayVisible = useUIStore((s) => s.setFullscreenOverlayVisible)
 
   const {
     pdf,
@@ -128,19 +131,30 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
     if (!document.fullscreenElement) {
       containerRef.current?.parentElement?.requestFullscreen()
       setIsFullscreen(true)
+      // Show overlay automatically if split view is enabled
+      if (splitViewEnabled) {
+        setFullscreenOverlayVisible(true)
+      }
     } else {
       document.exitFullscreen()
       setIsFullscreen(false)
+      // Hide overlay when exiting fullscreen
+      setFullscreenOverlayVisible(false)
     }
-  }, [])
+  }, [splitViewEnabled, setFullscreenOverlayVisible])
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
+      const isNowFullscreen = !!document.fullscreenElement
+      setIsFullscreen(isNowFullscreen)
+      // Hide overlay when exiting fullscreen
+      if (!isNowFullscreen) {
+        setFullscreenOverlayVisible(false)
+      }
     }
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  }, [])
+  }, [setFullscreenOverlayVisible])
 
   const setPageRef = useCallback((pageNum, ref) => {
     pageRefs.current[pageNum] = ref
@@ -209,6 +223,8 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
           ))}
         </div>
       </div>
+      {/* Fullscreen overlay for Notes/AI Chat */}
+      {isFullscreen && splitViewEnabled && <FullscreenOverlay />}
     </div>
   )
 }
