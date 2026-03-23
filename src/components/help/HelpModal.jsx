@@ -8,7 +8,8 @@ const SECTIONS = [
   { id: 'migration', label: 'Switching Providers', icon: 'migrate' },
   { id: 'ai', label: 'AI Setup', icon: 'brain' },
   { id: 'library', label: 'Managing Library', icon: 'folder' },
-  { id: 'tags', label: 'Tags & Organization', icon: 'tag' },
+  { id: 'tags', label: 'Tags', icon: 'tag' },
+  { id: 'collections', label: 'Collections', icon: 'collection' },
   { id: 'chat', label: 'AI Chat', icon: 'chat' },
   { id: 'settings', label: 'Settings Guide', icon: 'settings' },
   { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: 'keyboard' }
@@ -69,6 +70,14 @@ const SectionIcons = {
       <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
       <line x1="7" y1="7" x2="7.01" y2="7"/>
     </svg>
+  ),
+  collection: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="3" width="7" height="7" rx="1"/>
+      <rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/>
+      <rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
   )
 }
 
@@ -126,8 +135,9 @@ export default function HelpModal({ onClose }) {
       <ul className={styles.featureList}>
         <li><strong>Private Storage</strong> — Your PDFs stay in your Dropbox/Box, never on our servers</li>
         <li><strong>Smart Metadata</strong> — Automatic extraction via GROBID, CrossRef, and AI</li>
-        <li><strong>Flexible Organization</strong> — Use folders for primary structure and tags for cross-cutting categories</li>
-        <li><strong>AI Chat</strong> — Ask questions about individual papers, folders, or your entire library</li>
+        <li><strong>Flexible Organization</strong> — Folders for storage, tags for topics, collections for projects</li>
+        <li><strong>AI Chat</strong> — Ask questions scoped to documents, folders, tags, or collections</li>
+        <li><strong>Collaboration</strong> — Share folders, tags, or collections with others</li>
         <li><strong>Notes</strong> — Take notes on papers with export to Markdown, PDF, or Word</li>
         <li><strong>PWA Support</strong> — Install as an app on Mac, Windows, or iPad</li>
       </ul>
@@ -488,57 +498,67 @@ export default function HelpModal({ onClose }) {
 
   const renderTags = () => (
     <div className={styles.content}>
-      <h2>Tags & Organization</h2>
+      <h2>Tags</h2>
       <p className={styles.intro}>
-        Tags provide a flexible, cross-folder way to organize and find your documents.
-        Unlike folders, a document can have multiple tags, making it easy to categorize
-        papers by topic, methodology, project, status, or any criteria you choose.
+        Tags are labels for grouping <strong>semantically similar documents</strong> together.
+        Use tags when papers share a common theme, methodology, topic, or characteristic.
+        Unlike folders, a document can have multiple tags, enabling cross-cutting organization.
       </p>
 
-      <h3>Why Use Tags?</h3>
+      <h3>What Tags Are For</h3>
+      <p>
+        Think of tags as a way to mark papers that belong together conceptually. A tag like
+        "Deep Learning" groups all papers that use or discuss deep learning methods, regardless
+        of which folder they're stored in. Similarly, a "Review Papers" tag identifies all
+        literature reviews across your library.
+      </p>
       <ul className={styles.featureList}>
-        <li><strong>Cross-folder organization</strong> — A paper can belong to multiple categories without duplicating files</li>
+        <li><strong>Semantic grouping</strong> — Group papers by what they're about, not where they're stored</li>
+        <li><strong>Cross-folder organization</strong> — A paper can have multiple tags without duplication</li>
         <li><strong>Quick filtering</strong> — Click a tag to instantly see all documents with that tag</li>
-        <li><strong>Visual distinction</strong> — Each tag has a color for easy recognition</li>
-        <li><strong>Flexible workflow</strong> — Use tags for topics, status (to-read, reviewed), projects, or any system that works for you</li>
-        <li><strong>AI Chat scope</strong> — Filter by tags before asking AI questions to focus on specific topics</li>
+        <li><strong>AI Chat scope</strong> — Ask AI questions about all papers with specific tags</li>
+        <li><strong>Shareable</strong> — Share tags with collaborators (papers with that tag become visible to them)</li>
       </ul>
 
-      <h3>Tags vs Folders</h3>
+      <h3>Tags vs Collections</h3>
+      <p>
+        Tags and Collections work together but serve different purposes.
+        See the <strong>Collections</strong> section for a detailed comparison.
+      </p>
       <table className={styles.comparisonTable}>
         <thead>
           <tr>
-            <th>Feature</th>
-            <th>Folders</th>
+            <th>Aspect</th>
             <th>Tags</th>
+            <th>Collections</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Documents per location</td>
-            <td>One folder only</td>
-            <td>Multiple tags</td>
+            <td>Purpose</td>
+            <td>Group similar documents</td>
+            <td>Organize for a specific goal</td>
           </tr>
           <tr>
-            <td>Best for</td>
-            <td>Primary categorization</td>
-            <td>Secondary attributes</td>
+            <td>Scope</td>
+            <td>Semantic/topical</td>
+            <td>Project/task-oriented</td>
           </tr>
           <tr>
-            <td>Hierarchy</td>
-            <td>Nested folders</td>
-            <td>Flat (with optional categories)</td>
+            <td>Contains</td>
+            <td>Documents directly</td>
+            <td>Tags (documents indirectly)</td>
           </tr>
           <tr>
             <td>Example</td>
-            <td>Research Area</td>
-            <td>Method, Status, Project</td>
+            <td>"Machine Learning", "Survey"</td>
+            <td>"PhD Thesis Chapter 3"</td>
           </tr>
         </tbody>
       </table>
 
       <h3>Creating Tags</h3>
-      <p>Tags are created centrally in the <strong>TAGS</strong> section of the left sidebar:</p>
+      <p>Tags are created in the <strong>TAGS</strong> section of the left sidebar:</p>
       <ol className={styles.steps}>
         <li>Look for the <strong>TAGS</strong> section below your folders</li>
         <li>Click the <strong>+</strong> button next to "TAGS"</li>
@@ -547,22 +567,15 @@ export default function HelpModal({ onClose }) {
       </ol>
 
       <h3>Managing Tags</h3>
-      <p>Right-click any tag in the TAGS section to access management options:</p>
+      <p>Right-click any tag in the TAGS section to access options:</p>
       <ul>
         <li><strong>Edit tag</strong> — Change the name, color, category, or add a description</li>
         <li><strong>Filter by this tag</strong> — Show all documents with this tag</li>
-      </ul>
-
-      <h3>Tag Properties</h3>
-      <ul>
-        <li><strong>Name</strong> — The display name shown on documents and in the sidebar</li>
-        <li><strong>Color</strong> — Visual color for quick identification</li>
-        <li><strong>Category</strong> — Optional grouping (e.g., "Topics", "Status", "Projects")</li>
-        <li><strong>Description</strong> — Optional notes about what this tag represents</li>
+        <li><strong>Share tag</strong> — Make this tag and its documents visible to collaborators</li>
+        <li><strong>Add to collection</strong> — Include this tag in a collection</li>
       </ul>
 
       <h3>Assigning Tags to Documents</h3>
-      <p>There are several ways to add tags to documents:</p>
       <ul>
         <li><strong>Right-click menu:</strong> Right-click a document → "Manage tags..." → Check/uncheck tags</li>
         <li><strong>Edit metadata:</strong> Right-click → "Edit metadata" → Add tags in the Tags field</li>
@@ -570,28 +583,25 @@ export default function HelpModal({ onClose }) {
       </ul>
 
       <h3>Filtering by Tags</h3>
-      <p>Click any tag in the TAGS section to filter your library:</p>
       <ul>
-        <li><strong>Single tag:</strong> Click a tag to see all documents with that tag (across all folders)</li>
+        <li><strong>Single tag:</strong> Click a tag to see all documents with that tag</li>
         <li><strong>Multiple tags:</strong> Hold Shift and click to select multiple tags</li>
         <li><strong>AND mode:</strong> Show documents that have ALL selected tags</li>
         <li><strong>OR mode:</strong> Show documents that have ANY of the selected tags</li>
-        <li><strong>Clear:</strong> Click "Clear" to remove the tag filter</li>
       </ul>
 
       <h3>Merging Tags</h3>
-      <p>If you have duplicate or similar tags, you can merge them:</p>
+      <p>If you have duplicate or similar tags:</p>
       <ol className={styles.steps}>
-        <li>Click the merge icon (⎌) next to the TAGS header</li>
+        <li>Click the merge icon next to the TAGS header</li>
         <li>Select source tags (will be deleted)</li>
         <li>Select target tag (will be kept)</li>
         <li>Click "Merge Tags" — all documents are updated automatically</li>
       </ol>
 
       <h3>Keywords vs Tags</h3>
-      <p>ScholarLib distinguishes between two types of labels:</p>
       <ul>
-        <li><strong>Keywords</strong> — Automatically extracted from the paper's metadata (author-assigned keywords from the publication)</li>
+        <li><strong>Keywords</strong> — Automatically extracted from the paper's metadata (author-assigned)</li>
         <li><strong>Tags</strong> — Your personal organizational labels that you create and assign</li>
       </ul>
       <p>Both can be displayed on document cards. Control this in Settings → Appearance.</p>
@@ -599,10 +609,178 @@ export default function HelpModal({ onClose }) {
       <h3>Tips for Effective Tagging</h3>
       <ul>
         <li>Keep tag names short and consistent</li>
-        <li>Use categories to group related tags (e.g., all method tags in "Methods")</li>
-        <li>Consider a "To Read" or "Priority" tag for workflow management</li>
-        <li>Use project-specific tags to group papers across research areas</li>
+        <li>Use tags for <em>what a paper is about</em>, not <em>what you're using it for</em> (use collections for that)</li>
+        <li>Consider tags like "To Read", "Reviewed", or "Key Paper" for workflow</li>
         <li>Don't over-tag — 2-5 tags per document is usually sufficient</li>
+      </ul>
+    </div>
+  )
+
+  const renderCollections = () => (
+    <div className={styles.content}>
+      <h2>Collections</h2>
+      <p className={styles.intro}>
+        Collections are <strong>higher-level groupings of tags</strong> that organize documents
+        for a specific purpose or project. While tags group semantically similar documents,
+        collections bring together documents you need for a particular task — like writing
+        a paper, preparing a thesis chapter, or conducting a literature review.
+      </p>
+
+      <h3>Understanding Collections vs Tags</h3>
+      <p>
+        The key difference is in their purpose and how they relate to documents:
+      </p>
+
+      <div className={styles.conceptBox}>
+        <div className={styles.conceptItem}>
+          <strong>Tags: "What is this paper about?"</strong>
+          <p>
+            Tags describe the content or nature of a document. A paper tagged "Deep Learning"
+            and "Computer Vision" belongs with other papers on those topics. Tags are semantic —
+            they capture what documents have in common conceptually.
+          </p>
+        </div>
+        <div className={styles.conceptItem}>
+          <strong>Collections: "What do I need this paper for?"</strong>
+          <p>
+            Collections gather documents for a specific goal. A "PhD Thesis Chapter 3" collection
+            might include papers tagged "Battery Modeling", "State Estimation", and "Machine Learning" —
+            not because these tags are related, but because you need all of them for that chapter.
+          </p>
+        </div>
+      </div>
+
+      <h3>How Collections Work</h3>
+      <p>Collections contain <strong>tags</strong>, not documents directly. A document belongs to a collection if it has any of the collection's tags.</p>
+      <ul>
+        <li>Add tags to a collection to include all documents with those tags</li>
+        <li>A single collection can contain multiple unrelated tags</li>
+        <li>Documents automatically appear/disappear as tags are added/removed</li>
+        <li>You can exclude specific documents from a collection even if they have matching tags</li>
+      </ul>
+
+      <h3>Example: Writing a Paper</h3>
+      <p>Imagine you're writing a paper on "Energy-Aware Machine Learning for IoT Devices":</p>
+      <ol className={styles.steps}>
+        <li>You have tags: "Energy Efficiency", "Machine Learning", "IoT", "Edge Computing", "Surveys"</li>
+        <li>Create a collection: "Energy-ML-IoT Paper"</li>
+        <li>Add the relevant tags to this collection</li>
+        <li>Now you can:
+          <ul>
+            <li>Filter your library to see all papers for this project</li>
+            <li>Use AI Chat scoped to this collection to ask research questions</li>
+            <li>Share the collection with co-authors</li>
+          </ul>
+        </li>
+      </ol>
+
+      <h3>Creating Collections</h3>
+      <ol className={styles.steps}>
+        <li>Look for the <strong>COLLECTIONS</strong> section in the left sidebar</li>
+        <li>Click the <strong>+</strong> button next to "COLLECTIONS"</li>
+        <li>Enter a name and optional description</li>
+        <li>Select which tags to include in this collection</li>
+        <li>Click "Create Collection"</li>
+      </ol>
+
+      <h3>Managing Collections</h3>
+      <p>Right-click any collection to access options:</p>
+      <ul>
+        <li><strong>Edit collection</strong> — Change name, description, color, or tags</li>
+        <li><strong>Filter by this collection</strong> — Show all documents in this collection</li>
+        <li><strong>Share collection</strong> — Make this collection visible to collaborators</li>
+        <li><strong>Merge collections</strong> — Combine multiple collections into one</li>
+      </ul>
+
+      <h3>Excluding Documents</h3>
+      <p>
+        Sometimes a document has a matching tag but doesn't belong in a particular collection.
+        You can exclude specific documents:
+      </p>
+      <ul>
+        <li>Right-click a document → "Exclude from collection..."</li>
+        <li>Select which collections to exclude it from</li>
+        <li>The document keeps its tags but won't appear in that collection</li>
+        <li>You can re-include the document later if needed</li>
+      </ul>
+
+      <h3>Filtering by Collections</h3>
+      <ul>
+        <li><strong>Single collection:</strong> Click a collection to see all its documents</li>
+        <li><strong>Multiple collections:</strong> Hold Shift and click to select multiple</li>
+        <li><strong>AND mode:</strong> Show documents that appear in ALL selected collections</li>
+        <li><strong>OR mode:</strong> Show documents that appear in ANY selected collection</li>
+      </ul>
+
+      <h3>Collections in AI Chat</h3>
+      <p>
+        Collections are especially powerful with AI Chat. Scope your questions to a collection
+        to get answers based only on papers relevant to that project:
+      </p>
+      <ul>
+        <li>Click "Collections" in the AI Chat scope selector</li>
+        <li>Select one or more collections</li>
+        <li>Choose AND/OR mode for multiple collections</li>
+        <li>Your questions will only search documents in those collections</li>
+      </ul>
+
+      <h3>Sharing Collections</h3>
+      <p>
+        Share entire collections with collaborators. When you share a collection, all documents
+        in that collection become visible to the shared users:
+      </p>
+      <ul>
+        <li>Right-click a collection → "Share collection..."</li>
+        <li>Enter email addresses of collaborators</li>
+        <li>Choose permission level (view or edit)</li>
+        <li>Collaborators see the collection and can filter by it</li>
+      </ul>
+
+      <h3>Comparison Table</h3>
+      <table className={styles.comparisonTable}>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Tags</th>
+            <th>Collections</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Purpose</td>
+            <td>Categorize by content/topic</td>
+            <td>Organize for a project/task</td>
+          </tr>
+          <tr>
+            <td>Contains</td>
+            <td>Documents (directly)</td>
+            <td>Tags (documents indirectly)</td>
+          </tr>
+          <tr>
+            <td>Exclusions</td>
+            <td>No (all tagged docs included)</td>
+            <td>Yes (exclude specific docs)</td>
+          </tr>
+          <tr>
+            <td>Typical use</td>
+            <td>"ML", "Survey", "2024"</td>
+            <td>"Thesis Ch.3", "Grant Proposal"</td>
+          </tr>
+          <tr>
+            <td>Question answered</td>
+            <td>"What is this about?"</td>
+            <td>"What do I need this for?"</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Tips for Using Collections</h3>
+      <ul>
+        <li>Create a collection for each major writing project or research goal</li>
+        <li>Name collections by their purpose: "Thesis Chapter 3", "Review Paper Draft", "Grant Literature"</li>
+        <li>Use collections to scope AI Chat for project-specific research questions</li>
+        <li>Share collections with co-authors working on the same project</li>
+        <li>A collection can include tags that aren't related to each other — that's the point!</li>
       </ul>
     </div>
   )
@@ -612,21 +790,44 @@ export default function HelpModal({ onClose }) {
       <h2>AI Chat</h2>
       <p className={styles.intro}>
         Ask questions about your papers and get AI-powered answers with citations.
+        The AI searches your documents, retrieves relevant passages, and generates
+        answers based on your actual research.
       </p>
 
       <h3>Chat Scope</h3>
-      <p>Choose what documents the AI searches when answering:</p>
+      <p>Control which documents the AI searches when answering. The scope selector appears above the chat input:</p>
       <ul>
         <li><strong>This doc:</strong> Only the currently selected document</li>
         <li><strong>Folder:</strong> All documents in the current folder</li>
         <li><strong>All:</strong> Your entire library</li>
+        <li><strong>Tags:</strong> Documents with specific tags you select</li>
+        <li><strong>Collections:</strong> Documents in specific collections you select</li>
       </ul>
+
+      <h3>Using Tags & Collections Scope</h3>
+      <p>Tags and Collections scope options appear when you have tags/collections in your library:</p>
+      <ol className={styles.steps}>
+        <li>Click <strong>Tags</strong> or <strong>Collections</strong> in the scope selector</li>
+        <li>A dropdown appears — check the tags/collections you want to include</li>
+        <li>If you select multiple, choose the mode:
+          <ul>
+            <li><strong>AND:</strong> Documents must match ALL selected tags/collections</li>
+            <li><strong>OR:</strong> Documents matching ANY selected tag/collection</li>
+          </ul>
+        </li>
+        <li>The dropdown shows how many documents match your selection</li>
+      </ol>
+      <p>
+        This is especially powerful for project-focused research. Scope to a collection like
+        "Thesis Chapter 3" to ask questions only about papers relevant to that chapter.
+      </p>
 
       <h3>How It Works</h3>
       <ol>
-        <li>Your question is used to search relevant passages in your documents</li>
+        <li>Your question is used to search relevant passages in the scoped documents</li>
+        <li>The most relevant chunks are retrieved (semantic search)</li>
         <li>Retrieved context is sent to the AI along with your question</li>
-        <li>AI generates an answer based on your actual papers</li>
+        <li>AI generates an answer based on your actual papers, with citations</li>
       </ol>
 
       <h3>Quick Prompts</h3>
@@ -636,20 +837,25 @@ export default function HelpModal({ onClose }) {
         <li>"What methods were used?"</li>
         <li>"List main conclusions"</li>
         <li>"Identify research gaps"</li>
+        <li>"Compare approaches across papers"</li>
       </ul>
 
       <h3>Chat History</h3>
       <ul>
         <li>Conversations are automatically saved</li>
         <li>Click the <strong>clock icon</strong> in the sidebar to view history</li>
-        <li>Resume any previous conversation</li>
+        <li>Resume any previous conversation with its original scope</li>
+        <li>Export conversations as text for your notes</li>
       </ul>
 
       <h3>Tips</h3>
       <ul>
         <li>Be specific in your questions for better answers</li>
-        <li>Use "Folder" scope when comparing multiple papers</li>
-        <li>Start a new conversation (+) when changing topics</li>
+        <li>Use "Folder" scope when comparing papers in the same research area</li>
+        <li>Use "Collections" scope when working on a specific project</li>
+        <li>Use "Tags" scope to explore a topic across your whole library</li>
+        <li>Start a new conversation (+) when changing topics or scope</li>
+        <li>Narrow your scope for faster, more focused answers</li>
       </ul>
     </div>
   )
@@ -915,6 +1121,7 @@ export default function HelpModal({ onClose }) {
       case 'ai': return renderAISetup()
       case 'library': return renderLibrary()
       case 'tags': return renderTags()
+      case 'collections': return renderCollections()
       case 'chat': return renderChat()
       case 'settings': return renderSettings()
       case 'shortcuts': return renderShortcuts()

@@ -695,3 +695,33 @@
   margin: 0;
   line-height: 1.5;
 }
+
+/* Concept Box for Collections explanation */
+.conceptBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.conceptItem {
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--accent);
+}
+
+.conceptItem strong {
+  display: block;
+  font-size: 14px;
+  color: var(--accent);
+  margin-bottom: var(--space-2);
+}
+
+.conceptItem p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
