@@ -1,7 +1,7 @@
 import Modal from '../ui/Modal'
 import styles from './QuickHelpModal.module.css'
 
-const DOCS_URL = '/scholarlib/docs/'
+const DOCS_URL = '/ScholarLib/docs/'
 
 export default function QuickHelpModal({ onClose }) {
   const openDocs = () => {
