@@ -5,7 +5,7 @@ import { themes as prismThemes } from 'prism-react-renderer';
 const config = {
   title: 'ScholarLib Documentation',
   tagline: 'Private Academic Reference Manager',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/favicon.png',
 
   url: 'https://alipourmousavi.com',
   baseUrl: '/ScholarLib/docs/',
