@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redirecting... | ScholarLib</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0d12;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .container {
+      text-align: center;
+      padding: 2rem;
+    }
+    h1 {
+      color: #d4af37;
+      margin-bottom: 1rem;
+    }
+    a {
+      color: #d4af37;
+    }
+  </style>
+  <script>
+    (function() {
+      var path = window.location.pathname;
+
+      // Check if path starts with a case variation of "scholarlib"
+      if (/^\/scholarlib/i.test(path) && !/^\/ScholarLib/.test(path)) {
+        // Replace the case-insensitive match with correct case
+        var correctedPath = path.replace(/^\/scholarlib/i, '/ScholarLib');
+        var newUrl = window.location.origin + correctedPath + window.location.search + window.location.hash;
+        window.location.replace(newUrl);
+      }
+    })();
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>Page Not Found</h1>
+    <p>The page you're looking for doesn't exist.</p>
+    <p><a href="/ScholarLib/">Go to ScholarLib</a></p>
+  </div>
+</body>
+</html>
