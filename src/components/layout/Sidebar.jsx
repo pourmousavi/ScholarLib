@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useUIStore } from '../../store/uiStore'
 import { useAIStore } from '../../store/aiStore'
 import { useLibraryStore } from '../../store/libraryStore'
@@ -16,6 +16,14 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [showResults, setShowResults] = useState(false)
+
+  // Resizable divider state
+  const [folderHeight, setFolderHeight] = useState(() => {
+    const saved = localStorage.getItem('sv_folder_height')
+    return saved ? parseInt(saved, 10) : 60 // Default 60% for folders
+  })
+  const [isDragging, setIsDragging] = useState(false)
+  const treeContainerRef = useRef(null)
 
   const setShowModal = useUIStore((s) => s.setShowModal)
   const { canInstall, install } = usePWAInstall()
@@ -180,6 +188,41 @@ export default function Sidebar() {
 
   const providerInfo = getProviderInfo()
 
+  // Resizable divider handlers
+  const handleDividerMouseDown = useCallback((e) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isDragging) return
+
+    const handleMouseMove = (e) => {
+      if (!treeContainerRef.current) return
+
+      const container = treeContainerRef.current
+      const rect = container.getBoundingClientRect()
+      const relativeY = e.clientY - rect.top
+      const percentage = Math.min(Math.max((relativeY / rect.height) * 100, 20), 80)
+
+      setFolderHeight(percentage)
+    }
+
+    const handleMouseUp = () => {
+      setIsDragging(false)
+      // Save to localStorage
+      localStorage.setItem('sv_folder_height', folderHeight.toString())
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging, folderHeight])
+
   return (
     <div className={styles.sidebar}>
       {/* Logo area */}
@@ -239,10 +282,21 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Folder tree */}
-      <div className={styles.tree}>
-        <FolderTree />
-        <TagsList />
+      {/* Folder tree and Tags with resizable divider */}
+      <div className={styles.tree} ref={treeContainerRef}>
+        <div className={styles.foldersSection} style={{ height: `${folderHeight}%` }}>
+          <FolderTree />
+        </div>
+        <div
+          className={`${styles.divider} ${isDragging ? styles.dragging : ''}`}
+          onMouseDown={handleDividerMouseDown}
+        >
+          <div className={styles.dividerLine} />
+          <div className={styles.dividerHandle} />
+        </div>
+        <div className={styles.tagsSection} style={{ height: `${100 - folderHeight}%` }}>
+          <TagsList />
+        </div>
       </div>
 
       {/* Footer */}

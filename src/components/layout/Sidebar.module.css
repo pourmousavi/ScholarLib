@@ -161,11 +161,66 @@
   color: var(--text-muted);
 }
 
-/* Folder tree */
+/* Folder tree and Tags container */
 .tree {
   flex: 1;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: var(--space-2) 0;
+}
+
+.foldersSection {
+  overflow-y: auto;
+  min-height: 80px;
+}
+
+.tagsSection {
+  overflow-y: auto;
+  min-height: 60px;
+}
+
+/* Resizable divider */
+.divider {
+  flex-shrink: 0;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  position: relative;
+  margin: 0 var(--space-3);
+}
+
+.divider:hover .dividerLine,
+.divider.dragging .dividerLine {
+  background: var(--accent);
+  opacity: 0.5;
+}
+
+.divider:hover .dividerHandle,
+.divider.dragging .dividerHandle {
+  opacity: 1;
+  background: var(--accent);
+}
+
+.dividerLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border-default);
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.dividerHandle {
+  width: 32px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-default);
+  opacity: 0.6;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  z-index: 1;
 }
 
 /* Footer */
