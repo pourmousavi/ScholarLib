@@ -15,7 +15,7 @@
 
 .title {
   font-family: 'Fraunces', serif;
-  font-size: 20px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text-primary);
   margin: 0;
@@ -67,7 +67,7 @@
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-family: 'DM Sans', sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: all var(--transition-fast);
   text-align: left;
@@ -84,8 +84,8 @@
 }
 
 .navIcon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -94,8 +94,8 @@
 }
 
 .navIcon svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .navItem.active .navIcon {
@@ -118,7 +118,7 @@
 
 .sectionTitle {
   font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 var(--space-4);
@@ -148,7 +148,7 @@
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-family: 'DM Sans', sans-serif;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .field input:focus,
@@ -207,7 +207,7 @@
 }
 
 .radioLabel {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-primary);
 }
@@ -227,7 +227,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
   cursor: pointer;
 }
@@ -341,7 +341,7 @@
 }
 
 .storageValue {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-primary);
   display: flex;
   align-items: center;
@@ -384,7 +384,7 @@
   border-radius: var(--radius-sm);
   color: var(--error);
   font-family: 'DM Sans', sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: all var(--transition-fast);
 }
@@ -400,7 +400,7 @@
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-family: 'DM Sans', sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: all var(--transition-fast);
 }
@@ -425,7 +425,7 @@
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-family: 'DM Sans', sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: all var(--transition-fast);
 }
@@ -442,7 +442,7 @@
   border-radius: var(--radius-sm);
   color: #0f1117;
   font-family: 'DM Sans', sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -463,7 +463,7 @@
   justify-content: center;
   height: 300px;
   color: var(--text-tertiary);
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .primaryBtn {
@@ -473,7 +473,7 @@
   border-radius: var(--radius-sm);
   color: #0f1117;
   font-family: 'DM Sans', sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -528,7 +528,7 @@
 }
 
 .modelBrowserHeader strong {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-primary);
 }
 
@@ -560,7 +560,7 @@
 }
 
 .modelInfoValue {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-primary);
 }
 
