@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
+import { useUIStore } from '../../store/uiStore'
 import { collectionService } from '../../services/tags/CollectionService'
 import { LibraryService } from '../../services/library/LibraryService'
 import CollectionEditModal from '../tags/CollectionEditModal'
@@ -34,6 +35,9 @@ export default function CollectionsList() {
 
   const adapter = useStorageStore((s) => s.adapter)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
+
+  const setShowModal = useUIStore((s) => s.setShowModal)
+  const setExportDocs = useUIStore((s) => s.setExportDocs)
 
   // Helper to save library after collection changes
   const saveLibrary = useCallback(async () => {
@@ -238,6 +242,33 @@ export default function CollectionsList() {
               }}
             >
               Share collection...
+            </button>
+            <button
+              className={styles.contextItem}
+              onClick={() => {
+                // Get all document IDs in this collection
+                const collection = collectionRegistry[contextMenu.slug]
+                if (!collection) {
+                  closeContextMenu()
+                  return
+                }
+
+                // Find all documents that match this collection
+                const collectionDocIds = Object.values(documents)
+                  .filter(doc => collectionService.documentMatchesCollection(doc, collection))
+                  .map(d => d.id)
+
+                if (collectionDocIds.length === 0) {
+                  closeContextMenu()
+                  return
+                }
+
+                setExportDocs(collectionDocIds, 'collection')
+                setShowModal('export-citations')
+                closeContextMenu()
+              }}
+            >
+              Export citations...
             </button>
           </div>
         </>

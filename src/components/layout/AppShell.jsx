@@ -8,6 +8,7 @@ import { SettingsModal } from '../settings'
 import { ShareModal, ActivityDashboard, MoveFolderPicker } from '../sharing'
 import { ChatHistoryModal } from '../ai'
 import { HelpModal } from '../help'
+import { CitationExportModal } from '../citation'
 import EditMetadataModal from '../metadata/EditMetadataModal'
 import styles from './AppShell.module.css'
 
@@ -156,6 +157,9 @@ export default function AppShell() {
       )}
       {showModal === 'help' && (
         <HelpModal onClose={() => setShowModal(null)} />
+      )}
+      {showModal === 'export-citations' && (
+        <CitationExportModal onClose={() => setShowModal(null)} />
       )}
     </>
   )

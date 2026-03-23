@@ -66,6 +66,10 @@ export const useUIStore = create((set) => ({
   docListCollapsed: false,
   theme: initialTheme,
 
+  // Citation export state
+  exportDocIds: [],      // Document IDs to export
+  exportSource: null,    // 'document' | 'bulk' | 'folder' | 'tag' | 'collection'
+
   // Appearance settings
   showDocCounts: initialAppearance.showDocCounts,
   fontSize: initialAppearance.fontSize,
@@ -77,6 +81,11 @@ export const useUIStore = create((set) => ({
 
   setActivePanel: (panel) => set({ activePanel: panel }),
   setShowModal: (modal) => set({ showModal: modal }),
+
+  // Citation export actions
+  setExportDocs: (docIds, source) => set({ exportDocIds: docIds, exportSource: source }),
+  clearExportDocs: () => set({ exportDocIds: [], exportSource: null }),
+
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   toggleDocList: () => set((s) => ({ docListCollapsed: !s.docListCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),

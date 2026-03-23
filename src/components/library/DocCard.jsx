@@ -8,7 +8,7 @@ import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
 import { settingsService } from '../../services/settings/SettingsService'
 import { collectionService } from '../../services/tags/CollectionService'
-import { StatusDot, Tag, CollectionBadge, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon, FolderIcon } from '../ui'
+import { StatusDot, Tag, CollectionBadge, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon, FolderIcon, ExportIcon } from '../ui'
 import QuickTagModal from './QuickTagModal'
 import AddToCollectionModal from './AddToCollectionModal'
 import styles from './DocCard.module.css'
@@ -41,6 +41,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
 
   const setShowModal = useUIStore((s) => s.setShowModal)
+  const setExportDocs = useUIStore((s) => s.setExportDocs)
 
   const { showToast } = useToast()
 
@@ -223,6 +224,12 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
     handleCloseContextMenu()
   }
 
+  const handleExportCitation = () => {
+    setExportDocs([doc.id], 'document')
+    setShowModal('export-citations')
+    handleCloseContextMenu()
+  }
+
   const handleExcludeFromCollection = async (collectionSlug, collectionName) => {
     const result = excludeDocFromCollection(collectionSlug, doc.id)
     if (result.error) {
@@ -263,6 +270,12 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
       onClick: handleAddToCollection
     },
     ...collectionExclusionItems,
+    { separator: true },
+    {
+      label: 'Export citation...',
+      icon: <ExportIcon />,
+      onClick: handleExportCitation
+    },
     { separator: true },
     {
       label: 'Move to folder...',

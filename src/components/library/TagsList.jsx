@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
+import { useUIStore } from '../../store/uiStore'
 import { tagService } from '../../services/tags/TagService'
 import { LibraryService } from '../../services/library/LibraryService'
 import TagEditModal from '../tags/TagEditModal'
@@ -34,6 +35,9 @@ export default function TagsList() {
 
   const adapter = useStorageStore((s) => s.adapter)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
+
+  const setShowModal = useUIStore((s) => s.setShowModal)
+  const setExportDocs = useUIStore((s) => s.setExportDocs)
 
   // Helper to save library after tag changes
   const saveLibrary = useCallback(async () => {
@@ -302,6 +306,26 @@ export default function TagsList() {
               }}
             >
               Share tag...
+            </button>
+            <button
+              className={styles.contextItem}
+              onClick={() => {
+                // Get all document IDs with this tag
+                const tagDocIds = Object.values(documents)
+                  .filter(d => d.user_data?.tags?.includes(contextMenu.slug))
+                  .map(d => d.id)
+
+                if (tagDocIds.length === 0) {
+                  closeContextMenu()
+                  return
+                }
+
+                setExportDocs(tagDocIds, 'tag')
+                setShowModal('export-citations')
+                closeContextMenu()
+              }}
+            >
+              Export citations...
             </button>
           </div>
         </>

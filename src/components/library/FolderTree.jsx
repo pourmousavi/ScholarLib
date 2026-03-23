@@ -4,7 +4,7 @@ import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
 import { useToast } from '../../hooks/useToast'
 import { LibraryService } from '../../services/library/LibraryService'
-import { ContextMenu, ShareIcon, LinkIcon, UsersIcon, RenameIcon, UnshareIcon, FolderMinusIcon } from '../ui'
+import { ContextMenu, ShareIcon, LinkIcon, UsersIcon, RenameIcon, UnshareIcon, FolderMinusIcon, ExportIcon } from '../ui'
 import styles from './FolderTree.module.css'
 
 export default function FolderTree() {
@@ -42,6 +42,7 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
 
   const setShowModal = useUIStore((s) => s.setShowModal)
   const showDocCounts = useUIStore((s) => s.showDocCounts)
+  const setExportDocs = useUIStore((s) => s.setExportDocs)
 
   const { showToast } = useToast()
 
@@ -124,6 +125,22 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
     showToast({ message: 'Rename folder not implemented yet', type: 'info' })
   }
 
+  const handleExportCitations = () => {
+    handleCloseContextMenu()
+    // Get all document IDs in this folder
+    const folderDocIds = Object.values(documents)
+      .filter(d => d.folder_id === folder.id)
+      .map(d => d.id)
+
+    if (folderDocIds.length === 0) {
+      showToast({ message: 'No documents in this folder to export', type: 'info' })
+      return
+    }
+
+    setExportDocs(folderDocIds, 'folder')
+    setShowModal('export-citations')
+  }
+
   const handleDeleteFolder = async () => {
     handleCloseContextMenu()
 
@@ -186,6 +203,12 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
       label: 'Copy sharing link',
       icon: <LinkIcon />,
       onClick: handleCopySharingLink
+    },
+    {
+      label: 'Export all citations...',
+      icon: <ExportIcon />,
+      onClick: handleExportCitations,
+      disabled: docCount === 0
     },
     // Only show "View who has access" if folder is shared
     ...(isShared ? [{
