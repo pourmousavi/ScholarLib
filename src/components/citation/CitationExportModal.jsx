@@ -4,7 +4,6 @@ import { useLibraryStore } from '../../store/libraryStore'
 import { CitationExporter } from '../../services/citation'
 import { useToast } from '../../hooks/useToast'
 import Modal from '../ui/Modal'
-import Btn from '../ui/Btn'
 import styles from './CitationExportModal.module.css'
 
 export default function CitationExportModal({ onClose }) {
@@ -107,20 +106,21 @@ export default function CitationExportModal({ onClose }) {
   if (exportDocs.length === 0) {
     return (
       <Modal onClose={handleClose} width={500} title="Export Citations">
-        <div className={styles.header}>
-          <h2 className={styles.title}>Export Citations</h2>
-          <button className={styles.closeBtn} onClick={handleClose} aria-label="Close">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-        <div className={styles.body}>
-          <p className={styles.emptyMessage}>No documents selected for export.</p>
-        </div>
-        <div className={styles.footer}>
-          <Btn onClick={handleClose}>Close</Btn>
+        <div className={styles.container}>
+          <div className={styles.header}>
+            <h2 className={styles.title}>Export Citations</h2>
+            <button className={styles.closeBtn} onClick={handleClose} aria-label="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          <div className={styles.body}>
+            <p className={styles.emptyMessage}>No documents selected for export.</p>
+          </div>
+          <div className={styles.footer}>
+            <button className={styles.cancelBtn} onClick={handleClose}>Close</button>
+          </div>
         </div>
       </Modal>
     )
@@ -128,56 +128,65 @@ export default function CitationExportModal({ onClose }) {
 
   return (
     <Modal onClose={handleClose} width={700} title="Export Citations">
-      <div className={styles.header}>
-        <h2 className={styles.title}>
-          Export Citations
-          <span className={styles.badge}>{exportDocs.length}</span>
-        </h2>
-        <button className={styles.closeBtn} onClick={handleClose} aria-label="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-
-      <div className={styles.body}>
-        <p className={styles.subtitle}>
-          Exporting {exportDocs.length} {exportDocs.length === 1 ? 'document' : 'documents'} from {sourceLabel}
-        </p>
-
-        {/* Format selector */}
-        <div className={styles.formatSelector}>
-          {CitationExporter.formats.map((format) => (
-            <button
-              key={format.id}
-              className={`${styles.formatTab} ${selectedFormat === format.id ? styles.active : ''}`}
-              onClick={() => setSelectedFormat(format.id)}
-            >
-              {format.name}
-            </button>
-          ))}
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <h2 className={styles.title}>
+            Export Citations
+            <span className={styles.badge}>{exportDocs.length}</span>
+          </h2>
+          <button className={styles.closeBtn} onClick={handleClose} aria-label="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
         </div>
 
-        {/* Preview area */}
-        <div className={styles.previewWrapper}>
-          <label className={styles.previewLabel}>Preview</label>
-          <textarea
-            className={styles.preview}
-            value={previewContent}
-            readOnly
-            spellCheck={false}
-          />
-        </div>
-      </div>
+        <div className={styles.body}>
+          <p className={styles.subtitle}>
+            Exporting {exportDocs.length} {exportDocs.length === 1 ? 'document' : 'documents'} from {sourceLabel}
+          </p>
 
-      <div className={styles.footer}>
-        <Btn onClick={handleCopy} disabled={isCopying || !previewContent}>
-          {isCopying ? 'Copying...' : 'Copy to Clipboard'}
-        </Btn>
-        <Btn primary onClick={handleDownload} disabled={!previewContent}>
-          Download {CitationExporter.getExtension(selectedFormat)}
-        </Btn>
+          {/* Format selector */}
+          <div className={styles.formatSelector}>
+            {CitationExporter.formats.map((format) => (
+              <button
+                key={format.id}
+                className={`${styles.formatTab} ${selectedFormat === format.id ? styles.active : ''}`}
+                onClick={() => setSelectedFormat(format.id)}
+              >
+                {format.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Preview area */}
+          <div className={styles.previewWrapper}>
+            <label className={styles.previewLabel}>Preview</label>
+            <textarea
+              className={styles.preview}
+              value={previewContent}
+              readOnly
+              spellCheck={false}
+            />
+          </div>
+        </div>
+
+        <div className={styles.footer}>
+          <button
+            className={styles.cancelBtn}
+            onClick={handleCopy}
+            disabled={isCopying || !previewContent}
+          >
+            {isCopying ? 'Copying...' : 'Copy to Clipboard'}
+          </button>
+          <button
+            className={styles.primaryBtn}
+            onClick={handleDownload}
+            disabled={!previewContent}
+          >
+            Download {CitationExporter.getExtension(selectedFormat)}
+          </button>
+        </div>
       </div>
     </Modal>
   )
