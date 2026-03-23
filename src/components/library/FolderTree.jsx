@@ -269,13 +269,13 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
           aria-label={`${folder.name}, ${docCount} documents`}
         >
           <button
-            className={styles.toggle}
+            className={`${styles.toggle} ${isExpanded ? styles.expanded : ''}`}
             onClick={handleToggle}
             style={{ visibility: hasChildren ? 'visible' : 'hidden' }}
             aria-label={isExpanded ? 'Collapse folder' : 'Expand folder'}
             tabIndex={-1}
           >
-            {isExpanded ? '>' : '>'}
+            ▸
           </button>
           <span className={styles.name}>{folder.name}</span>
           {showDocCounts && (
