@@ -8,6 +8,7 @@ const SECTIONS = [
   { id: 'migration', label: 'Switching Providers', icon: 'migrate' },
   { id: 'ai', label: 'AI Setup', icon: 'brain' },
   { id: 'library', label: 'Managing Library', icon: 'folder' },
+  { id: 'tags', label: 'Tags & Organization', icon: 'tag' },
   { id: 'chat', label: 'AI Chat', icon: 'chat' },
   { id: 'settings', label: 'Settings Guide', icon: 'settings' },
   { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: 'keyboard' }
@@ -61,6 +62,12 @@ const SectionIcons = {
       <path d="M3 11V9a4 4 0 014-4h14"/>
       <path d="M7 21l-4-4 4-4"/>
       <path d="M21 13v2a4 4 0 01-4 4H3"/>
+    </svg>
+  ),
+  tag: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+      <line x1="7" y1="7" x2="7.01" y2="7"/>
     </svg>
   )
 }
@@ -119,6 +126,7 @@ export default function HelpModal({ onClose }) {
       <ul className={styles.featureList}>
         <li><strong>Private Storage</strong> — Your PDFs stay in your Dropbox/Box, never on our servers</li>
         <li><strong>Smart Metadata</strong> — Automatic extraction via GROBID, CrossRef, and AI</li>
+        <li><strong>Flexible Organization</strong> — Use folders for primary structure and tags for cross-cutting categories</li>
         <li><strong>AI Chat</strong> — Ask questions about individual papers, folders, or your entire library</li>
         <li><strong>Notes</strong> — Take notes on papers with export to Markdown, PDF, or Word</li>
         <li><strong>PWA Support</strong> — Install as an app on Mac, Windows, or iPad</li>
@@ -463,11 +471,139 @@ export default function HelpModal({ onClose }) {
         <li>Re-generates document chunks and embeddings for improved AI chat</li>
       </ul>
 
+      <h3>Tagging Documents</h3>
+      <ul>
+        <li>Right-click a document → "Manage tags..." to assign tags</li>
+        <li>Create and manage tags in the <strong>TAGS</strong> section of the sidebar</li>
+        <li>See the <strong>Tags & Organization</strong> section for detailed tag usage</li>
+      </ul>
+
       <h3>Search</h3>
       <p>
         Use the search box at the top of the sidebar to find documents by title,
         author, journal, or keywords.
       </p>
+    </div>
+  )
+
+  const renderTags = () => (
+    <div className={styles.content}>
+      <h2>Tags & Organization</h2>
+      <p className={styles.intro}>
+        Tags provide a flexible, cross-folder way to organize and find your documents.
+        Unlike folders, a document can have multiple tags, making it easy to categorize
+        papers by topic, methodology, project, status, or any criteria you choose.
+      </p>
+
+      <h3>Why Use Tags?</h3>
+      <ul className={styles.featureList}>
+        <li><strong>Cross-folder organization</strong> — A paper can belong to multiple categories without duplicating files</li>
+        <li><strong>Quick filtering</strong> — Click a tag to instantly see all documents with that tag</li>
+        <li><strong>Visual distinction</strong> — Each tag has a color for easy recognition</li>
+        <li><strong>Flexible workflow</strong> — Use tags for topics, status (to-read, reviewed), projects, or any system that works for you</li>
+        <li><strong>AI Chat scope</strong> — Filter by tags before asking AI questions to focus on specific topics</li>
+      </ul>
+
+      <h3>Tags vs Folders</h3>
+      <table className={styles.comparisonTable}>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Folders</th>
+            <th>Tags</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Documents per location</td>
+            <td>One folder only</td>
+            <td>Multiple tags</td>
+          </tr>
+          <tr>
+            <td>Best for</td>
+            <td>Primary categorization</td>
+            <td>Secondary attributes</td>
+          </tr>
+          <tr>
+            <td>Hierarchy</td>
+            <td>Nested folders</td>
+            <td>Flat (with optional categories)</td>
+          </tr>
+          <tr>
+            <td>Example</td>
+            <td>Research Area</td>
+            <td>Method, Status, Project</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Creating Tags</h3>
+      <p>Tags are created centrally in the <strong>TAGS</strong> section of the left sidebar:</p>
+      <ol className={styles.steps}>
+        <li>Look for the <strong>TAGS</strong> section below your folders</li>
+        <li>Click the <strong>+</strong> button next to "TAGS"</li>
+        <li>Enter a name for your tag and press Enter</li>
+        <li>The tag is created with an automatic color</li>
+      </ol>
+
+      <h3>Managing Tags</h3>
+      <p>Right-click any tag in the TAGS section to access management options:</p>
+      <ul>
+        <li><strong>Edit tag</strong> — Change the name, color, category, or add a description</li>
+        <li><strong>Filter by this tag</strong> — Show all documents with this tag</li>
+      </ul>
+
+      <h3>Tag Properties</h3>
+      <ul>
+        <li><strong>Name</strong> — The display name shown on documents and in the sidebar</li>
+        <li><strong>Color</strong> — Visual color for quick identification</li>
+        <li><strong>Category</strong> — Optional grouping (e.g., "Topics", "Status", "Projects")</li>
+        <li><strong>Description</strong> — Optional notes about what this tag represents</li>
+      </ul>
+
+      <h3>Assigning Tags to Documents</h3>
+      <p>There are several ways to add tags to documents:</p>
+      <ul>
+        <li><strong>Right-click menu:</strong> Right-click a document → "Manage tags..." → Check/uncheck tags</li>
+        <li><strong>Edit metadata:</strong> Right-click → "Edit metadata" → Add tags in the Tags field</li>
+        <li><strong>Bulk tagging:</strong> Select multiple documents, then use bulk actions to add/remove tags</li>
+      </ul>
+
+      <h3>Filtering by Tags</h3>
+      <p>Click any tag in the TAGS section to filter your library:</p>
+      <ul>
+        <li><strong>Single tag:</strong> Click a tag to see all documents with that tag (across all folders)</li>
+        <li><strong>Multiple tags:</strong> Hold Shift and click to select multiple tags</li>
+        <li><strong>AND mode:</strong> Show documents that have ALL selected tags</li>
+        <li><strong>OR mode:</strong> Show documents that have ANY of the selected tags</li>
+        <li><strong>Clear:</strong> Click "Clear" to remove the tag filter</li>
+      </ul>
+
+      <h3>Merging Tags</h3>
+      <p>If you have duplicate or similar tags, you can merge them:</p>
+      <ol className={styles.steps}>
+        <li>Click the merge icon (⎌) next to the TAGS header</li>
+        <li>Select source tags (will be deleted)</li>
+        <li>Select target tag (will be kept)</li>
+        <li>Click "Merge Tags" — all documents are updated automatically</li>
+      </ol>
+
+      <h3>Keywords vs Tags</h3>
+      <p>ScholarLib distinguishes between two types of labels:</p>
+      <ul>
+        <li><strong>Keywords</strong> — Automatically extracted from the paper's metadata (author-assigned keywords from the publication)</li>
+        <li><strong>Tags</strong> — Your personal organizational labels that you create and assign</li>
+      </ul>
+      <p>Both can be displayed on document cards. Control this in Settings → Appearance.</p>
+
+      <h3>Tips for Effective Tagging</h3>
+      <ul>
+        <li>Keep tag names short and consistent</li>
+        <li>Use categories to group related tags (e.g., all method tags in "Methods")</li>
+        <li>Consider a "To Read" or "Priority" tag for workflow management</li>
+        <li>Use project-specific tags to group papers across research areas</li>
+        <li>Don't over-tag — 2-5 tags per document is usually sufficient</li>
+      </ul>
     </div>
   )
 
@@ -555,6 +691,8 @@ export default function HelpModal({ onClose }) {
       <ul>
         <li><strong>Theme:</strong> Dark or Light mode</li>
         <li><strong>Show Document Counts:</strong> Toggle folder document counts in sidebar</li>
+        <li><strong>Show Tags:</strong> Display your assigned tags on document cards</li>
+        <li><strong>Show Keywords:</strong> Display paper keywords (from metadata) on document cards</li>
         <li><strong>Font Size:</strong> Normal or Large (scales all text)</li>
         <li><strong>PDF Default Zoom:</strong> Initial zoom level when opening PDFs (75-150%)</li>
       </ul>
@@ -776,6 +914,7 @@ export default function HelpModal({ onClose }) {
       case 'migration': return renderMigration()
       case 'ai': return renderAISetup()
       case 'library': return renderLibrary()
+      case 'tags': return renderTags()
       case 'chat': return renderChat()
       case 'settings': return renderSettings()
       case 'shortcuts': return renderShortcuts()

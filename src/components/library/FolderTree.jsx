@@ -15,8 +15,8 @@ export default function FolderTree() {
 
   return (
     <nav className={styles.tree} aria-label="Folder navigation">
-      <div className={styles.sectionLabel} id="collections-label">COLLECTIONS</div>
-      <div role="tree" aria-labelledby="collections-label">
+      <div className={styles.sectionLabel} id="folders-label">FOLDERS</div>
+      <div role="tree" aria-labelledby="folders-label">
         {rootFolders.map((folder) => (
           <FolderNode key={folder.id} folder={folder} depth={0} />
         ))}
