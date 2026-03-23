@@ -695,8 +695,20 @@ export default function ChatPanel() {
             className={styles.sendBtn}
             onClick={handleSend}
             disabled={!input.trim() || isStreaming || !isAvailable}
+            title="Send message"
           >
-            {isStreaming ? '...' : 'S'}
+            {isStreaming ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="32">
+                  <animate attributeName="stroke-dashoffset" values="32;0" dur="1s" repeatCount="indefinite"/>
+                </circle>
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M22 2L11 13"/>
+                <path d="M22 2L15 22L11 13L2 9L22 2Z"/>
+              </svg>
+            )}
           </button>
         </div>
       </div>

@@ -10,11 +10,40 @@
   flex-shrink: 0;
 }
 
+.headerTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.collapseBtn {
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.collapseBtn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+
 .breadcrumb {
   font-family: 'DM Sans', sans-serif;
   font-size: 13px;
   color: var(--text-tertiary);
-  margin-bottom: var(--space-2);
+  flex: 1;
+  min-width: 0;
 }
 
 .separator {
@@ -55,6 +84,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-top: var(--space-2);
 }
 
 .docCount {

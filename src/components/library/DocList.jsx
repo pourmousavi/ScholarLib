@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useIndexStore } from '../../store/indexStore'
+import { useUIStore } from '../../store/uiStore'
 import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
 import { collectionService } from '../../services/tags/CollectionService'
@@ -42,6 +43,8 @@ export default function DocList() {
   const adapter = useStorageStore((s) => s.adapter)
   const isConnected = useStorageStore((s) => s.isConnected)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
+
+  const toggleDocList = useUIStore((s) => s.toggleDocList)
 
   const isIndexing = useIndexStore((s) => s.isIndexing)
   const startIndexing = useIndexStore((s) => s.startIndexing)
@@ -291,7 +294,8 @@ export default function DocList() {
     <div className={styles.docList}>
       {/* Header */}
       <div className={styles.header}>
-        <div className={styles.breadcrumb}>
+        <div className={styles.headerTop}>
+          <div className={styles.breadcrumb}>
           {isCollectionView ? (
             <span className={styles.collectionViewTitle}>
               <svg className={styles.viewIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -314,6 +318,17 @@ export default function DocList() {
               </span>
             ))
           )}
+        </div>
+          <button
+            className={styles.collapseBtn}
+            onClick={toggleDocList}
+            title="Collapse document list"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="11 17 6 12 11 7"/>
+              <polyline points="18 17 13 12 18 7"/>
+            </svg>
+          </button>
         </div>
         <div className={styles.headerMeta}>
           <span className={styles.docCount}>{allDocs.length} documents</span>
