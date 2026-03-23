@@ -97,7 +97,20 @@ function AppContent() {
       setIsLoadingLibrary(true)
       try {
         const library = await LibraryService.loadLibrary(adapter)
-        setLibraryData(library)
+        const result = setLibraryData(library)
+
+        // If orphan tags were synced, save the updated registry
+        if (result?.syncedTags > 0) {
+          console.log(`Synced ${result.syncedTags} orphan tag(s) into registry, saving...`)
+          const { folders, documents, tagRegistry, smartCollections } = useLibraryStore.getState()
+          await LibraryService.saveLibrary(adapter, {
+            version: '1.0',
+            folders,
+            documents,
+            tag_registry: tagRegistry,
+            smart_collections: smartCollections
+          })
+        }
 
         // Sync index status with actual index metadata
         // This fixes cases where library.json has stale status

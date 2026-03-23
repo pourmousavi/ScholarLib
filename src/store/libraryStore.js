@@ -319,8 +319,14 @@ export const useLibraryStore = create((set, get) => ({
   setLibraryData: (library) => {
     const folders = library.folders || []
     const documents = library.documents || {}
-    const tagRegistry = library.tag_registry || {}
+    let tagRegistry = library.tag_registry || {}
     const smartCollections = library.smart_collections || []
+
+    // Sync orphan tags: find tags used in documents but not in registry
+    const { syncedTags, registry: syncedRegistry } = tagService.syncOrphanTags(tagRegistry, documents)
+    if (syncedTags.length > 0) {
+      tagRegistry = syncedRegistry
+    }
 
     // Auto-expand root folders
     const rootFolderIds = folders
@@ -341,6 +347,9 @@ export const useLibraryStore = create((set, get) => ({
       selectedFolderId: firstRootId,
       selectedDocId: null,
     })
+
+    // Return syncedTags count so caller can save if needed
+    return { syncedTags: syncedTags.length }
   },
 
   // Clear library (for logout)

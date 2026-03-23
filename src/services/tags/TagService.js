@@ -331,6 +331,57 @@ class TagService {
   }
 
   /**
+   * Sync orphan tags from documents into the registry
+   * Finds tags used in documents that don't exist in registry and creates them
+   * Returns { syncedTags: [{slug, tag}], registry: updatedRegistry }
+   */
+  syncOrphanTags(tagRegistry, documents) {
+    const orphanSlugs = new Set()
+
+    // Find all tags used in documents
+    for (const doc of Object.values(documents)) {
+      const tags = doc.user_data?.tags || []
+      for (const slug of tags) {
+        if (slug && !tagRegistry[slug]) {
+          orphanSlugs.add(slug)
+        }
+      }
+    }
+
+    if (orphanSlugs.size === 0) {
+      return { syncedTags: [], registry: tagRegistry }
+    }
+
+    // Create registry entries for orphan tags
+    const syncedTags = []
+    const updatedRegistry = { ...tagRegistry }
+
+    for (const slug of orphanSlugs) {
+      // Convert slug back to display name (capitalize words)
+      const displayName = slug
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+
+      const now = new Date().toISOString()
+      const tag = {
+        displayName,
+        color: this.getNextColor(updatedRegistry),
+        category: null,
+        description: '',
+        created_at: now,
+        updated_at: now
+      }
+
+      updatedRegistry[slug] = tag
+      syncedTags.push({ slug, tag })
+    }
+
+    console.log(`Synced ${syncedTags.length} orphan tag(s):`, syncedTags.map(t => t.slug))
+    return { syncedTags, registry: updatedRegistry }
+  }
+
+  /**
    * Search tags by query (for autocomplete)
    */
   searchTags(tagRegistry, query) {
