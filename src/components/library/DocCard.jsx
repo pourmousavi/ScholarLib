@@ -288,7 +288,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
           <h3 className={`${styles.title} ${isUnread ? styles.unread : ''}`}>
             {title}
           </h3>
-          {isStarred && <span className={styles.star} aria-hidden="true">*</span>}
+          {isStarred && <span className={styles.star} aria-hidden="true"><StarFilledIcon /></span>}
         </div>
         <div className={styles.authors}>{authorText}</div>
         {yearJournal && (
