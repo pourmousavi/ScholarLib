@@ -35,7 +35,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   const collectionRegistry = useLibraryStore((s) => s.collectionRegistry)
   const selectCollectionFilter = useLibraryStore((s) => s.selectCollectionFilter)
   const toggleDocSelection = useLibraryStore((s) => s.toggleDocSelection)
-  const excludeDocFromCollection = useLibraryStore((s) => s.excludeDocFromCollection)
+  const removeDocFromCollection = useLibraryStore((s) => s.removeDocFromCollection)
 
   const adapter = useStorageStore((s) => s.adapter)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
@@ -230,8 +230,8 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
     handleCloseContextMenu()
   }
 
-  const handleExcludeFromCollection = async (collectionSlug, collectionName) => {
-    const result = excludeDocFromCollection(collectionSlug, doc.id)
+  const handleRemoveFromCollection = async (collectionSlug, collectionName) => {
+    const result = removeDocFromCollection(collectionSlug, doc.id)
     if (result.error) {
       showToast({ message: result.error, type: 'error' })
     } else {
@@ -241,14 +241,14 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
     handleCloseContextMenu()
   }
 
-  // Build collection exclusion menu items
-  const collectionExclusionItems = docCollections.length > 0
+  // Build collection removal menu items
+  const collectionRemovalItems = docCollections.length > 0
     ? [
         { separator: true },
         ...docCollections.map(collection => ({
           label: `Remove from "${collection.displayName}"`,
           icon: <FolderIcon />,
-          onClick: () => handleExcludeFromCollection(collection.slug, collection.displayName)
+          onClick: () => handleRemoveFromCollection(collection.slug, collection.displayName)
         }))
       ]
     : []
@@ -269,7 +269,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
       icon: <FolderIcon />,
       onClick: handleAddToCollection
     },
-    ...collectionExclusionItems,
+    ...collectionRemovalItems,
     { separator: true },
     {
       label: 'Export citation...',

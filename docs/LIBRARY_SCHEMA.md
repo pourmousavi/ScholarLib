@@ -233,6 +233,7 @@ Collections are logical groupings of tags that enable better organization, filte
     "description": "Methodology sources for thesis chapter 3",
     "color": "#7C3AED",
     "tags": ["battery-thermal", "literature-review", "methodology"],
+    "included_docs": ["d_xyz789"],
     "excluded_docs": ["d_abc123"],
     "shared_with": [
       {
@@ -250,6 +251,7 @@ Collections are logical groupings of tags that enable better organization, filte
     "description": "Papers to review this week",
     "color": "#0EA5E9",
     "tags": ["to-read", "needs-review"],
+    "included_docs": [],
     "excluded_docs": [],
     "shared_with": [],
     "created_at": "2026-03-12T11:00:00Z",
@@ -266,6 +268,7 @@ Collections are logical groupings of tags that enable better organization, filte
 | `description` | string | Optional description of the collection's purpose |
 | `color` | string | Hex color code for visual distinction (from collection palette) |
 | `tags` | string[] | Array of tag slugs that belong to this collection |
+| `included_docs` | string[] | Document IDs explicitly added to this collection (regardless of tags) |
 | `excluded_docs` | string[] | Document IDs explicitly excluded from this collection (even if they have matching tags) |
 | `shared_with` | array | Sharing configuration (same structure as folders) |
 | `created_at` | ISO8601 | When the collection was created |
@@ -300,17 +303,26 @@ const COLLECTION_COLORS = [
 - When a tag is deleted from `tag_registry`, it is automatically removed from all collection `tags` arrays
 - Collections do NOT own tags — they are a logical grouping layer
 
-### Collection Filtering Logic
+### Collection Filtering Logic (Hybrid Approach)
+
+Collections support a hybrid membership model:
+- **Tag-based membership**: Documents with matching tags are automatically included
+- **Explicit includes**: Documents can be manually added regardless of tags (`included_docs`)
+- **Explicit excludes**: Documents can be manually removed despite having matching tags (`excluded_docs`)
 
 **Single collection selected:**
-Show documents that have ANY tag in that collection's `tags[]` array, excluding documents in `excluded_docs[]`.
+Show documents that are explicitly included OR have ANY tag in the collection's `tags[]` array, excluding documents in `excluded_docs[]`.
 ```javascript
-// Collection "Thesis Ch3" has tags [A, B, C] and excluded_docs [d_123]
-// Show docs with (tag A OR tag B OR tag C) AND NOT in excluded_docs
+// Collection "Thesis Ch3" has tags [A, B, C], included_docs [d_xyz], excluded_docs [d_123]
+// Show docs that are: (explicitly included OR have tag A OR B OR C) AND NOT excluded
 const matchesCollection = (doc, collection) => {
-  // Check if explicitly excluded
+  // Check if explicitly excluded (takes priority)
   if (collection.excluded_docs?.includes(doc.id)) {
     return false
+  }
+  // Check if explicitly included (regardless of tags)
+  if (collection.included_docs?.includes(doc.id)) {
+    return true
   }
   // Check if has any matching tag
   const docTags = doc.user_data?.tags || []
@@ -319,13 +331,13 @@ const matchesCollection = (doc, collection) => {
 ```
 
 **Multiple collections selected:**
-- **OR mode:** Doc has any tag from any selected collection (not excluded from any)
-- **AND mode:** Doc has at least one tag from EACH selected collection (not excluded from any)
+- **OR mode:** Doc matches ANY collection (explicitly included or has matching tag, not excluded)
+- **AND mode:** Doc matches ALL collections (must satisfy each collection's criteria)
 
 ```javascript
-// "Thesis Ch3" has [A, B, C], "Review Queue" has [D, E]
-// OR: Show docs with (A OR B OR C OR D OR E) AND not excluded
-// AND: Show docs with (A OR B OR C) AND (D OR E) AND not excluded
+// "Thesis Ch3" has tags [A, B, C], "Review Queue" has tags [D, E]
+// OR: Show docs matching at least one collection
+// AND: Show docs matching ALL collections
 const matchesMultipleCollections = (doc, collections, mode) => {
   const docTags = doc.user_data?.tags || []
 
@@ -333,25 +345,42 @@ const matchesMultipleCollections = (doc, collections, mode) => {
   const isExcluded = collections.some(c => c.excluded_docs?.includes(doc.id))
   if (isExcluded) return false
 
+  const matchesSingleCollection = (collection) => {
+    // Explicitly included
+    if (collection.included_docs?.includes(doc.id)) return true
+    // Tag-based match
+    return collection.tags.some(t => docTags.includes(t))
+  }
+
   if (mode === 'OR') {
-    // Any tag from any collection
-    return collections.some(collection =>
-      collection.tags.some(t => docTags.includes(t))
-    )
+    return collections.some(matchesSingleCollection)
   } else {
-    // At least one tag from EACH collection
-    return collections.every(collection =>
-      collection.tags.some(t => docTags.includes(t))
-    )
+    return collections.every(matchesSingleCollection)
   }
 }
 ```
 
-### Document Exclusion
+### Document Inclusion & Exclusion
+
+**Explicit Inclusion (`included_docs`):**
+Documents can be manually added to a collection regardless of their tags:
+- Right-click a document → "Add to Collection..." → select collection directly
+- The document appears in the collection without needing matching tags
+- Useful for one-off additions without modifying the document's tags
+- If the document is later explicitly excluded, exclusion wins
+
+**Explicit Exclusion (`excluded_docs`):**
 Documents can be explicitly excluded from a collection while retaining their tags:
 - Right-click a document → "Remove from [Collection]" adds the doc ID to `excluded_docs`
 - The document keeps its tags but won't appear in that collection
 - To re-include, remove the doc ID from `excluded_docs`
+- Exclusion takes priority over both tag-based and explicit inclusion
+
+**Membership Priority:**
+1. If in `excluded_docs` → NOT in collection (highest priority)
+2. If in `included_docs` → IN collection
+3. If has matching tag → IN collection
+4. Otherwise → NOT in collection
 
 ### Collection Deletion Behavior
 When a collection is deleted:
@@ -363,9 +392,10 @@ When a collection is deleted:
 ### Collection Merge Behavior
 When merging collections A and B into target C:
 1. C.tags = [...C.tags, ...A.tags, ...B.tags] (deduplicated)
-2. C.excluded_docs = [...C.excluded_docs, ...A.excluded_docs, ...B.excluded_docs] (deduplicated)
-3. Delete collections A and B from registry
-4. Tags remain unchanged
+2. C.included_docs = [...C.included_docs, ...A.included_docs, ...B.included_docs] (deduplicated)
+3. C.excluded_docs = [...C.excluded_docs, ...A.excluded_docs, ...B.excluded_docs] (deduplicated)
+4. Delete collections A and B from registry
+5. Tags remain unchanged
 
 ---
 

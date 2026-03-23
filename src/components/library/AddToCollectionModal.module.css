@@ -146,6 +146,51 @@
   margin-bottom: var(--space-4);
 }
 
+.directAddOption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  margin-bottom: var(--space-4);
+}
+
+.directAddOption input[type="checkbox"] {
+  accent-color: var(--accent);
+  margin-top: 2px;
+}
+
+.directAddLabel {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.directAddHint {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  color: var(--text-secondary);
+  width: 100%;
+  padding-left: 22px;
+}
+
+.tagSection {
+  margin-bottom: var(--space-4);
+}
+
+.tagSectionTitle {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-2);
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;

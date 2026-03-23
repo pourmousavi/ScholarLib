@@ -298,6 +298,7 @@ const mockCollectionRegistry = {
     description: 'Core battery research papers',
     color: '#7C3AED',
     tags: ['degradation', 'thermal', 'cycling', 'capacity'],
+    included_docs: [],
     excluded_docs: [],
     shared_with: [],
     created_at: '2024-01-15T10:00:00Z',
@@ -308,6 +309,7 @@ const mockCollectionRegistry = {
     description: 'Machine learning methodology papers',
     color: '#0EA5E9',
     tags: ['ml', 'lstm', 'forecasting'],
+    included_docs: [],
     excluded_docs: [],
     shared_with: [],
     created_at: '2024-01-20T10:00:00Z',
@@ -855,11 +857,12 @@ export const useLibraryStore = create((set, get) => ({
       return result
     }
 
-    // Update target collection's tags and excluded_docs
+    // Update target collection's tags, included_docs, and excluded_docs
     const newRegistry = { ...collectionRegistry }
     newRegistry[targetSlug] = {
       ...newRegistry[targetSlug],
       tags: result.mergedTags,
+      included_docs: result.mergedIncludedDocs || [],
       excluded_docs: result.mergedExcludedDocs || [],
       updated_at: new Date().toISOString()
     }
@@ -922,6 +925,52 @@ export const useLibraryStore = create((set, get) => ({
     return { success: true }
   },
 
+  // Add a document directly to a collection (regardless of tags)
+  addDocToCollection: (collectionSlug, docId) => {
+    const { collectionRegistry } = get()
+    const result = collectionService.addDocumentToCollection(collectionRegistry, collectionSlug, docId)
+
+    if (result.error) {
+      return result
+    }
+
+    const newRegistry = {
+      ...collectionRegistry,
+      [collectionSlug]: {
+        ...collectionRegistry[collectionSlug],
+        included_docs: result.newIncludedDocs,
+        excluded_docs: result.newExcludedDocs,
+        updated_at: new Date().toISOString()
+      }
+    }
+
+    set({ collectionRegistry: newRegistry })
+    return { success: true }
+  },
+
+  // Remove a document from a collection (handles both explicit includes and tag-based membership)
+  removeDocFromCollection: (collectionSlug, docId) => {
+    const { collectionRegistry } = get()
+    const result = collectionService.removeDocumentFromCollection(collectionRegistry, collectionSlug, docId)
+
+    if (result.error) {
+      return result
+    }
+
+    const newRegistry = {
+      ...collectionRegistry,
+      [collectionSlug]: {
+        ...collectionRegistry[collectionSlug],
+        included_docs: result.newIncludedDocs,
+        excluded_docs: result.newExcludedDocs,
+        updated_at: new Date().toISOString()
+      }
+    }
+
+    set({ collectionRegistry: newRegistry })
+    return { success: true, wasExplicitlyIncluded: result.wasExplicitlyIncluded }
+  },
+
   // Exclude a document from a collection (document keeps its tags but won't appear in collection)
   excludeDocFromCollection: (collectionSlug, docId) => {
     const { collectionRegistry } = get()
@@ -935,6 +984,7 @@ export const useLibraryStore = create((set, get) => ({
       ...collectionRegistry,
       [collectionSlug]: {
         ...collectionRegistry[collectionSlug],
+        included_docs: result.newIncludedDocs,
         excluded_docs: result.newExcludedDocs,
         updated_at: new Date().toISOString()
       }

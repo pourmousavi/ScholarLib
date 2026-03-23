@@ -8,20 +8,23 @@ import { collectionService } from '../../services/tags/CollectionService'
 import styles from './AddToCollectionModal.module.css'
 
 /**
- * AddToCollectionModal - Add document to a collection by adding tags from that collection
- * Two-step flow:
- * 1. Select a collection
- * 2. Select which tags from that collection to add to the document
+ * AddToCollectionModal - Add document to a collection
+ *
+ * Supports hybrid collection membership:
+ * - Add document directly to collection (explicit include, regardless of tags)
+ * - Optionally also add tags from the collection to the document
  */
 export default function AddToCollectionModal({ docId, onClose }) {
   const [selectedCollection, setSelectedCollection] = useState(null)
   const [selectedTags, setSelectedTags] = useState([])
+  const [addDirectly, setAddDirectly] = useState(true) // Default to direct add
   const [isSaving, setIsSaving] = useState(false)
 
   const documents = useLibraryStore(s => s.documents)
   const collectionRegistry = useLibraryStore(s => s.collectionRegistry)
   const tagRegistry = useLibraryStore(s => s.tagRegistry)
   const addTagToDocument = useLibraryStore(s => s.addTagToDocument)
+  const addDocToCollection = useLibraryStore(s => s.addDocToCollection)
 
   const adapter = useStorageStore(s => s.adapter)
   const isDemoMode = useStorageStore(s => s.isDemoMode)
@@ -47,10 +50,20 @@ export default function AddToCollectionModal({ docId, onClose }) {
     }
   }, [adapter, isDemoMode])
 
-  // Get collections with counts
+  // Get collections the document is already in
+  const docCollections = useMemo(() => {
+    return collectionService.getCollectionsForDocument(collectionRegistry, doc)
+  }, [collectionRegistry, doc])
+
+  const docCollectionSlugs = useMemo(() => {
+    return docCollections.map(c => c.slug)
+  }, [docCollections])
+
+  // Get collections with counts, excluding ones doc is already in
   const collectionsWithCounts = useMemo(() => {
-    return collectionService.getAllCollectionsWithCounts(collectionRegistry, tagRegistry, documents)
-  }, [collectionRegistry, tagRegistry, documents])
+    const all = collectionService.getAllCollectionsWithCounts(collectionRegistry, tagRegistry, documents)
+    return all.filter(c => !docCollectionSlugs.includes(c.slug))
+  }, [collectionRegistry, tagRegistry, documents, docCollectionSlugs])
 
   // Get tags from selected collection that are not already on the document
   const availableTags = useMemo(() => {
@@ -90,14 +103,25 @@ export default function AddToCollectionModal({ docId, onClose }) {
     )
   }
 
-  const handleAddTags = async () => {
-    if (selectedTags.length === 0) return
+  const handleAdd = async () => {
+    if (!selectedCollection) return
+    if (!addDirectly && selectedTags.length === 0) return
 
     setIsSaving(true)
     try {
+      // Add document directly to collection if selected
+      if (addDirectly) {
+        const result = addDocToCollection(selectedCollection, docId)
+        if (result.error) {
+          console.error('Failed to add to collection:', result.error)
+        }
+      }
+
+      // Also add any selected tags
       for (const slug of selectedTags) {
         addTagToDocument(docId, slug)
       }
+
       await saveLibrary()
       onClose()
     } finally {
@@ -159,41 +183,33 @@ export default function AddToCollectionModal({ docId, onClose }) {
             </div>
           </>
         ) : (
-          // Step 2: Select tags from collection
+          // Step 2: Configure how to add to collection
           <>
             <h3 className={styles.stepTitle}>
-              Add tags from "{collectionRegistry[selectedCollection]?.displayName}"
+              Add to "{collectionRegistry[selectedCollection]?.displayName}"
             </h3>
 
-            {existingTags.length > 0 && (
-              <div className={styles.existingSection}>
-                <span className={styles.existingLabel}>Already on document:</span>
-                <div className={styles.existingTags}>
-                  {existingTags.map(tag => (
-                    <span
-                      key={tag.slug}
-                      className={styles.existingTag}
-                      style={{ borderColor: tag.color, color: tag.color }}
-                    >
-                      {tag.displayName}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Direct add option */}
+            <label className={styles.directAddOption}>
+              <input
+                type="checkbox"
+                checked={addDirectly}
+                onChange={(e) => setAddDirectly(e.target.checked)}
+              />
+              <span className={styles.directAddLabel}>
+                Add document directly to collection
+              </span>
+              <span className={styles.directAddHint}>
+                Document will appear in this collection regardless of its tags
+              </span>
+            </label>
 
-            {availableTags.length === 0 ? (
-              <div className={styles.empty}>
-                {existingTags.length > 0
-                  ? 'All tags from this collection are already on this document.'
-                  : 'This collection has no tags.'}
-              </div>
-            ) : (
-              <>
-                <p className={styles.description}>
-                  Select tags to add to this document
+            {/* Optional: Also add tags */}
+            {availableTags.length > 0 && (
+              <div className={styles.tagSection}>
+                <p className={styles.tagSectionTitle}>
+                  Optionally, also add tags from this collection:
                 </p>
-
                 <div className={styles.tagList}>
                   {availableTags.map(tag => (
                     <label key={tag.slug} className={styles.tagItem}>
@@ -210,17 +226,38 @@ export default function AddToCollectionModal({ docId, onClose }) {
                     </label>
                   ))}
                 </div>
-              </>
+              </div>
+            )}
+
+            {existingTags.length > 0 && (
+              <div className={styles.existingSection}>
+                <span className={styles.existingLabel}>Tags already on document:</span>
+                <div className={styles.existingTags}>
+                  {existingTags.map(tag => (
+                    <span
+                      key={tag.slug}
+                      className={styles.existingTag}
+                      style={{ borderColor: tag.color, color: tag.color }}
+                    >
+                      {tag.displayName}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
 
             <div className={styles.actions}>
               <Btn onClick={handleBack}>Back</Btn>
               <Btn
                 gold
-                onClick={handleAddTags}
-                disabled={selectedTags.length === 0 || isSaving}
+                onClick={handleAdd}
+                disabled={(!addDirectly && selectedTags.length === 0) || isSaving}
               >
-                {isSaving ? 'Adding...' : `Add ${selectedTags.length} tag${selectedTags.length !== 1 ? 's' : ''}`}
+                {isSaving ? 'Adding...' : (
+                  addDirectly
+                    ? (selectedTags.length > 0 ? `Add to collection + ${selectedTags.length} tag${selectedTags.length !== 1 ? 's' : ''}` : 'Add to collection')
+                    : `Add ${selectedTags.length} tag${selectedTags.length !== 1 ? 's' : ''}`
+                )}
               </Btn>
             </div>
           </>
