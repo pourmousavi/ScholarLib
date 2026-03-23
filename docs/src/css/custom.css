@@ -17,8 +17,18 @@ html {
   --ifm-color-primary-light: #d9b94e;
   --ifm-color-primary-lighter: #dec365;
   --ifm-color-primary-lightest: #e8d38c;
-  --ifm-code-font-size: 95%;
+  --ifm-code-font-size: 90%;
   --docusaurus-highlighted-code-line-bg: rgba(212, 175, 55, 0.1);
+
+  /* Smaller font sizes like React docs */
+  --ifm-font-size-base: 15px;
+  --ifm-line-height-base: 1.65;
+  --ifm-heading-font-weight: 600;
+  --ifm-h1-font-size: 1.75rem;
+  --ifm-h2-font-size: 1.35rem;
+  --ifm-h3-font-size: 1.15rem;
+  --ifm-h4-font-size: 1rem;
+  --ifm-h5-font-size: 0.875rem;
 }
 
 /* Dark mode tokens */
@@ -37,19 +47,68 @@ html {
   --docusaurus-highlighted-code-line-bg: rgba(212, 175, 55, 0.15);
 }
 
-/* Typography improvements */
+/* Typography improvements - smaller sizes like React docs */
 .markdown h1 {
-  font-size: 2rem;
+  font-size: 1.75rem;
+  margin-bottom: 1rem;
 }
 
 .markdown h2 {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   margin-top: 2rem;
+  margin-bottom: 0.75rem;
 }
 
 .markdown h3 {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown h4 {
+  font-size: 1rem;
+  margin-top: 1.25rem;
+}
+
+.markdown p {
+  margin-bottom: 1rem;
+}
+
+.markdown li {
+  margin-bottom: 0.35rem;
+}
+
+/* Sidebar typography */
+.menu__link {
+  font-size: 0.875rem;
+  padding: 0.375rem 0.75rem;
+}
+
+.menu__list-item-collapsible .menu__link {
+  font-size: 0.875rem;
+}
+
+/* Table of contents */
+.table-of-contents {
+  font-size: 0.8125rem;
+}
+
+.table-of-contents__link {
+  padding: 0.25rem 0;
+}
+
+/* Breadcrumbs */
+.breadcrumbs__link {
+  font-size: 0.8125rem;
+}
+
+/* Pagination */
+.pagination-nav__label {
+  font-size: 0.8125rem;
+}
+
+.pagination-nav__sublabel {
+  font-size: 0.75rem;
 }
 
 /* Custom admonition styles */
@@ -228,11 +287,19 @@ pre {
 
 /* Responsive adjustments */
 @media (max-width: 996px) {
+  :root {
+    --ifm-font-size-base: 14px;
+  }
+
   .markdown h1 {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
   }
 
   .markdown h2 {
-    font-size: 1.35rem;
+    font-size: 1.25rem;
+  }
+
+  .markdown h3 {
+    font-size: 1.1rem;
   }
 }
