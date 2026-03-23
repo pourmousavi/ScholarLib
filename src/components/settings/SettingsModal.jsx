@@ -102,6 +102,10 @@ export default function SettingsModal({ onClose }) {
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
 
+  // Display settings state
+  const [showTags, setShowTagsState] = useState(settingsService.getShowTags())
+  const [showKeywords, setShowKeywordsState] = useState(settingsService.getShowKeywords())
+
   // Migration state
   const [showMigrationWizard, setShowMigrationWizard] = useState(false)
   const [migrationMode, setMigrationMode] = useState(null) // 'export' or 'import'
@@ -1219,6 +1223,40 @@ export default function SettingsModal({ onClose }) {
           <option value={125}>125%</option>
           <option value={150}>150%</option>
         </select>
+      </div>
+
+      <h3 className={styles.sectionTitle} style={{ marginTop: 24 }}>Document Cards</h3>
+
+      <div className={styles.field}>
+        <label>Display on document cards</label>
+        <div className={styles.toggleGroup}>
+          <label className={styles.toggle}>
+            <input
+              type="checkbox"
+              checked={showTags}
+              onChange={(e) => {
+                setShowTagsState(e.target.checked)
+                settingsService.setShowTags(e.target.checked)
+              }}
+            />
+            <span>Tags (user-assigned organizational labels)</span>
+          </label>
+
+          <label className={styles.toggle}>
+            <input
+              type="checkbox"
+              checked={showKeywords}
+              onChange={(e) => {
+                setShowKeywordsState(e.target.checked)
+                settingsService.setShowKeywords(e.target.checked)
+              }}
+            />
+            <span>Keywords (from paper metadata)</span>
+          </label>
+        </div>
+        <span className={styles.fieldHint}>
+          Tags are your organizational labels. Keywords are extracted from the paper's metadata.
+        </span>
       </div>
     </div>
   )

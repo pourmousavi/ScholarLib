@@ -13,7 +13,8 @@
       "Bash(git reset:*)",
       "Bash(grep:*)",
       "WebSearch",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(timeout 5 npm run dev:*)"
     ]
   }
 }

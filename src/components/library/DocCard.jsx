@@ -6,12 +6,19 @@ import { useIndexStore } from '../../store/indexStore'
 import { useToast } from '../../hooks/useToast'
 import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
-import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon } from '../ui'
+import { settingsService } from '../../services/settings/SettingsService'
+import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon } from '../ui'
+import QuickTagModal from './QuickTagModal'
 import styles from './DocCard.module.css'
 
 const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: isSelectedForBulk = false }) {
   const [contextMenu, setContextMenu] = useState(null)
   const [isReindexing, setIsReindexing] = useState(false)
+  const [showTagModal, setShowTagModal] = useState(false)
+
+  // Display settings
+  const showTags = settingsService.getShowTags()
+  const showKeywords = settingsService.getShowKeywords()
 
   const isIndexing = useIndexStore((s) => s.isIndexing)
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
@@ -56,6 +63,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   const yearJournal = [year, journal].filter(Boolean).join(' · ')
 
   const tags = doc.user_data?.tags || []
+  const keywords = doc.metadata?.keywords || []
 
   const handleClick = () => {
     if (selectionMode) {
@@ -186,11 +194,21 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
     }
   }
 
+  const handleManageTags = () => {
+    setShowTagModal(true)
+    handleCloseContextMenu()
+  }
+
   const contextMenuItems = [
     {
       label: 'Edit metadata...',
       icon: <EditIcon />,
       onClick: handleEditMetadata
+    },
+    {
+      label: 'Manage tags...',
+      icon: <TagIcon />,
+      onClick: handleManageTags
     },
     {
       label: 'Move to folder...',
@@ -270,7 +288,8 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
         {yearJournal && (
           <div className={styles.meta}>{yearJournal}</div>
         )}
-        {tags.length > 0 && (
+        {/* Tags (user-assigned) */}
+        {showTags && tags.length > 0 && (
           <div className={styles.tags} aria-label={`Tags: ${tags.map(t => tagRegistry[t]?.displayName || t).join(', ')}`}>
             {tags.slice(0, 3).map((slug) => {
               const tagData = tagRegistry[slug]
@@ -287,6 +306,18 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
             )}
           </div>
         )}
+
+        {/* Keywords (from paper metadata) */}
+        {showKeywords && keywords.length > 0 && (
+          <div className={styles.keywords} aria-label={`Keywords: ${keywords.join(', ')}`}>
+            {keywords.slice(0, 4).map((kw, idx) => (
+              <span key={idx} className={styles.keyword}>{kw}</span>
+            ))}
+            {keywords.length > 4 && (
+              <span className={styles.moreKeywords}>+{keywords.length - 4}</span>
+            )}
+          </div>
+        )}
       </article>
 
       {contextMenu && (
@@ -295,6 +326,13 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
           y={contextMenu.y}
           items={contextMenuItems}
           onClose={handleCloseContextMenu}
+        />
+      )}
+
+      {showTagModal && (
+        <QuickTagModal
+          docId={doc.id}
+          onClose={() => setShowTagModal(false)}
         />
       )}
     </>

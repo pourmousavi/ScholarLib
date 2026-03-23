@@ -29,6 +29,10 @@ class SettingsService {
           font_size: 'normal', // normal | large
           pdf_default_zoom: 100
         },
+        doc_card: {
+          show_tags: true,
+          show_keywords: true
+        },
         export: {
           default_format: 'markdown',
           chat_include_citations: true,
@@ -198,6 +202,44 @@ class SettingsService {
       return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     }
     return name[0].toUpperCase()
+  }
+
+  // ============================================
+  // Document Card Display Settings
+  // ============================================
+
+  /**
+   * Get whether to show tags on document cards
+   * @returns {boolean}
+   */
+  getShowTags() {
+    const val = localStorage.getItem('sv_show_tags')
+    return val === null ? true : val === 'true'
+  }
+
+  /**
+   * Set whether to show tags on document cards
+   * @param {boolean} show
+   */
+  setShowTags(show) {
+    localStorage.setItem('sv_show_tags', show.toString())
+  }
+
+  /**
+   * Get whether to show keywords on document cards
+   * @returns {boolean}
+   */
+  getShowKeywords() {
+    const val = localStorage.getItem('sv_show_keywords')
+    return val === null ? true : val === 'true'
+  }
+
+  /**
+   * Set whether to show keywords on document cards
+   * @param {boolean} show
+   */
+  setShowKeywords(show) {
+    localStorage.setItem('sv_show_keywords', show.toString())
   }
 }
 
