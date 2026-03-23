@@ -3,6 +3,11 @@
  * Custom CSS for Docusaurus
  */
 
+/* Smooth scrolling for anchor links */
+html {
+  scroll-behavior: smooth;
+}
+
 /* Color tokens matching ScholarLib app */
 :root {
   --ifm-color-primary: #d4af37;
