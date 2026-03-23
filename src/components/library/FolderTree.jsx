@@ -49,8 +49,14 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
   const saveLibrary = useCallback(async () => {
     if (isDemoMode || !adapter) return
     try {
-      const { folders, documents } = useLibraryStore.getState()
-      await LibraryService.saveLibrary(adapter, { version: '1.0', folders, documents })
+      const { folders, documents, tagRegistry, smartCollections } = useLibraryStore.getState()
+      await LibraryService.saveLibrary(adapter, {
+        version: '1.0',
+        folders,
+        documents,
+        tag_registry: tagRegistry,
+        smart_collections: smartCollections
+      })
     } catch (e) {
       console.error('Failed to save library:', e)
     }

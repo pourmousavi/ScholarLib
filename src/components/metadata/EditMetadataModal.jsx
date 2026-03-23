@@ -156,9 +156,12 @@ export default function EditMetadataModal({ onClose }) {
 
       // Save to storage
       if (!isDemoMode && adapter) {
+        const { tagRegistry, smartCollections } = useLibraryStore.getState()
         const library = {
           folders,
           documents: { ...documents, [doc.id]: updatedDoc },
+          tag_registry: tagRegistry,
+          smart_collections: smartCollections,
           version: '1.0',
           last_modified: new Date().toISOString()
         }

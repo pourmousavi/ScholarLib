@@ -41,11 +41,13 @@ export default function MoveFolderPicker({ onClose }) {
 
       // Save to storage
       if (!isDemoMode && adapter) {
-        const { folders: currentFolders, documents: currentDocs } = useLibraryStore.getState()
+        const { folders: currentFolders, documents: currentDocs, tagRegistry, smartCollections } = useLibraryStore.getState()
         await LibraryService.saveLibrary(adapter, {
           version: '1.0',
           folders: currentFolders,
-          documents: currentDocs
+          documents: currentDocs,
+          tag_registry: tagRegistry,
+          smart_collections: smartCollections
         })
       }
 

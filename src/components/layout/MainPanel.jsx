@@ -57,8 +57,14 @@ export default function MainPanel() {
       if (!isDemoMode && adapter) {
         const saveAsync = async () => {
           try {
-            const { folders, documents } = useLibraryStore.getState()
-            await LibraryService.saveLibrary(adapter, { version: '1.0', folders, documents })
+            const { folders, documents, tagRegistry, smartCollections } = useLibraryStore.getState()
+            await LibraryService.saveLibrary(adapter, {
+              version: '1.0',
+              folders,
+              documents,
+              tag_registry: tagRegistry,
+              smart_collections: smartCollections
+            })
           } catch (e) {
             console.error('Failed to save read status:', e)
           }

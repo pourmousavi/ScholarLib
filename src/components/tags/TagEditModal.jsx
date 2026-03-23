@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import Modal from '../ui/Modal'
 import Btn from '../ui/Btn'
 import TagColorPicker from './TagColorPicker'
 import { useLibraryStore } from '../../store/libraryStore'
+import { useStorageStore } from '../../store/storageStore'
+import { LibraryService } from '../../services/library/LibraryService'
 import styles from './TagEditModal.module.css'
 
 export default function TagEditModal({ slug, onClose }) {
@@ -10,6 +12,26 @@ export default function TagEditModal({ slug, onClose }) {
   const documents = useLibraryStore(s => s.documents)
   const updateTag = useLibraryStore(s => s.updateTag)
   const deleteTag = useLibraryStore(s => s.deleteTag)
+
+  const adapter = useStorageStore(s => s.adapter)
+  const isDemoMode = useStorageStore(s => s.isDemoMode)
+
+  // Helper to save library after tag changes
+  const saveLibrary = useCallback(async () => {
+    if (isDemoMode || !adapter) return
+    try {
+      const { folders, documents, tagRegistry, smartCollections } = useLibraryStore.getState()
+      await LibraryService.saveLibrary(adapter, {
+        version: '1.0',
+        folders,
+        documents,
+        tag_registry: tagRegistry,
+        smart_collections: smartCollections
+      })
+    } catch (e) {
+      console.error('Failed to save library:', e)
+    }
+  }, [adapter, isDemoMode])
 
   const tag = tagRegistry[slug]
 
@@ -37,6 +59,8 @@ export default function TagEditModal({ slug, onClose }) {
     setIsSaving(true)
     try {
       await updateTag(slug, { displayName, color, category, description })
+      // Save to storage
+      await saveLibrary()
       onClose()
     } finally {
       setIsSaving(false)
@@ -47,6 +71,8 @@ export default function TagEditModal({ slug, onClose }) {
     setIsDeleting(true)
     try {
       await deleteTag(slug)
+      // Save to storage
+      await saveLibrary()
       onClose()
     } finally {
       setIsDeleting(false)

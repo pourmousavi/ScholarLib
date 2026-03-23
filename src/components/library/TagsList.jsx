@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
+import { useStorageStore } from '../../store/storageStore'
 import { tagService } from '../../services/tags/TagService'
+import { LibraryService } from '../../services/library/LibraryService'
 import TagEditModal from '../tags/TagEditModal'
 import TagMergeModal from '../tags/TagMergeModal'
 import styles from './TagsList.module.css'
@@ -27,6 +29,26 @@ export default function TagsList() {
   const setTagFilterMode = useLibraryStore((s) => s.setTagFilterMode)
   const clearTagFilter = useLibraryStore((s) => s.clearTagFilter)
   const selectTagFilter = useLibraryStore((s) => s.selectTagFilter)
+
+  const adapter = useStorageStore((s) => s.adapter)
+  const isDemoMode = useStorageStore((s) => s.isDemoMode)
+
+  // Helper to save library after tag changes
+  const saveLibrary = useCallback(async () => {
+    if (isDemoMode || !adapter) return
+    try {
+      const { folders, documents, tagRegistry, smartCollections } = useLibraryStore.getState()
+      await LibraryService.saveLibrary(adapter, {
+        version: '1.0',
+        folders,
+        documents,
+        tag_registry: tagRegistry,
+        smart_collections: smartCollections
+      })
+    } catch (e) {
+      console.error('Failed to save library:', e)
+    }
+  }, [adapter, isDemoMode])
 
   // Get tags with counts
   const tagsWithCounts = useMemo(() => {
@@ -66,6 +88,8 @@ export default function TagsList() {
     if (!result.error) {
       setNewTagName('')
       setShowCreateInput(false)
+      // Save to storage
+      await saveLibrary()
     }
   }
 

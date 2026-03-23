@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import Modal from '../ui/Modal'
 import Btn from '../ui/Btn'
 import { useLibraryStore } from '../../store/libraryStore'
+import { useStorageStore } from '../../store/storageStore'
 import { tagService } from '../../services/tags/TagService'
+import { LibraryService } from '../../services/library/LibraryService'
 import styles from './TagMergeModal.module.css'
 
 export default function TagMergeModal({ onClose }) {
@@ -13,6 +15,26 @@ export default function TagMergeModal({ onClose }) {
   const tagRegistry = useLibraryStore(s => s.tagRegistry)
   const documents = useLibraryStore(s => s.documents)
   const mergeTags = useLibraryStore(s => s.mergeTags)
+
+  const adapter = useStorageStore(s => s.adapter)
+  const isDemoMode = useStorageStore(s => s.isDemoMode)
+
+  // Helper to save library after tag changes
+  const saveLibrary = useCallback(async () => {
+    if (isDemoMode || !adapter) return
+    try {
+      const { folders, documents, tagRegistry, smartCollections } = useLibraryStore.getState()
+      await LibraryService.saveLibrary(adapter, {
+        version: '1.0',
+        folders,
+        documents,
+        tag_registry: tagRegistry,
+        smart_collections: smartCollections
+      })
+    } catch (e) {
+      console.error('Failed to save library:', e)
+    }
+  }, [adapter, isDemoMode])
 
   const tagsWithCounts = useMemo(() =>
     tagService.getAllTagsWithCounts(tagRegistry, documents),
@@ -34,6 +56,8 @@ export default function TagMergeModal({ onClose }) {
     setIsMerging(true)
     try {
       await mergeTags(sourceTags, targetTag)
+      // Save to storage
+      await saveLibrary()
       onClose()
     } finally {
       setIsMerging(false)
