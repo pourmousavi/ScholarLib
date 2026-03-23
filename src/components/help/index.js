@@ -1,1 +1,1 @@
-export { default as HelpModal } from './HelpModal'
+export { default as QuickHelpModal } from './QuickHelpModal'

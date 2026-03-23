@@ -1,0 +1,233 @@
+/**
+ * ScholarLib Documentation Theme
+ * Custom CSS for Docusaurus
+ */
+
+/* Color tokens matching ScholarLib app */
+:root {
+  --ifm-color-primary: #d4af37;
+  --ifm-color-primary-dark: #c9a230;
+  --ifm-color-primary-darker: #be952a;
+  --ifm-color-primary-darkest: #9e7b23;
+  --ifm-color-primary-light: #d9b94e;
+  --ifm-color-primary-lighter: #dec365;
+  --ifm-color-primary-lightest: #e8d38c;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(212, 175, 55, 0.1);
+}
+
+/* Dark mode tokens */
+[data-theme='dark'] {
+  --ifm-color-primary: #d4af37;
+  --ifm-color-primary-dark: #c9a230;
+  --ifm-color-primary-darker: #be952a;
+  --ifm-color-primary-darkest: #9e7b23;
+  --ifm-color-primary-light: #d9b94e;
+  --ifm-color-primary-lighter: #dec365;
+  --ifm-color-primary-lightest: #e8d38c;
+  --ifm-background-color: #0a0d12;
+  --ifm-background-surface-color: #12161d;
+  --ifm-navbar-background-color: #12161d;
+  --ifm-footer-background-color: #0a0d12;
+  --docusaurus-highlighted-code-line-bg: rgba(212, 175, 55, 0.15);
+}
+
+/* Typography improvements */
+.markdown h1 {
+  font-size: 2rem;
+}
+
+.markdown h2 {
+  font-size: 1.5rem;
+  margin-top: 2rem;
+}
+
+.markdown h3 {
+  font-size: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+/* Custom admonition styles */
+.admonition {
+  border-radius: 8px;
+}
+
+/* Tip admonition with gold accent */
+.admonition.admonition-tip {
+  border-left-color: var(--ifm-color-primary);
+}
+
+.admonition.admonition-tip .admonition-heading h5 {
+  color: var(--ifm-color-primary);
+}
+
+/* Info admonition */
+.admonition.admonition-info {
+  background-color: rgba(56, 189, 248, 0.1);
+  border-left-color: #38bdf8;
+}
+
+/* Warning admonition */
+.admonition.admonition-warning {
+  background-color: rgba(251, 191, 36, 0.1);
+  border-left-color: #fbbf24;
+}
+
+/* Caution/Danger admonition */
+.admonition.admonition-danger,
+.admonition.admonition-caution {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-left-color: #ef4444;
+}
+
+/* Table styling */
+table {
+  display: table;
+  width: 100%;
+}
+
+table th {
+  background-color: var(--ifm-background-surface-color);
+}
+
+[data-theme='dark'] table th {
+  background-color: #1a1f28;
+}
+
+/* Keyboard shortcut styling */
+kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+  line-height: 1.4;
+  color: var(--ifm-font-color-base);
+  vertical-align: middle;
+  background-color: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 6px;
+  box-shadow: inset 0 -1px 0 var(--ifm-color-emphasis-300);
+}
+
+[data-theme='dark'] kbd {
+  background-color: #1a1f28;
+  border-color: #2d3748;
+  box-shadow: inset 0 -1px 0 #2d3748;
+}
+
+/* Code block styling */
+pre {
+  border-radius: 8px;
+}
+
+/* Navbar styling */
+.navbar {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] .navbar {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Sidebar styling */
+.menu__link--active:not(.menu__link--sublist) {
+  background-color: rgba(212, 175, 55, 0.1);
+}
+
+/* Footer styling */
+.footer {
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+[data-theme='dark'] .footer {
+  border-top: 1px solid #1a1f28;
+}
+
+/* Search input styling */
+.navbar__search-input {
+  border-radius: 6px;
+}
+
+/* Link hover effects */
+.menu__link:hover {
+  color: var(--ifm-color-primary);
+}
+
+/* Quality badge styles for AI comparison table */
+.badge--basic {
+  background-color: var(--ifm-color-emphasis-200);
+  color: var(--ifm-font-color-secondary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge--good {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge--excellent {
+  background-color: rgba(212, 175, 55, 0.2);
+  color: var(--ifm-color-primary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Checklist styling */
+.checklist {
+  list-style: none;
+  padding-left: 0;
+}
+
+.checklist li {
+  position: relative;
+  padding-left: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.checklist li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  background: linear-gradient(135deg, #d4af37, #f5d77a);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Back to app button styling */
+.navbar__item.navbar__link[href="https://apourmousavi.github.io/scholarlib/"] {
+  background-color: var(--ifm-color-primary);
+  color: #0a0d12;
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-weight: 500;
+}
+
+.navbar__item.navbar__link[href="https://apourmousavi.github.io/scholarlib/"]:hover {
+  background-color: var(--ifm-color-primary-light);
+  color: #0a0d12;
+}
+
+/* Responsive adjustments */
+@media (max-width: 996px) {
+  .markdown h1 {
+    font-size: 1.75rem;
+  }
+
+  .markdown h2 {
+    font-size: 1.35rem;
+  }
+}
