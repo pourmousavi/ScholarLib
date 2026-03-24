@@ -2,9 +2,18 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useUIStore } from '../../store/uiStore'
 import { NotesPanel } from '../notes'
 import { ChatPanel } from '../ai'
+import { AnnotationSidebar } from '../annotations'
 import styles from './FullscreenOverlay.module.css'
 
-export default function FullscreenOverlay() {
+export default function FullscreenOverlay({
+  annotations = [],
+  selectedAnnotationId,
+  onSelectAnnotation,
+  onUpdateComment,
+  onUpdateColor,
+  onDeleteAnnotation,
+  onNavigateToAnnotation
+}) {
   const fullscreenOverlayVisible = useUIStore((s) => s.fullscreenOverlayVisible)
   const toggleFullscreenOverlay = useUIStore((s) => s.toggleFullscreenOverlay)
   const fullscreenOverlayWidth = useUIStore((s) => s.fullscreenOverlayWidth)
@@ -57,7 +66,8 @@ export default function FullscreenOverlay() {
 
   const tabs = [
     { id: 'ai', label: 'AI Chat' },
-    { id: 'notes', label: 'Notes' }
+    { id: 'notes', label: 'Notes' },
+    { id: 'annotations', label: `Annotations${annotations.length > 0 ? ` (${annotations.length})` : ''}` }
   ]
 
   return (
@@ -119,6 +129,19 @@ export default function FullscreenOverlay() {
         <div className={styles.content}>
           {splitViewRightTab === 'ai' && <ChatPanel />}
           {splitViewRightTab === 'notes' && <NotesPanel />}
+          {splitViewRightTab === 'annotations' && (
+            <AnnotationSidebar
+              annotations={annotations}
+              selectedAnnotationId={selectedAnnotationId}
+              onSelectAnnotation={onSelectAnnotation}
+              onUpdateComment={onUpdateComment}
+              onUpdateColor={onUpdateColor}
+              onDelete={onDeleteAnnotation}
+              onNavigateToAnnotation={onNavigateToAnnotation}
+              onClose={() => {}} // No-op in fullscreen overlay context
+              embedded // Flag to adjust styling
+            />
+          )}
         </div>
       </div>
     </>

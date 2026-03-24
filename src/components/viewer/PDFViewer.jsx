@@ -474,8 +474,18 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
         )}
       </div>
 
-      {/* Fullscreen overlay for Notes/AI Chat */}
-      {isFullscreen && splitViewEnabled && <FullscreenOverlay />}
+      {/* Fullscreen overlay for Notes/AI Chat/Annotations */}
+      {isFullscreen && (
+        <FullscreenOverlay
+          annotations={annotations}
+          selectedAnnotationId={selectedAnnotationId}
+          onSelectAnnotation={selectAnnotation}
+          onUpdateComment={updateComment}
+          onUpdateColor={updateColor}
+          onDeleteAnnotation={deleteAnnotation}
+          onNavigateToAnnotation={handleNavigateToAnnotation}
+        />
+      )}
     </div>
   )
 }

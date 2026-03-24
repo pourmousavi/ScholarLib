@@ -224,3 +224,9 @@
   font-size: 11px;
   color: var(--text-muted);
 }
+
+/* Embedded mode for fullscreen overlay */
+.embedded {
+  border-left: none;
+  background: transparent;
+}

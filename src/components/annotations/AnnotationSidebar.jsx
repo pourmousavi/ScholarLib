@@ -26,7 +26,8 @@ function AnnotationSidebar({
   onUpdateColor,
   onDelete,
   onNavigateToAnnotation,
-  onClose
+  onClose,
+  embedded = false // When true, hide close button and adjust styling for fullscreen overlay
 }) {
   const [filterType, setFilterType] = useState('all')
   const [filterColor, setFilterColor] = useState(null)
@@ -106,23 +107,25 @@ function AnnotationSidebar({
   }, [onSelectAnnotation, onNavigateToAnnotation])
 
   return (
-    <div className={styles.sidebar}>
-      {/* Header */}
-      <div className={styles.header}>
-        <h3 className={styles.title}>
-          Annotations
-          <span className={styles.count}>{annotations.length}</span>
-        </h3>
-        <button
-          className={styles.closeButton}
-          onClick={onClose}
-          aria-label="Close sidebar"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-          </svg>
-        </button>
-      </div>
+    <div className={`${styles.sidebar} ${embedded ? styles.embedded : ''}`}>
+      {/* Header - only show in standalone mode */}
+      {!embedded && (
+        <div className={styles.header}>
+          <h3 className={styles.title}>
+            Annotations
+            <span className={styles.count}>{annotations.length}</span>
+          </h3>
+          <button
+            className={styles.closeButton}
+            onClick={onClose}
+            aria-label="Close sidebar"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Search */}
       <div className={styles.search}>
