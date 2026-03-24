@@ -24,6 +24,13 @@ Your API keys are stored only in your browser's local storage. They are never se
 |---------|-------------|
 | **Provider** | Shows current Dropbox or Box connection |
 | **Disconnect** | Sign out (data remains in cloud) |
+| **Import from Zotero** | Import your Zotero library (collections, tags, notes, PDFs) |
+| **Export Library Bundle** | Export your library for migration to another storage provider |
+| **Import Library Bundle** | Import a previously exported ScholarLib bundle |
+
+:::tip Migrating from Zotero?
+Click **Import from Zotero** to launch the import wizard. See the [Importing from Zotero](./import.md) guide for detailed instructions.
+:::
 
 ## Metadata
 

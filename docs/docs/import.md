@@ -31,10 +31,11 @@ For libraries over 500 items, consider exporting collections separately to make 
 
 ### Step 1: Select Source
 
-1. In ScholarLib, go to **Settings → Import Library**
-2. Select **Zotero RDF** as the source type
-3. Click **Choose File** and select your `.rdf` file
-4. (Optional) Click **Choose Folder** and select the folder containing your PDFs
+1. In ScholarLib, go to **Settings → Storage**
+2. Click the **Import from Zotero** button
+3. Select **Zotero RDF** as the source type
+4. Click **Choose File** and select your `.rdf` file
+5. (Optional) Click **Choose Folder** and select the folder containing your PDFs
 
 :::info Attachments Folder
 The attachments folder is optional. If you include it, ScholarLib will upload your PDFs to your cloud storage. Without it, only metadata is imported.
