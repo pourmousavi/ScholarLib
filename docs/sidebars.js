@@ -2,6 +2,8 @@
 const sidebars = {
   tutorialSidebar: [
     'getting-started',
+    'annotations',
+    'import',
     {
       type: 'category',
       label: 'Storage',
