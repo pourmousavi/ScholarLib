@@ -33,31 +33,39 @@ function HighlightToolbar({
       return
     }
 
-    const containerRect = containerRef.current.getBoundingClientRect()
+    const container = containerRef.current
+    const containerRect = container.getBoundingClientRect()
     const toolbarRect = toolbarRef.current.getBoundingClientRect()
     const selectionRect = selection.boundingRect
 
     // Find the page element to get correct offset
-    const pageElement = containerRef.current.querySelector(`[data-page-number="${selection.page}"]`)
+    const pageElement = container.querySelector(`[data-page-number="${selection.page}"]`)
     if (!pageElement) return
 
     const pageRect = pageElement.getBoundingClientRect()
 
-    // Position above the selection, centered
-    const selectionCenterX = pageRect.left + selectionRect.x1 + (selectionRect.x2 - selectionRect.x1) / 2
-    let left = selectionCenterX - containerRect.left - toolbarRect.width / 2
-    let top = pageRect.top + selectionRect.y1 - containerRect.top - toolbarRect.height - 8
+    // Get scroll offset - needed because toolbar is position:absolute inside scrolling container
+    const scrollTop = container.scrollTop
+    const scrollLeft = container.scrollLeft
 
-    // Keep within container bounds
+    // Position above the selection, centered
+    // Convert screen coordinates to content coordinates by adding scroll offset
+    const selectionCenterX = pageRect.left + selectionRect.x1 + (selectionRect.x2 - selectionRect.x1) / 2
+    let left = selectionCenterX - containerRect.left + scrollLeft - toolbarRect.width / 2
+    let top = pageRect.top + selectionRect.y1 - containerRect.top + scrollTop - toolbarRect.height - 12
+
+    // Keep within visible viewport bounds
     const padding = 8
-    if (left < padding) left = padding
-    if (left + toolbarRect.width > containerRect.width - padding) {
-      left = containerRect.width - toolbarRect.width - padding
-    }
+    const viewportLeft = scrollLeft + padding
+    const viewportRight = scrollLeft + containerRect.width - toolbarRect.width - padding
+    const viewportTop = scrollTop + padding
+
+    if (left < viewportLeft) left = viewportLeft
+    if (left > viewportRight) left = viewportRight
 
     // If not enough space above, show below
-    if (top < padding) {
-      top = pageRect.top + selectionRect.y2 - containerRect.top + 8
+    if (top < viewportTop) {
+      top = pageRect.top + selectionRect.y2 - containerRect.top + scrollTop + 8
     }
 
     setPosition({ top, left })

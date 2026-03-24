@@ -397,6 +397,17 @@
   text-align: left;
 }
 
+.annotationContext {
+  display: flex;
+  align-items: center;
+  font-size: 10px;
+  color: var(--accent);
+  background: var(--bg-selected);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-2);
+}
+
 /* Error state */
 .error {
   display: flex;

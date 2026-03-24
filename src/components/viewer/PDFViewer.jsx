@@ -5,7 +5,8 @@ import { useAnnotations, useTextSelection } from '../../hooks'
 import { useUIStore } from '../../store/uiStore'
 import { useAnnotationStore } from '../../store/annotationStore'
 import { Spinner, Btn } from '../ui'
-import { AnnotationLayer, HighlightToolbar, AnnotationPopover, AnnotationSidebar } from '../annotations'
+import { AnnotationLayer, HighlightToolbar, AnnotationPopover, AnnotationSidebar, AreaSelector } from '../annotations'
+import { exportToMarkdown } from '../../services/annotations'
 import PDFToolbar from './PDFToolbar'
 import FullscreenOverlay from '../layout/FullscreenOverlay'
 import styles from './PDFViewer.module.css'
@@ -38,6 +39,7 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
     highlightColor,
     showAnnotationSidebar,
     createHighlight,
+    createAreaAnnotation,
     updateComment,
     updateColor,
     deleteAnnotation,
@@ -58,6 +60,9 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
 
   // Text selection state
   const [textSelection, setTextSelection] = useState(null)
+
+  // Area selection mode
+  const [areaSelectMode, setAreaSelectMode] = useState(false)
 
   // Popover state
   const [popoverAnnotation, setPopoverAnnotation] = useState(null)
@@ -158,6 +163,64 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
       }
     }
   }, [])
+
+  // Toggle area selection mode
+  const handleToggleAreaSelect = useCallback(() => {
+    setAreaSelectMode(prev => !prev)
+    // Clear text selection when entering area mode
+    if (!areaSelectMode) {
+      setTextSelection(null)
+    }
+  }, [areaSelectMode])
+
+  // Handle area selection
+  const handleAreaSelected = useCallback((position, imageData) => {
+    // Normalize coordinates to PDF units
+    const scale = zoom / 100
+    const normalizedPosition = {
+      page: position.page,
+      rects: position.rects.map(r => ({
+        x1: r.x1 / scale,
+        y1: r.y1 / scale,
+        x2: r.x2 / scale,
+        y2: r.y2 / scale
+      })),
+      boundingRect: position.boundingRect ? {
+        x1: position.boundingRect.x1 / scale,
+        y1: position.boundingRect.y1 / scale,
+        x2: position.boundingRect.x2 / scale,
+        y2: position.boundingRect.y2 / scale
+      } : null
+    }
+
+    createAreaAnnotation(normalizedPosition, imageData, {
+      color: highlightColor
+    })
+
+    // Exit area mode after selection
+    setAreaSelectMode(false)
+  }, [zoom, createAreaAnnotation, highlightColor])
+
+  // Export annotations
+  const handleExportAnnotations = useCallback(() => {
+    if (annotations.length === 0) return
+
+    const markdown = exportToMarkdown(annotations, {
+      documentTitle: docId,
+      includeImages: false
+    })
+
+    // Download as file
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `annotations-${docId || 'document'}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [annotations, docId])
 
   // Notify parent of extracted text
   useEffect(() => {
@@ -338,6 +401,9 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
         annotationCount={annotationCount}
         onToggleAnnotations={toggleSidebar}
         showAnnotationSidebar={showAnnotationSidebar}
+        areaSelectMode={areaSelectMode}
+        onToggleAreaSelect={handleToggleAreaSelect}
+        onExportAnnotations={handleExportAnnotations}
       />
       <div className={styles.viewerContent}>
         <div className={styles.container} ref={containerRef} onClick={handleContainerClick}>
@@ -359,7 +425,7 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
           </div>
 
           {/* Highlight toolbar on text selection */}
-          {textSelection && (
+          {textSelection && !areaSelectMode && (
             <HighlightToolbar
               selection={textSelection}
               onHighlight={handleCreateHighlight}
@@ -369,6 +435,14 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
               containerRef={containerRef}
             />
           )}
+
+          {/* Area selector overlay */}
+          <AreaSelector
+            active={areaSelectMode}
+            onAreaSelected={handleAreaSelected}
+            onCancel={() => setAreaSelectMode(false)}
+            containerRef={containerRef}
+          />
 
           {/* Annotation popover */}
           {popoverAnnotation && popoverPosition && (

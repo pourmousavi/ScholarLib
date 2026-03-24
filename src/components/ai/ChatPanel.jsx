@@ -4,6 +4,7 @@ import { useAIStore } from '../../store/aiStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
+import { useAnnotationStore } from '../../store/annotationStore'
 import { aiService } from '../../services/ai/AIService'
 import { ollamaService } from '../../services/ai/OllamaService'
 import { claudeService } from '../../services/ai/ClaudeService'
@@ -68,6 +69,10 @@ export default function ChatPanel() {
   const folders = useLibraryStore((s) => s.folders)
   const updateDocument = useLibraryStore((s) => s.updateDocument)
   const selectedDoc = selectedDocId ? documents[selectedDocId] : null
+
+  // Get annotation count for current document
+  const currentAnnotations = useAnnotationStore((s) => s.currentAnnotations)
+  const annotationCount = currentAnnotations.length
 
   // Track previous selection to detect USER-initiated changes (not conversation loads)
   const prevSelectionRef = useRef({ docId: selectedDocId, folderId: selectedFolderId })
@@ -596,9 +601,19 @@ export default function ChatPanel() {
                 </Btn>
               </>
             ) : (
-              <span className={styles.emptyHint}>
-                AI will search indexed documents and provide cited answers
-              </span>
+              <>
+                <span className={styles.emptyHint}>
+                  AI will search indexed documents and provide cited answers
+                </span>
+                {scope.type === 'document' && annotationCount > 0 && (
+                  <span className={styles.annotationContext}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: 4 }}>
+                      <path d="M15.54 3.5l4.95 4.95-9.9 9.9H5.64v-4.95l9.9-9.9z"/>
+                    </svg>
+                    {annotationCount} annotation{annotationCount !== 1 ? 's' : ''} included in AI context
+                  </span>
+                )}
+              </>
             )}
           </div>
         ) : (
