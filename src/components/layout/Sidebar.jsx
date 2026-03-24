@@ -60,6 +60,10 @@ export default function Sidebar({ isMobile = false }) {
       setChecking(true)
       let available = false
 
+      // Detect mobile devices - don't auto-init heavy AI models on mobile
+      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+        (window.innerWidth < 768 && 'ontouchstart' in window)
+
       switch (provider) {
         case 'ollama':
           available = await ollamaService.isAvailable()
@@ -69,19 +73,26 @@ export default function Sidebar({ isMobile = false }) {
           if (webllmService.isReady()) {
             available = true
           } else if (webllmService.isSupported()) {
-            // Auto-initialize WebLLM (model files are cached in browser)
-            setWebLLMStatus('downloading')
-            try {
-              const savedModel = localStorage.getItem('sv_webllm_model') || 'Llama-3.2-3B-Instruct-q4f32_1-MLC'
-              await webllmService.initialize(savedModel, (progress) => {
-                setWebLLMProgress(progress.progress * 100)
-              })
-              setWebLLMStatus('ready')
-              available = true
-            } catch (error) {
-              console.error('WebLLM auto-init failed:', error)
+            // Skip auto-initialization on mobile devices to prevent crashes
+            if (isMobileDevice) {
+              console.log('WebLLM: Skipping auto-init on mobile device')
               setWebLLMStatus('idle')
               available = false
+            } else {
+              // Auto-initialize WebLLM on desktop (model files are cached in browser)
+              setWebLLMStatus('downloading')
+              try {
+                const savedModel = localStorage.getItem('sv_webllm_model') || 'Llama-3.2-3B-Instruct-q4f32_1-MLC'
+                await webllmService.initialize(savedModel, (progress) => {
+                  setWebLLMProgress(progress.progress * 100)
+                })
+                setWebLLMStatus('ready')
+                available = true
+              } catch (error) {
+                console.error('WebLLM auto-init failed:', error)
+                setWebLLMStatus('idle')
+                available = false
+              }
             }
           }
           break
