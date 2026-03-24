@@ -644,14 +644,10 @@
 }
 
 .modelDropdown {
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  margin-bottom: var(--space-1);
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-lg);
   min-width: 180px;
   z-index: 1100;
   overflow: hidden;

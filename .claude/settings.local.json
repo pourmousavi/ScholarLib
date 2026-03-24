@@ -14,7 +14,19 @@
       "Bash(grep:*)",
       "WebSearch",
       "Bash(git restore:*)",
-      "Bash(timeout 5 npm run dev:*)"
+      "Bash(timeout 5 npm run dev:*)",
+      "Bash(xargs:*)",
+      "Bash(ls:*)",
+      "Bash(gh run list:*)",
+      "WebFetch(domain:www.zotero.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(npm search:*)",
+      "Bash(wc:*)",
+      "Bash(npm info:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(npm view:*)"
     ]
   }
 }

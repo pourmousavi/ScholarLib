@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useAIStore } from '../../store/aiStore'
 import { tagService } from '../../services/tags/TagService'
@@ -14,6 +15,7 @@ export default function TagScopeSelector() {
   const [dropdownStyle, setDropdownStyle] = useState({})
   const containerRef = useRef(null)
   const triggerRef = useRef(null)
+  const dropdownRef = useRef(null)
 
   const tagRegistry = useLibraryStore((s) => s.tagRegistry)
   const documents = useLibraryStore((s) => s.documents)
@@ -55,14 +57,19 @@ export default function TagScopeSelector() {
 
   // Close on click outside
   useEffect(() => {
+    if (!isOpen) return
+
     const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+      const isInsideContainer = containerRef.current?.contains(e.target)
+      const isInsideDropdown = dropdownRef.current?.contains(e.target)
+
+      if (!isInsideContainer && !isInsideDropdown) {
         setIsOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [isOpen])
 
   // Calculate dropdown position when opening
   useEffect(() => {
@@ -111,8 +118,8 @@ export default function TagScopeSelector() {
         <span className={styles.arrow}>{isOpen ? '▲' : '▼'}</span>
       </button>
 
-      {isOpen && (
-        <div className={styles.dropdown} style={dropdownStyle}>
+      {isOpen && createPortal(
+        <div ref={dropdownRef} className={styles.dropdown} style={dropdownStyle}>
           <div className={styles.controls}>
             <input
               type="text"
@@ -180,7 +187,8 @@ export default function TagScopeSelector() {
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

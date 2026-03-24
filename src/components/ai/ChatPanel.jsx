@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import ReactMarkdown from 'react-markdown'
 import { useAIStore } from '../../store/aiStore'
 import { useLibraryStore } from '../../store/libraryStore'
@@ -31,12 +32,14 @@ export default function ChatPanel() {
   const [downloadStatus, setDownloadStatus] = useState('')
   const [selectedModel, setSelectedModel] = useState(null)
   const [showModelSelector, setShowModelSelector] = useState(false)
+  const [modelDropdownStyle, setModelDropdownStyle] = useState({})
   const [isIndexingDoc, setIsIndexingDoc] = useState(false)
   const [indexingProgress, setIndexingProgress] = useState('')
 
   const messagesRef = useRef(null)
   const inputRef = useRef(null)
   const modelSelectorRef = useRef(null)
+  const modelDropdownRef = useRef(null)
 
   const provider = useAIStore((s) => s.provider)
   const model = useAIStore((s) => s.model)
@@ -159,14 +162,30 @@ export default function ChatPanel() {
 
   // Close model selector when clicking outside
   useEffect(() => {
+    if (!showModelSelector) return
+
     const handleClickOutside = (e) => {
-      if (modelSelectorRef.current && !modelSelectorRef.current.contains(e.target)) {
+      const isInsideSelector = modelSelectorRef.current?.contains(e.target)
+      const isInsideDropdown = modelDropdownRef.current?.contains(e.target)
+
+      if (!isInsideSelector && !isInsideDropdown) {
         setShowModelSelector(false)
       }
     }
-    if (showModelSelector) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showModelSelector])
+
+  // Calculate model dropdown position when opening
+  useEffect(() => {
+    if (showModelSelector && modelSelectorRef.current) {
+      const rect = modelSelectorRef.current.getBoundingClientRect()
+      setModelDropdownStyle({
+        position: 'fixed',
+        bottom: window.innerHeight - rect.top + 4,
+        left: rect.left,
+        minWidth: rect.width,
+      })
     }
   }, [showModelSelector])
 
@@ -710,8 +729,8 @@ export default function ChatPanel() {
               >
                 {getModelDisplayName()} <span className={styles.modelArrow}>v</span>
               </button>
-              {showModelSelector && (
-                <div className={styles.modelDropdown}>
+              {showModelSelector && createPortal(
+                <div ref={modelDropdownRef} className={styles.modelDropdown} style={modelDropdownStyle}>
                   {availableModels.map((m) => (
                     <button
                       key={m.id}
@@ -722,7 +741,8 @@ export default function ChatPanel() {
                       <span className={styles.modelPrice}>{m.inputPrice}</span>
                     </button>
                   ))}
-                </div>
+                </div>,
+                document.body
               )}
             </div>
             {costEstimate && input.trim() && (

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useAIStore } from '../../store/aiStore'
 import { collectionService } from '../../services/tags/CollectionService'
@@ -14,6 +15,7 @@ export default function CollectionScopeSelector() {
   const [dropdownStyle, setDropdownStyle] = useState({})
   const containerRef = useRef(null)
   const triggerRef = useRef(null)
+  const dropdownRef = useRef(null)
 
   const collectionRegistry = useLibraryStore((s) => s.collectionRegistry)
   const tagRegistry = useLibraryStore((s) => s.tagRegistry)
@@ -64,14 +66,19 @@ export default function CollectionScopeSelector() {
 
   // Close on click outside
   useEffect(() => {
+    if (!isOpen) return
+
     const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+      const isInsideContainer = containerRef.current?.contains(e.target)
+      const isInsideDropdown = dropdownRef.current?.contains(e.target)
+
+      if (!isInsideContainer && !isInsideDropdown) {
         setIsOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [isOpen])
 
   // Calculate dropdown position when opening
   useEffect(() => {
@@ -122,8 +129,8 @@ export default function CollectionScopeSelector() {
         <span className={styles.arrow}>{isOpen ? '\u25B2' : '\u25BC'}</span>
       </button>
 
-      {isOpen && (
-        <div className={styles.dropdown} style={dropdownStyle}>
+      {isOpen && createPortal(
+        <div ref={dropdownRef} className={styles.dropdown} style={dropdownStyle}>
           <div className={styles.controls}>
             <input
               type="text"
@@ -191,7 +198,8 @@ export default function CollectionScopeSelector() {
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
