@@ -242,7 +242,7 @@ export async function importDocuments(parsedData, options, onProgress) {
     notesImported: 0
   }
 
-  const { createDocument, documents } = useLibraryStore.getState()
+  const { addDocument, documents } = useLibraryStore.getState()
   const total = parsedData.items.length
 
   // Send initial progress update
@@ -382,8 +382,8 @@ export async function importDocuments(parsedData, options, onProgress) {
         // Update existing document
         useLibraryStore.getState().updateDocument(doc.id, doc)
       } else {
-        // Create new document
-        createDocument(doc.folder_id, doc)
+        // Add new document to store
+        addDocument(doc)
       }
 
       results.imported.push({
