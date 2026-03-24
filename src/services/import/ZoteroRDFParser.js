@@ -58,7 +58,7 @@ export function parseZoteroRDF(rdfContent) {
   result.stats.collectionCount = result.collections.length
 
   // Build collection hierarchy
-  buildCollectionHierarchy(result.collections)
+  buildCollectionHierarchy(result.collections, doc)
 
   // Parse items (articles, books, etc.)
   const itemElements = findBibItems(doc)
@@ -376,11 +376,19 @@ function parseItemCollections(el) {
 function parseCollection(el) {
   const about = el.getAttributeNS(NS.rdf, 'about') || el.getAttribute('rdf:about')
 
+  // Look for parent collection reference (dcterms:isPartOf)
+  let parentId = null
+  const isPartOfEl = el.querySelector('isPartOf, *|isPartOf')
+  if (isPartOfEl) {
+    parentId = isPartOfEl.getAttributeNS(NS.rdf, 'resource') ||
+               isPartOfEl.getAttribute('rdf:resource')
+  }
+
   return {
     id: about,
     name: getTextContent(el, 'dc:title') || getTextContent(el, 'z:name'),
     key: getTextContent(el, 'z:key'),
-    parentId: null, // Will be resolved later
+    parentId: parentId,
     children: [],
 
     // Zotero-specific
@@ -392,16 +400,44 @@ function parseCollection(el) {
 /**
  * Build collection hierarchy from flat list
  * @param {Array} collections
+ * @param {Document} doc - The parsed RDF document for looking up hasPart references
  */
-function buildCollectionHierarchy(collections) {
+function buildCollectionHierarchy(collections, doc) {
   const byId = {}
   for (const coll of collections) {
     byId[coll.id] = coll
   }
 
-  // Zotero RDF uses hasPart/isPartOf for hierarchy
-  // This is a simplified approach
-  // In practice, you'd need to parse the actual hierarchy links
+  // Also check for hasPart references in the document
+  // Some Zotero exports use hasPart instead of isPartOf
+  if (doc) {
+    const hasPartElements = doc.querySelectorAll('hasPart, *|hasPart')
+    for (const el of hasPartElements) {
+      const parentEl = el.parentElement
+      if (!parentEl) continue
+
+      const parentId = parentEl.getAttributeNS(NS.rdf, 'about') ||
+                       parentEl.getAttribute('rdf:about')
+      const childId = el.getAttributeNS(NS.rdf, 'resource') ||
+                      el.getAttribute('rdf:resource')
+
+      if (parentId && childId && byId[childId] && byId[parentId]) {
+        byId[childId].parentId = parentId
+        if (!byId[parentId].children.includes(childId)) {
+          byId[parentId].children.push(childId)
+        }
+      }
+    }
+  }
+
+  // Build children arrays from parentId references
+  for (const coll of collections) {
+    if (coll.parentId && byId[coll.parentId]) {
+      if (!byId[coll.parentId].children.includes(coll.id)) {
+        byId[coll.parentId].children.push(coll.id)
+      }
+    }
+  }
 }
 
 /**

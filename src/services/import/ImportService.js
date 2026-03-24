@@ -88,10 +88,13 @@ export async function parseImportFile(sourceType, fileContent) {
  */
 export function createFolderMapping(collections, rootFolderId) {
   const mapping = {}
-  const { folders, addFolder } = useLibraryStore.getState()
+  const { folders, addFolder, updateFolder } = useLibraryStore.getState()
 
   // Sort collections by depth (parents before children)
   const sorted = sortCollectionsByDepth(collections)
+
+  // Keep track of newly created folders so we can update their children
+  const createdFolders = {}
 
   for (const collection of sorted) {
     // Determine parent folder ID
@@ -100,9 +103,11 @@ export function createFolderMapping(collections, rootFolderId) {
       ? mapping[collection.parentId]
       : (rootFolderId === 'root' ? null : rootFolderId)
 
+    // Get current folders (need fresh state as we're adding)
+    const currentFolders = useLibraryStore.getState().folders
+
     // Check if folder with same name already exists in parent
-    // folders is an array, not an object
-    const existingFolder = folders.find(
+    const existingFolder = currentFolders.find(
       f => f.name === collection.name && f.parent_id === parentFolderId
     )
 
@@ -121,12 +126,29 @@ export function createFolderMapping(collections, rootFolderId) {
         shared_with: [],
         color: null,
         icon: null,
-        sort_order: folders.filter(f => f.parent_id === parentFolderId).length
+        sort_order: currentFolders.filter(f => f.parent_id === parentFolderId).length
       }
 
       // Add to store
       addFolder(newFolder)
+      createdFolders[folderId] = newFolder
       mapping[collection.id] = folderId
+
+      // Update parent folder's children array
+      if (parentFolderId) {
+        const parentFolder = currentFolders.find(f => f.id === parentFolderId)
+        if (parentFolder) {
+          updateFolder(parentFolderId, {
+            children: [...(parentFolder.children || []), folderId]
+          })
+        } else if (createdFolders[parentFolderId]) {
+          // Parent was just created in this session
+          createdFolders[parentFolderId].children.push(folderId)
+          updateFolder(parentFolderId, {
+            children: createdFolders[parentFolderId].children
+          })
+        }
+      }
     }
   }
 
@@ -278,9 +300,11 @@ export async function importDocuments(parsedData, options, onProgress) {
       }
 
       // Determine target folder
+      // Note: defaultFolderId of 'root' means no folder (null)
+      const defaultFolder = options.defaultFolderId === 'root' ? null : options.defaultFolderId
       const folderId = item.collections.length > 0
-        ? folderMapping[item.collections[0]] || options.defaultFolderId
-        : options.defaultFolderId
+        ? folderMapping[item.collections[0]] || defaultFolder
+        : defaultFolder
 
       // Convert to ScholarLib document
       let doc = convertToScholarLibDocument(item, folderId)
