@@ -196,6 +196,16 @@ export default function ImportWizard({ onClose }) {
     }))
   }, [])
 
+  // Bulk duplicate resolution handler
+  const handleBulkDuplicateResolution = useCallback((action) => {
+    if (!importStats?.duplicates) return
+    const newResolutions = {}
+    for (const dup of importStats.duplicates) {
+      newResolutions[dup.index] = { action, existingDocId: dup.matches[0]?.docId }
+    }
+    setDuplicateResolutions(newResolutions)
+  }, [importStats?.duplicates])
+
   // Render step content
   const renderStep = () => {
     switch (step) {
@@ -223,6 +233,7 @@ export default function ImportWizard({ onClose }) {
             importStats={importStats}
             importOptions={importOptions}
             setImportOptions={setImportOptions}
+            existingDocCount={Object.keys(documents).length}
             onBack={() => setStep(1)}
             onNext={() => setStep(importStats?.duplicates?.length > 0 ? 4 : 3)}
           />
@@ -248,6 +259,7 @@ export default function ImportWizard({ onClose }) {
             duplicates={importStats?.duplicates || []}
             resolutions={duplicateResolutions}
             onResolve={handleDuplicateResolution}
+            onBulkResolve={handleBulkDuplicateResolution}
             onBack={() => setStep(3)}
             onNext={handleStartImport}
           />
@@ -415,6 +427,7 @@ function Step2_ScanResults({
   importStats,
   importOptions,
   setImportOptions,
+  existingDocCount,
   onBack,
   onNext
 }) {
@@ -445,9 +458,15 @@ function Step2_ScanResults({
         </div>
       </div>
 
+      {existingDocCount > 0 && (
+        <div className={styles.info}>
+          Your library already contains {existingDocCount} document(s)
+        </div>
+      )}
+
       {importStats?.duplicateCount > 0 && (
         <div className={styles.warning}>
-          Found {importStats.duplicateCount} potential duplicate(s)
+          Found {importStats.duplicateCount} potential duplicate(s) matching existing documents
         </div>
       )}
 
@@ -590,6 +609,7 @@ function Step4_ReviewDuplicates({
   duplicates,
   resolutions,
   onResolve,
+  onBulkResolve,
   onBack,
   onNext
 }) {
@@ -598,8 +618,16 @@ function Step4_ReviewDuplicates({
       <h3 className={styles.stepTitle}>Review Duplicates</h3>
 
       <p className={styles.hint}>
-        Found {duplicates.length} potential duplicate(s). Choose how to handle each:
+        Found {duplicates.length} potential duplicate(s) that match documents already in your library.
       </p>
+
+      {/* Bulk actions */}
+      <div className={styles.bulkActions}>
+        <span className={styles.bulkLabel}>Apply to all:</span>
+        <Btn small onClick={() => onBulkResolve('skip')}>Skip All</Btn>
+        <Btn small onClick={() => onBulkResolve('keep_both')}>Import All as New</Btn>
+        <Btn small onClick={() => onBulkResolve('replace')}>Replace All</Btn>
+      </div>
 
       <div className={styles.duplicateList}>
         {duplicates.slice(0, 5).map(dup => (

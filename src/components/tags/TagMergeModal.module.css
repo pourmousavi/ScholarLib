@@ -1,5 +1,9 @@
 .container {
   padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(90vh - 2px);
+  overflow-y: auto;
 }
 
 .title {
