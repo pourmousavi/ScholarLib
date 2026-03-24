@@ -238,7 +238,7 @@ export default function ImportWizard({ onClose }) {
             defaultFolderId={defaultFolderId}
             setDefaultFolderId={setDefaultFolderId}
             onBack={() => setStep(2)}
-            onNext={() => setStep(importStats?.duplicates?.length > 0 ? 4 : 5)}
+            onNext={importStats?.duplicates?.length > 0 ? () => setStep(4) : handleStartImport}
           />
         )
 
