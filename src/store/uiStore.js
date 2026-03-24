@@ -114,8 +114,8 @@ export const useUIStore = create((set) => ({
 
   // Mobile helper: close sidebar and show doclist
   showDocListMobile: () => set({ sidebarCollapsed: true, docListCollapsed: false }),
-  // Mobile helper: close doclist (after selecting a doc)
-  closeDocListMobile: () => set({ docListCollapsed: true }),
+  // Mobile helper: close doclist and switch to PDF panel (after selecting a doc)
+  closeDocListMobile: () => set({ docListCollapsed: true, activePanel: 'pdf' }),
   // Mobile helper: close all overlays
   closeAllOverlays: () => set({ sidebarCollapsed: true, docListCollapsed: true }),
 
