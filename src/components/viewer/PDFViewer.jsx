@@ -52,6 +52,7 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
     annotationCount
   } = useAnnotations(docId)
 
+  const viewerRef = useRef(null)
   const containerRef = useRef(null)
   const pageRefs = useRef({})
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -318,19 +319,17 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
-      containerRef.current?.parentElement?.requestFullscreen()
+      viewerRef.current?.requestFullscreen()
       setIsFullscreen(true)
-      // Show overlay automatically if split view is enabled
-      if (splitViewEnabled) {
-        setFullscreenOverlayVisible(true)
-      }
+      // Always show overlay in fullscreen for easy access to Notes/AI Chat
+      setFullscreenOverlayVisible(true)
     } else {
       document.exitFullscreen()
       setIsFullscreen(false)
       // Hide overlay when exiting fullscreen
       setFullscreenOverlayVisible(false)
     }
-  }, [splitViewEnabled, setFullscreenOverlayVisible])
+  }, [setFullscreenOverlayVisible])
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -387,7 +386,7 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
   }
 
   return (
-    <div className={styles.viewer}>
+    <div className={styles.viewer} ref={viewerRef}>
       <PDFToolbar
         currentPage={visiblePage}
         totalPages={totalPages}
