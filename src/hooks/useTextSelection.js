@@ -19,11 +19,17 @@ export function useTextSelection({ containerRef, currentPage, onSelectionChange 
 
   /**
    * Convert client rects to page-relative coordinates
+   * Uses the text layer element as reference since that's where selections happen
    */
   const getRectsRelativeToPage = useCallback((range, pageElement) => {
     if (!pageElement) return []
 
-    const pageRect = pageElement.getBoundingClientRect()
+    // Use text layer as reference point since that's where the selection spans are
+    // This ensures coordinates align exactly with where the text visually appears
+    const textLayer = pageElement.querySelector('[data-text-layer]')
+    const refElement = textLayer || pageElement
+    const refRect = refElement.getBoundingClientRect()
+
     const clientRects = range.getClientRects()
     const rects = []
 
@@ -32,10 +38,10 @@ export function useTextSelection({ containerRef, currentPage, onSelectionChange 
       if (rect.width === 0 || rect.height === 0) continue
 
       rects.push({
-        x1: rect.left - pageRect.left,
-        y1: rect.top - pageRect.top,
-        x2: rect.right - pageRect.left,
-        y2: rect.bottom - pageRect.top,
+        x1: rect.left - refRect.left,
+        y1: rect.top - refRect.top,
+        x2: rect.right - refRect.left,
+        y2: rect.bottom - refRect.top,
         width: rect.width,
         height: rect.height
       })

@@ -655,7 +655,7 @@ function PageCanvas({
       data-page-number={pageNumber}
     >
       <canvas ref={canvasRef} className={styles.page} />
-      <div ref={textLayerRef} className={styles.textLayer} />
+      <div ref={textLayerRef} className={styles.textLayer} data-text-layer />
       <AnnotationLayer
         annotations={annotations}
         selectedAnnotationId={selectedAnnotationId}
