@@ -106,11 +106,15 @@ const AnnotationHighlight = memo(function AnnotationHighlight({
       }}
     >
       {rects.map((rect, index) => {
+        // Add small padding to ensure full text coverage
+        // PDF.js text layer positions can be slightly narrower than rendered text
+        const rightPadding = type === 'highlight' ? 3 : 0
+
         const style = {
           position: 'absolute',
           left: `${rect.x1 * scaleFactor}px`,
           top: `${rect.y1 * scaleFactor}px`,
-          width: `${(rect.x2 - rect.x1) * scaleFactor}px`,
+          width: `${(rect.x2 - rect.x1) * scaleFactor + rightPadding}px`,
           height: `${(rect.y2 - rect.y1) * scaleFactor}px`,
           backgroundColor: type === 'underline' ? 'transparent' : backgroundColor,
           borderBottom: type === 'underline' ? `2px solid ${color}` : 'none',
