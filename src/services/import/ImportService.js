@@ -88,27 +88,44 @@ export async function parseImportFile(sourceType, fileContent) {
  */
 export function createFolderMapping(collections, rootFolderId) {
   const mapping = {}
-  const { folders, createFolder } = useLibraryStore.getState()
+  const { folders, addFolder } = useLibraryStore.getState()
 
   // Sort collections by depth (parents before children)
   const sorted = sortCollectionsByDepth(collections)
 
   for (const collection of sorted) {
     // Determine parent folder ID
+    // Use null for root level (rootFolderId === 'root' means no parent)
     const parentFolderId = collection.parentId
       ? mapping[collection.parentId]
-      : rootFolderId
+      : (rootFolderId === 'root' ? null : rootFolderId)
 
     // Check if folder with same name already exists in parent
-    const existingFolder = Object.values(folders).find(
+    // folders is an array, not an object
+    const existingFolder = folders.find(
       f => f.name === collection.name && f.parent_id === parentFolderId
     )
 
     if (existingFolder) {
       mapping[collection.id] = existingFolder.id
     } else {
-      // Create new folder
-      const folderId = createFolder(collection.name, parentFolderId)
+      // Create new folder object
+      const folderId = `f_${nanoid(10)}`
+      const newFolder = {
+        id: folderId,
+        name: collection.name,
+        slug: collection.name.toLowerCase().replace(/\s+/g, '-'),
+        parent_id: parentFolderId,
+        children: [],
+        created_at: new Date().toISOString(),
+        shared_with: [],
+        color: null,
+        icon: null,
+        sort_order: folders.filter(f => f.parent_id === parentFolderId).length
+      }
+
+      // Add to store
+      addFolder(newFolder)
       mapping[collection.id] = folderId
     }
   }
