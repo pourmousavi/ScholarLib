@@ -8,9 +8,10 @@ class TextChunker {
    * @param {Object} options - Chunking options
    * @param {number} options.chunkSize - Words per chunk (default 512)
    * @param {number} options.overlap - Overlap words between chunks (default 50)
+   * @param {Array} options.annotations - Optional annotations to include in context
    * @returns {Array<{text: string, index: number}>}
    */
-  chunk(text, { chunkSize = 512, overlap = 50 } = {}) {
+  chunk(text, { chunkSize = 512, overlap = 50, annotations = [] } = {}) {
     if (!text || typeof text !== 'string') {
       return []
     }
@@ -22,7 +23,7 @@ class TextChunker {
 
     while (i < words.length) {
       const chunkWords = words.slice(i, i + chunkSize)
-      const chunkText = chunkWords.join(' ')
+      let chunkText = chunkWords.join(' ')
 
       if (chunkText.trim()) {
         chunks.push({
@@ -37,7 +38,69 @@ class TextChunker {
       i += chunkSize - overlap
     }
 
+    // If there are annotations, create a dedicated annotation chunk
+    if (annotations && annotations.length > 0) {
+      const annotationText = this.formatAnnotationsForEmbedding(annotations)
+      if (annotationText.trim()) {
+        chunks.push({
+          text: annotationText,
+          index: index,
+          wordStart: -1, // Special marker for annotation chunk
+          wordEnd: -1,
+          isAnnotationChunk: true
+        })
+      }
+    }
+
     return chunks
+  }
+
+  /**
+   * Format annotations for embedding
+   * Includes highlighted text and user comments
+   * @param {Array} annotations - Annotations from AnnotationService
+   * @returns {string} Formatted annotation text
+   */
+  formatAnnotationsForEmbedding(annotations) {
+    // Filter annotations that should be included in AI context
+    const includedAnnotations = annotations.filter(
+      a => a.ai_context?.include_in_embeddings !== false
+    )
+
+    if (includedAnnotations.length === 0) {
+      return ''
+    }
+
+    const parts = ['[USER ANNOTATIONS AND HIGHLIGHTS]']
+
+    // Sort by page for logical ordering
+    includedAnnotations.sort((a, b) => (a.position?.page || 0) - (b.position?.page || 0))
+
+    for (const annotation of includedAnnotations) {
+      const highlightText = annotation.content?.text || ''
+      const comment = annotation.comment || ''
+      const page = annotation.position?.page
+
+      if (highlightText || comment) {
+        let entry = ''
+
+        if (highlightText) {
+          entry += `[HIGHLIGHTED on page ${page}]: "${highlightText}"`
+        }
+
+        if (comment) {
+          if (highlightText) {
+            entry += ` [USER NOTE]: ${comment}`
+          } else {
+            entry += `[USER NOTE on page ${page}]: ${comment}`
+          }
+        }
+
+        parts.push(entry)
+      }
+    }
+
+    return parts.join('\n')
   }
 
   /**

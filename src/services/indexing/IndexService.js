@@ -9,6 +9,7 @@ import { embeddingService } from './EmbeddingService'
 import { useLibraryStore } from '../../store/libraryStore'
 import { LibraryService } from '../library/LibraryService'
 import { collectionService } from '../tags/CollectionService'
+import { AnnotationService } from '../annotations'
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}pdf.worker.min.mjs`
@@ -108,10 +109,13 @@ class IndexService {
         (page, total) => onProgress?.({ stage: 'extracting', docId, progress: page / total })
       )
 
-      // 2. Chunk text
+      // 2. Chunk text (include annotations in context)
       onProgress?.({ stage: 'chunking', docId, progress: 0 })
       const cleanedText = textChunker.cleanText(text)
-      const chunks = textChunker.chunk(cleanedText)
+
+      // Get annotations for this document to include in embedding context
+      const annotations = AnnotationService.getAnnotationsForAI(docId)
+      const chunks = textChunker.chunk(cleanedText, { annotations })
 
       if (chunks.length === 0) {
         throw { code: 'NO_TEXT', message: 'No text could be extracted from PDF' }

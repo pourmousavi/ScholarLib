@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import * as pdfjsLib from 'pdfjs-dist'
 import { usePDFLoader } from '../../hooks/usePDFLoader'
+import { useAnnotations, useTextSelection } from '../../hooks'
 import { useUIStore } from '../../store/uiStore'
+import { useAnnotationStore } from '../../store/annotationStore'
 import { Spinner, Btn } from '../ui'
+import { AnnotationLayer, HighlightToolbar, AnnotationPopover, AnnotationSidebar } from '../annotations'
 import PDFToolbar from './PDFToolbar'
 import FullscreenOverlay from '../layout/FullscreenOverlay'
 import styles from './PDFViewer.module.css'
@@ -27,11 +31,112 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
     retry
   } = usePDFLoader(url, pdfDefaultZoom)
 
+  // Annotation state and methods
+  const {
+    annotations,
+    selectedAnnotationId,
+    highlightColor,
+    showAnnotationSidebar,
+    createHighlight,
+    updateComment,
+    updateColor,
+    deleteAnnotation,
+    selectAnnotation,
+    clearSelection,
+    setColor,
+    toggleSidebar,
+    setSidebar,
+    getAnnotationsForPage,
+    annotationCount
+  } = useAnnotations(docId)
+
   const containerRef = useRef(null)
   const pageRefs = useRef({})
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [renderedPages, setRenderedPages] = useState([])
   const [visiblePage, setVisiblePage] = useState(1)
+
+  // Text selection state
+  const [textSelection, setTextSelection] = useState(null)
+
+  // Popover state
+  const [popoverAnnotation, setPopoverAnnotation] = useState(null)
+  const [popoverPosition, setPopoverPosition] = useState(null)
+
+  // Handle text selection from pages
+  const handleTextSelection = useCallback((selection) => {
+    setTextSelection(selection)
+    // Clear annotation popover when selecting text
+    if (selection) {
+      setPopoverAnnotation(null)
+      clearSelection()
+    }
+  }, [clearSelection])
+
+  // Create highlight from selection
+  const handleCreateHighlight = useCallback((options = {}) => {
+    if (!textSelection) return
+
+    const annotation = createHighlight(textSelection, {
+      color: highlightColor,
+      comment: options.withComment ? '' : undefined
+    })
+
+    // Clear selection
+    setTextSelection(null)
+    window.getSelection()?.removeAllRanges()
+
+    // Open popover if creating with comment
+    if (options.withComment && annotation) {
+      setPopoverAnnotation(annotation)
+      setPopoverPosition({
+        top: textSelection.boundingRect.y2 + 8,
+        left: textSelection.boundingRect.x1
+      })
+    }
+  }, [textSelection, createHighlight, highlightColor])
+
+  // Handle annotation click
+  const handleAnnotationClick = useCallback((annotation) => {
+    selectAnnotation(annotation.id)
+    setTextSelection(null)
+
+    // Find page element for positioning
+    const pageElement = containerRef.current?.querySelector(
+      `[data-page-number="${annotation.position?.page}"]`
+    )
+    if (pageElement) {
+      const pageRect = pageElement.getBoundingClientRect()
+      const containerRect = containerRef.current.getBoundingClientRect()
+      const boundingRect = annotation.position?.boundingRect
+
+      if (boundingRect) {
+        setPopoverPosition({
+          top: pageRect.top - containerRect.top + boundingRect.y2 + 8,
+          left: pageRect.left - containerRect.left + boundingRect.x1
+        })
+        setPopoverAnnotation(annotation)
+      }
+    }
+  }, [selectAnnotation])
+
+  // Close popover
+  const handleClosePopover = useCallback(() => {
+    setPopoverAnnotation(null)
+    setPopoverPosition(null)
+    clearSelection()
+  }, [clearSelection])
+
+  // Navigate to annotation (from sidebar)
+  const handleNavigateToAnnotation = useCallback((annotation) => {
+    const pageNum = annotation.position?.page
+    if (pageNum) {
+      const pageRef = pageRefs.current[pageNum]
+      if (pageRef) {
+        pageRef.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+  }, [])
 
   // Notify parent of extracted text
   useEffect(() => {
@@ -209,31 +314,95 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
         onZoomOut={zoomOut}
         onToggleFullscreen={toggleFullscreen}
         isFullscreen={isFullscreen}
+        annotationCount={annotationCount}
+        onToggleAnnotations={toggleSidebar}
+        showAnnotationSidebar={showAnnotationSidebar}
       />
-      <div className={styles.container} ref={containerRef}>
-        <div className={styles.pages}>
-          {renderedPages.map((pageNum) => (
-            <PageCanvas
-              key={pageNum}
-              pdf={pdf}
-              pageNumber={pageNum}
-              zoom={zoom}
-              setRef={(ref) => setPageRef(pageNum, ref)}
+      <div className={styles.viewerContent}>
+        <div className={styles.container} ref={containerRef}>
+          <div className={styles.pages}>
+            {renderedPages.map((pageNum) => (
+              <PageCanvas
+                key={pageNum}
+                pdf={pdf}
+                pageNumber={pageNum}
+                zoom={zoom}
+                setRef={(ref) => setPageRef(pageNum, ref)}
+                annotations={getAnnotationsForPage(pageNum)}
+                selectedAnnotationId={selectedAnnotationId}
+                onAnnotationClick={handleAnnotationClick}
+                onTextSelection={handleTextSelection}
+                containerRef={containerRef}
+              />
+            ))}
+          </div>
+
+          {/* Highlight toolbar on text selection */}
+          {textSelection && (
+            <HighlightToolbar
+              selection={textSelection}
+              onHighlight={handleCreateHighlight}
+              onColorChange={setColor}
+              currentColor={highlightColor}
+              onClose={() => setTextSelection(null)}
+              containerRef={containerRef}
             />
-          ))}
+          )}
+
+          {/* Annotation popover */}
+          {popoverAnnotation && popoverPosition && (
+            <AnnotationPopover
+              annotation={popoverAnnotation}
+              onUpdateComment={updateComment}
+              onUpdateColor={updateColor}
+              onDelete={deleteAnnotation}
+              onClose={handleClosePopover}
+              position={popoverPosition}
+            />
+          )}
         </div>
+
+        {/* Annotation sidebar */}
+        {showAnnotationSidebar && (
+          <div className={styles.annotationSidebar}>
+            <AnnotationSidebar
+              annotations={annotations}
+              selectedAnnotationId={selectedAnnotationId}
+              onSelectAnnotation={selectAnnotation}
+              onUpdateComment={updateComment}
+              onUpdateColor={updateColor}
+              onDelete={deleteAnnotation}
+              onNavigateToAnnotation={handleNavigateToAnnotation}
+              onClose={() => setSidebar(false)}
+            />
+          </div>
+        )}
       </div>
+
       {/* Fullscreen overlay for Notes/AI Chat */}
       {isFullscreen && splitViewEnabled && <FullscreenOverlay />}
     </div>
   )
 }
 
-function PageCanvas({ pdf, pageNumber, zoom, setRef }) {
+function PageCanvas({
+  pdf,
+  pageNumber,
+  zoom,
+  setRef,
+  annotations,
+  selectedAnnotationId,
+  onAnnotationClick,
+  onTextSelection,
+  containerRef
+}) {
   const canvasRef = useRef(null)
+  const textLayerRef = useRef(null)
   const wrapperRef = useRef(null)
   const [isRendering, setIsRendering] = useState(false)
+  const [pageViewport, setPageViewport] = useState(null)
   const renderTaskRef = useRef(null)
+  const textRenderTaskRef = useRef(null)
 
   // Set ref for parent to track
   useEffect(() => {
@@ -241,6 +410,17 @@ function PageCanvas({ pdf, pageNumber, zoom, setRef }) {
       setRef(wrapperRef.current)
     }
   }, [setRef])
+
+  // Text selection tracking
+  const { selection, clearSelection } = useTextSelection({
+    containerRef: wrapperRef,
+    currentPage: pageNumber,
+    onSelectionChange: (sel) => {
+      if (sel) {
+        onTextSelection?.({ ...sel, page: pageNumber })
+      }
+    }
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -256,6 +436,16 @@ function PageCanvas({ pdf, pageNumber, zoom, setRef }) {
           // Ignore
         }
         renderTaskRef.current = null
+      }
+
+      // Cancel any existing text render
+      if (textRenderTaskRef.current) {
+        try {
+          textRenderTaskRef.current.cancel()
+        } catch (e) {
+          // Ignore
+        }
+        textRenderTaskRef.current = null
       }
 
       setIsRendering(true)
@@ -277,6 +467,9 @@ function PageCanvas({ pdf, pageNumber, zoom, setRef }) {
 
         const scale = zoom / 100
         const viewport = page.getViewport({ scale: scale * 1.5 }) // 1.5 for higher resolution
+        const displayViewport = page.getViewport({ scale }) // For text layer
+
+        setPageViewport(displayViewport)
 
         const canvas = canvasRef.current
         const context = canvas.getContext('2d')
@@ -295,6 +488,32 @@ function PageCanvas({ pdf, pageNumber, zoom, setRef }) {
         renderTaskRef.current = renderTask
 
         await renderTask.promise
+
+        // Render text layer after canvas
+        if (!cancelled && textLayerRef.current) {
+          // Clear previous text layer
+          textLayerRef.current.innerHTML = ''
+
+          const textContent = await page.getTextContent()
+
+          if (cancelled) return
+
+          // Set text layer size to match display viewport
+          textLayerRef.current.style.width = `${displayViewport.width}px`
+          textLayerRef.current.style.height = `${displayViewport.height}px`
+
+          // Use PDF.js text layer rendering
+          const textLayer = new pdfjsLib.TextLayer({
+            textContentSource: textContent,
+            container: textLayerRef.current,
+            viewport: displayViewport
+          })
+
+          textRenderTaskRef.current = textLayer
+
+          await textLayer.render()
+        }
+
         if (!cancelled) {
           setIsRendering(false)
         }
@@ -323,12 +542,31 @@ function PageCanvas({ pdf, pageNumber, zoom, setRef }) {
         }
         renderTaskRef.current = null
       }
+      if (textRenderTaskRef.current) {
+        try {
+          textRenderTaskRef.current.cancel()
+        } catch (e) {
+          // Ignore
+        }
+        textRenderTaskRef.current = null
+      }
     }
   }, [pdf, pageNumber, zoom])
 
   return (
-    <div className={styles.pageWrapper} ref={wrapperRef}>
+    <div
+      className={styles.pageWrapper}
+      ref={wrapperRef}
+      data-page-number={pageNumber}
+    >
       <canvas ref={canvasRef} className={styles.page} />
+      <div ref={textLayerRef} className={styles.textLayer} />
+      <AnnotationLayer
+        annotations={annotations}
+        selectedAnnotationId={selectedAnnotationId}
+        onAnnotationClick={onAnnotationClick}
+        scale={zoom}
+      />
       {isRendering && (
         <div className={styles.pageLoading}>
           <Spinner size={20} />

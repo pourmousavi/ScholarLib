@@ -586,3 +586,94 @@ The actual embeddings are stored as a flat binary file `embeddings_v1.bin`:
 - Format: contiguous Float32Array, 768 floats per chunk
 - Chunk at position `i` corresponds to chunk metadata at `index_meta.docs[doc_id].chunk_offset + i`
 - Separate `chunks_meta.json` stores `{ doc_id, chunk_index, page_approx, text_preview }` for each chunk
+
+---
+
+## annotations.json
+
+Stored at: `/ScholarLib/_system/annotations.json`
+
+PDF annotations (highlights, underlines, area selections, notes) created by users or imported from Zotero.
+
+```json
+{
+  "version": "1.0",
+  "annotations": {
+    "[doc-id]": [
+      {
+        "id": "ann_[nanoid]",
+        "type": "highlight | area | underline | note",
+        "color": "#FFEB3B",
+        "created_at": "ISO8601",
+        "updated_at": "ISO8601",
+        "position": {
+          "page": 3,
+          "rects": [
+            { "x1": 72.5, "y1": 680.2, "x2": 540.0, "y2": 692.5 }
+          ],
+          "boundingRect": { "x1": 72.5, "y1": 665.0, "x2": 540.0, "y2": 692.5 }
+        },
+        "content": {
+          "text": "Highlighted text from PDF",
+          "image": null
+        },
+        "comment": "User note attached to highlight",
+        "tags": ["important"],
+        "ai_context": {
+          "include_in_embeddings": true
+        },
+        "source": "user | zotero_import | pdf_import"
+      }
+    ]
+  }
+}
+```
+
+### Annotation Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique ID prefixed with `ann_` |
+| `type` | string | Type of annotation: "highlight", "area", "underline", or "note" |
+| `color` | string | Hex color code |
+| `created_at` | ISO8601 | When the annotation was created |
+| `updated_at` | ISO8601 | When the annotation was last modified |
+| `position.page` | number | Page number (1-indexed) |
+| `position.rects` | array | Array of rectangles defining the annotation area |
+| `position.boundingRect` | object | Bounding rectangle encompassing all rects |
+| `content.text` | string | Highlighted/selected text (empty for area annotations) |
+| `content.image` | string\|null | Base64 image data for area annotations |
+| `comment` | string | User comment attached to annotation |
+| `tags` | string[] | Tag slugs referencing tag_registry |
+| `ai_context.include_in_embeddings` | boolean | Whether to include in AI indexing |
+| `source` | string | Origin of annotation: "user", "zotero_import", or "pdf_import" |
+
+### Annotation Color Presets
+
+```javascript
+const ANNOTATION_COLORS = {
+  yellow: '#FFEB3B',
+  red: '#F44336',
+  green: '#4CAF50',
+  blue: '#2196F3',
+  purple: '#9C27B0',
+  orange: '#FF9800',
+  gray: '#9E9E9E',
+  cyan: '#00BCD4'
+}
+```
+
+### AI Integration
+
+When a document is indexed for AI search, annotations are included in the embedding context:
+- Highlighted text is prefixed with `[HIGHLIGHTED on page X]:`
+- User comments are prefixed with `[USER NOTE]:`
+- This allows AI to reference user annotations when answering questions
+- Annotations with `ai_context.include_in_embeddings: false` are excluded
+
+### Coordinate System
+
+Annotation coordinates use PDF coordinate system:
+- Origin is at top-left of page (after conversion from PDF's bottom-left origin)
+- Units are in PDF points (1 point = 1/72 inch)
+- `rects` array supports multi-line highlights with multiple rectangles

@@ -1,3 +1,5 @@
 export { useToast, useToastStore } from './useToast'
 export { usePWAInstall } from './usePWAInstall'
 export { useOnlineStatus } from './useOnlineStatus'
+export { useAnnotations } from './useAnnotations'
+export { useTextSelection } from './useTextSelection'

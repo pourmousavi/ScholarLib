@@ -7,11 +7,18 @@
   box-sizing: border-box;
 }
 
+.viewerContent {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
 .container {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-6);
   scroll-behavior: smooth;
+  position: relative;
 }
 
 .pages {
@@ -34,6 +41,63 @@
   border-radius: var(--radius-sm);
 }
 
+/* PDF.js Text Layer - for text selection */
+.textLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  opacity: 0.25;
+  line-height: 1.0;
+  z-index: 1;
+}
+
+.textLayer > span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.textLayer ::selection {
+  background: rgba(0, 0, 255, 0.3);
+}
+
+.textLayer .highlight {
+  margin: -1px;
+  padding: 1px;
+  background-color: rgba(180, 0, 170, 0.2);
+  border-radius: 4px;
+}
+
+.textLayer .highlight.appended {
+  position: initial;
+}
+
+.textLayer .highlight.begin {
+  border-radius: 4px 0 0 4px;
+}
+
+.textLayer .highlight.end {
+  border-radius: 0 4px 4px 0;
+}
+
+.textLayer .highlight.middle {
+  border-radius: 0;
+}
+
+.textLayer .highlight.selected {
+  background-color: rgba(0, 100, 0, 0.2);
+}
+
+/* Ensure text layer spans don't block annotation layer */
+.textLayer > span {
+  pointer-events: auto;
+}
+
 .pageLoading {
   position: absolute;
   inset: 0;
@@ -42,6 +106,14 @@
   justify-content: center;
   background: rgba(255, 255, 255, 0.8);
   border-radius: var(--radius-sm);
+  z-index: 10;
+}
+
+.annotationSidebar {
+  width: 300px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-subtle);
+  overflow: hidden;
 }
 
 .placeholder {
