@@ -8,19 +8,58 @@ import { ContextMenu, ShareIcon, LinkIcon, UsersIcon, RenameIcon, UnshareIcon, F
 import styles from './FolderTree.module.css'
 
 export default function FolderTree() {
+  const [collapsed, setCollapsed] = useState(false)
+
   const folders = useLibraryStore((s) => s.folders)
+  const documents = useLibraryStore((s) => s.documents)
+  const setShowModal = useUIStore((s) => s.setShowModal)
+
   const rootFolders = folders
     .filter(f => f.parent_id === null)
     .sort((a, b) => a.sort_order - b.sort_order)
 
+  const folderCount = folders.length
+  const docCount = Object.keys(documents).length
+
   return (
     <nav className={styles.tree} aria-label="Folder navigation">
-      <div className={styles.sectionLabel} id="folders-label">FOLDERS</div>
-      <div role="tree" aria-labelledby="folders-label">
-        {rootFolders.map((folder) => (
-          <FolderNode key={folder.id} folder={folder} depth={0} />
-        ))}
+      <div className={styles.headerRow}>
+        <button
+          className={styles.header}
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          <span className={styles.headerIcon}>{collapsed ? '▸' : '▾'}</span>
+          <span className={styles.headerTitle}>Folders</span>
+          <span className={styles.headerCount}>{folderCount}</span>
+        </button>
+        <div className={styles.headerActions}>
+          <button
+            className={styles.actionBtn}
+            onClick={() => setShowModal('new-folder')}
+            title="Create new folder"
+          >
+            +
+          </button>
+        </div>
       </div>
+      {!collapsed && (
+        <div role="tree" aria-labelledby="folders-label" className={styles.foldersList}>
+          {rootFolders.map((folder) => (
+            <FolderNode key={folder.id} folder={folder} depth={0} />
+          ))}
+          {rootFolders.length === 0 && (
+            <div className={styles.emptyState}>
+              <p>No folders yet</p>
+              <button
+                className={styles.createFirstBtn}
+                onClick={() => setShowModal('new-folder')}
+              >
+                + Create your first folder
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </nav>
   )
 }
