@@ -15,6 +15,7 @@ import { getDeviceType, getDeviceName, getRecommendedProviders, DEVICE_TYPES, is
 import { useToast } from '../../hooks/useToast'
 import Modal from '../ui/Modal'
 import MigrationWizard from '../migration/MigrationWizard'
+import { ImportWizard } from '../import'
 import styles from './SettingsModal.module.css'
 
 // SVG Icons for settings sections
@@ -110,6 +111,7 @@ export default function SettingsModal({ onClose }) {
   // Migration state
   const [showMigrationWizard, setShowMigrationWizard] = useState(false)
   const [migrationMode, setMigrationMode] = useState(null) // 'export' or 'import'
+  const [showZoteroImport, setShowZoteroImport] = useState(false)
 
   const provider = useAIStore((s) => s.provider)
   const model = useAIStore((s) => s.model)
@@ -991,6 +993,16 @@ export default function SettingsModal({ onClose }) {
     window.location.reload()
   }
 
+  const handleOpenZoteroImport = () => {
+    setShowZoteroImport(true)
+  }
+
+  const handleZoteroImportClose = () => {
+    setShowZoteroImport(false)
+    // Reload library data after import to reflect changes
+    window.location.reload()
+  }
+
   const renderStorageSection = () => (
     <div className={styles.section}>
       <h3 className={styles.sectionTitle}>Storage Provider</h3>
@@ -1031,6 +1043,20 @@ export default function SettingsModal({ onClose }) {
 
       {!isDemoMode && (
         <>
+          <h3 className={styles.sectionTitle} style={{ marginTop: 32 }}>Import from Reference Manager</h3>
+          <p className={styles.hint}>
+            Import your library from Zotero, including collections, tags, notes, and PDF attachments.
+          </p>
+
+          <div className={styles.actions} style={{ marginTop: 12 }}>
+            <button
+              className={styles.primaryBtn}
+              onClick={handleOpenZoteroImport}
+            >
+              Import from Zotero
+            </button>
+          </div>
+
           <h3 className={styles.sectionTitle} style={{ marginTop: 32 }}>Migration</h3>
           <p className={styles.hint}>
             Moving to a different storage provider? Export your library data and import it after connecting to the new provider.
@@ -1578,6 +1604,12 @@ export default function SettingsModal({ onClose }) {
           provider={storageProvider}
           onClose={handleMigrationClose}
           onComplete={handleMigrationComplete}
+        />
+      )}
+
+      {showZoteroImport && (
+        <ImportWizard
+          onClose={handleZoteroImportClose}
         />
       )}
     </>
