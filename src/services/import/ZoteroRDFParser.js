@@ -179,14 +179,37 @@ function parseItem(el, doc) {
   }
 
   // Parse links to attachments
-  const linkElements = el.querySelectorAll('link, *|link')
-  for (const linkEl of linkElements) {
-    const resource = linkEl.getAttributeNS(NS.rdf, 'resource') ||
-                     linkEl.getAttribute('rdf:resource')
-    if (resource) {
-      item.attachmentIds.push(resource)
+  // Try multiple selectors for finding attachment links
+  const linkSelectors = [
+    'link[*|resource]',
+    '*|link[*|resource]',
+    'link',
+    '*|link',
+    'resource'
+  ]
+
+  for (const selector of linkSelectors) {
+    try {
+      const linkElements = el.querySelectorAll(selector)
+      for (const linkEl of linkElements) {
+        const resource = linkEl.getAttributeNS(NS.rdf, 'resource') ||
+                         linkEl.getAttribute('rdf:resource') ||
+                         linkEl.getAttribute('resource') ||
+                         linkEl.textContent?.trim()
+        if (resource && !item.attachmentIds.includes(resource)) {
+          item.attachmentIds.push(resource)
+        }
+      }
+    } catch (e) {
+      // Some selectors might not work in all browsers
     }
   }
+
+  console.log('[ZoteroRDFParser] Parsed item:', {
+    id: item.id,
+    title: item.title,
+    attachmentIds: item.attachmentIds
+  })
 
   return item
 }
@@ -465,14 +488,46 @@ function parseNote(el) {
 function parseAttachment(el) {
   const about = el.getAttributeNS(NS.rdf, 'about') || el.getAttribute('rdf:about')
 
-  return {
+  // Get the path - try multiple elements
+  let path = getTextContent(el, 'z:path') ||
+             getTextContent(el, 'link:path') ||
+             getTextContent(el, 'resource')
+
+  // If path looks like a URL to a PDF, try to extract the filename
+  const url = getTextContent(el, 'z:url') || getTextContent(el, 'dc:identifier')
+  if (!path && url && url.toLowerCase().endsWith('.pdf')) {
+    path = url.split('/').pop()
+  }
+
+  // Get mime type
+  let mimeType = getTextContent(el, 'z:mimeType') ||
+                 getTextContent(el, 'link:type') ||
+                 getTextContent(el, 'dc:format')
+
+  // If no mimeType but path ends in .pdf, assume PDF
+  if (!mimeType && path?.toLowerCase().endsWith('.pdf')) {
+    mimeType = 'application/pdf'
+  }
+
+  const title = getTextContent(el, 'dc:title')
+
+  // If no mimeType but title ends in .pdf, assume PDF
+  if (!mimeType && title?.toLowerCase().endsWith('.pdf')) {
+    mimeType = 'application/pdf'
+  }
+
+  const attachment = {
     id: about,
-    title: getTextContent(el, 'dc:title'),
-    path: getTextContent(el, 'z:path') || getTextContent(el, 'link:path'),
-    url: getTextContent(el, 'z:url') || getTextContent(el, 'dc:identifier'),
-    mimeType: getTextContent(el, 'z:mimeType') || getTextContent(el, 'link:type'),
+    title: title,
+    path: path,
+    url: url,
+    mimeType: mimeType,
     parentItemId: null // Will be resolved
   }
+
+  console.log('[ZoteroRDFParser] Parsed attachment:', attachment)
+
+  return attachment
 }
 
 /**
@@ -483,14 +538,54 @@ function linkAttachmentsToItems(result) {
   const attachmentById = {}
   for (const att of result.attachments) {
     attachmentById[att.id] = att
+    // Also index by just the key part if ID is a full URL
+    if (att.id && att.id.includes('#')) {
+      const keyPart = att.id.split('#').pop()
+      attachmentById['#' + keyPart] = att
+    }
   }
+
+  console.log('[ZoteroRDFParser] Attachment mapping:', {
+    totalAttachments: result.attachments.length,
+    attachmentIds: result.attachments.map(a => a.id)
+  })
 
   for (const item of result.items) {
     for (const attId of item.attachmentIds) {
+      // Try direct match
       if (attachmentById[attId]) {
         attachmentById[attId].parentItemId = item.id
+        continue
+      }
+
+      // Try partial match (in case of URL vs local ID differences)
+      for (const att of result.attachments) {
+        if (!att.parentItemId && (
+          att.id === attId ||
+          att.id?.endsWith(attId) ||
+          attId?.endsWith(att.id?.split('#').pop() || '') ||
+          att.id?.includes(attId.split('#').pop() || '')
+        )) {
+          att.parentItemId = item.id
+          console.log('[ZoteroRDFParser] Linked attachment by partial match:', {
+            attachmentId: att.id,
+            itemId: item.id,
+            searchedId: attId
+          })
+          break
+        }
       }
     }
+  }
+
+  // Log unlinked attachments
+  const unlinkedAttachments = result.attachments.filter(a => !a.parentItemId)
+  if (unlinkedAttachments.length > 0) {
+    console.log('[ZoteroRDFParser] Unlinked attachments:', unlinkedAttachments.map(a => ({
+      id: a.id,
+      title: a.title,
+      path: a.path
+    })))
   }
 }
 

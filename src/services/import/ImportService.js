@@ -328,9 +328,42 @@ export async function importDocuments(parsedData, options, onProgress) {
       }
 
       // Find and upload PDF attachment
-      const attachment = parsedData.attachments.find(
+      // Try multiple matching strategies for finding the attachment
+      let attachment = parsedData.attachments.find(
         a => a.parentItemId === item.id && a.mimeType === 'application/pdf'
       )
+
+      // If no exact match, try matching by item's attachment IDs
+      if (!attachment && item.attachmentIds?.length > 0) {
+        attachment = parsedData.attachments.find(
+          a => item.attachmentIds.includes(a.id) && a.mimeType === 'application/pdf'
+        )
+      }
+
+      // If still no match, try finding any PDF attachment linked to this item
+      if (!attachment) {
+        attachment = parsedData.attachments.find(
+          a => a.parentItemId === item.id && (
+            a.mimeType === 'application/pdf' ||
+            a.path?.toLowerCase().endsWith('.pdf') ||
+            a.title?.toLowerCase().endsWith('.pdf')
+          )
+        )
+      }
+
+      console.log('[ImportService] Processing item:', {
+        title: item.title,
+        itemId: item.id,
+        attachmentIds: item.attachmentIds,
+        foundAttachment: attachment ? {
+          id: attachment.id,
+          path: attachment.path,
+          mimeType: attachment.mimeType,
+          parentItemId: attachment.parentItemId
+        } : null,
+        totalAttachments: parsedData.attachments.length,
+        hasAttachmentsFolder: !!attachmentsFolder
+      })
 
       if (attachment && attachmentsFolder) {
         try {
@@ -448,21 +481,101 @@ export async function importDocuments(parsedData, options, onProgress) {
 /**
  * Find attachment file in attachments folder
  * @param {FileList|Object} attachmentsFolder - Folder containing attachments
- * @param {string} path - Relative path to file
+ * @param {string} path - Relative path to file from Zotero
  * @returns {Promise<File|Blob|null>}
  */
 async function findAttachmentFile(attachmentsFolder, path) {
   if (!path) return null
 
+  // Normalize the path from Zotero
+  // Zotero paths can be:
+  // - "attachments:filename.pdf" (Zotero internal format)
+  // - "storage/XXXXXXXX/filename.pdf" (relative to Zotero data dir)
+  // - Just "filename.pdf"
+  // - Full absolute paths
+  let normalizedPath = path
+
+  // Strip "attachments:" prefix if present
+  if (normalizedPath.startsWith('attachments:')) {
+    normalizedPath = normalizedPath.substring('attachments:'.length)
+  }
+
+  // Extract just the filename for matching
+  const filename = normalizedPath.split('/').pop().split('\\').pop()
+
+  // Also try to get a subfolder/filename pattern for better matching
+  const pathParts = normalizedPath.replace(/\\/g, '/').split('/')
+  const lastTwoParts = pathParts.slice(-2).join('/').toLowerCase()
+
+  console.log('[ImportService] Looking for attachment:', {
+    originalPath: path,
+    normalizedPath,
+    filename,
+    lastTwoParts,
+    totalFilesInFolder: attachmentsFolder?.length || 0
+  })
+
   // Handle FileList (from file input with webkitdirectory)
   if (attachmentsFolder instanceof FileList) {
-    const filename = path.split('/').pop()
-
+    // First pass: try exact filename match
     for (const file of attachmentsFolder) {
-      if (file.name === filename || file.webkitRelativePath?.endsWith(filename)) {
+      // Skip non-PDF files
+      if (!file.name.toLowerCase().endsWith('.pdf')) continue
+
+      const relativePath = file.webkitRelativePath || file.name
+
+      // Try various matching strategies
+      if (file.name === filename) {
+        console.log('[ImportService] Found by filename match:', file.name)
+        return file
+      }
+
+      if (relativePath.endsWith(filename)) {
+        console.log('[ImportService] Found by path ending match:', relativePath)
+        return file
+      }
+
+      // Check if the relative path contains the last two parts of Zotero's path
+      if (lastTwoParts && relativePath.toLowerCase().includes(lastTwoParts)) {
+        console.log('[ImportService] Found by partial path match:', relativePath)
         return file
       }
     }
+
+    // Second pass: case-insensitive filename match
+    const lowerFilename = filename.toLowerCase()
+    for (const file of attachmentsFolder) {
+      if (!file.name.toLowerCase().endsWith('.pdf')) continue
+
+      if (file.name.toLowerCase() === lowerFilename) {
+        console.log('[ImportService] Found by case-insensitive match:', file.name)
+        return file
+      }
+    }
+
+    // Third pass: fuzzy match on title-like filenames
+    // Zotero sometimes renames files, so try to match by similarity
+    const cleanFilename = filename
+      .replace(/\.pdf$/i, '')
+      .replace(/[-_]/g, ' ')
+      .toLowerCase()
+
+    for (const file of attachmentsFolder) {
+      if (!file.name.toLowerCase().endsWith('.pdf')) continue
+
+      const cleanName = file.name
+        .replace(/\.pdf$/i, '')
+        .replace(/[-_]/g, ' ')
+        .toLowerCase()
+
+      // Check if the filenames share significant words
+      if (cleanFilename.length > 10 && cleanName.includes(cleanFilename.substring(0, 20))) {
+        console.log('[ImportService] Found by fuzzy match:', file.name)
+        return file
+      }
+    }
+
+    console.log('[ImportService] No match found for:', filename)
   }
 
   // Handle File object
