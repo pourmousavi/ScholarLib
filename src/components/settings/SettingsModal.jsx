@@ -11,6 +11,7 @@ import { ollamaService } from '../../services/ai/OllamaService'
 import { webllmService } from '../../services/ai/WebLLMService'
 import { claudeService } from '../../services/ai/ClaudeService'
 import { openaiService } from '../../services/ai/OpenAIService'
+import { getDeviceType, getDeviceName, getRecommendedProviders, DEVICE_TYPES, isWebLLMSuitable } from '../../utils/deviceDetection'
 import { useToast } from '../../hooks/useToast'
 import Modal from '../ui/Modal'
 import MigrationWizard from '../migration/MigrationWizard'
@@ -115,6 +116,12 @@ export default function SettingsModal({ onClose }) {
   const setProvider = useAIStore((s) => s.setProvider)
   const setModel = useAIStore((s) => s.setModel)
   const setAvailable = useAIStore((s) => s.setAvailable)
+  const allDeviceSettings = useAIStore((s) => s.allDeviceSettings)
+  const setDeviceProvider = useAIStore((s) => s.setDeviceProvider)
+
+  // Current device info
+  const currentDeviceType = getDeviceType()
+  const currentDeviceName = getDeviceName(currentDeviceType)
 
   const adapter = useStorageStore((s) => s.adapter)
   const storageProvider = useStorageStore((s) => s.provider)
@@ -511,7 +518,84 @@ export default function SettingsModal({ onClose }) {
 
   const renderAISection = () => (
     <div className={styles.section}>
-      <h3 className={styles.sectionTitle}>AI Provider</h3>
+      {/* Per-device settings notice */}
+      <div className={styles.deviceNotice}>
+        <div className={styles.deviceHeader}>
+          <span className={styles.deviceIcon}>
+            {currentDeviceType === 'mobile' ? '📱' : currentDeviceType === 'tablet' ? '📱' : '💻'}
+          </span>
+          <span>You're on <strong>{currentDeviceName}</strong></span>
+        </div>
+        <p className={styles.deviceHint}>
+          AI settings are saved per device. Configure different providers for desktop, tablet, and phone.
+        </p>
+      </div>
+
+      {/* Per-device quick settings */}
+      <div className={styles.deviceSettings}>
+        {Object.values(DEVICE_TYPES).map(deviceType => {
+          const settings = allDeviceSettings[deviceType] || { provider: 'none', model: '' }
+          const deviceName = getDeviceName(deviceType)
+          const isCurrent = deviceType === currentDeviceType
+          const recommended = getRecommendedProviders(deviceType)
+
+          return (
+            <div
+              key={deviceType}
+              className={`${styles.deviceCard} ${isCurrent ? styles.currentDevice : ''}`}
+            >
+              <div className={styles.deviceCardHeader}>
+                <span className={styles.deviceCardIcon}>
+                  {deviceType === 'mobile' ? '📱' : deviceType === 'tablet' ? '📱' : '💻'}
+                </span>
+                <span className={styles.deviceCardName}>{deviceName}</span>
+                {isCurrent && <span className={styles.currentBadge}>Current</span>}
+              </div>
+              <select
+                className={styles.deviceSelect}
+                value={settings.provider}
+                onChange={(e) => {
+                  const newProvider = e.target.value
+                  // Get a default model for the provider
+                  let defaultModel = ''
+                  if (newProvider === 'ollama') defaultModel = 'llama3.2'
+                  else if (newProvider === 'claude') defaultModel = 'claude-sonnet-4-20250514'
+                  else if (newProvider === 'openai') defaultModel = 'gpt-4o-mini'
+                  else if (newProvider === 'webllm') defaultModel = 'Llama-3.2-3B-Instruct-q4f32_1-MLC'
+
+                  setDeviceProvider(deviceType, newProvider, defaultModel)
+
+                  // If changing current device, also update availability
+                  if (isCurrent) {
+                    if (newProvider === 'ollama') setAvailable(ollamaStatus.available)
+                    else if (newProvider === 'webllm') setAvailable(webllmReady)
+                    else if (newProvider === 'claude') setAvailable(claudeService.isConfigured())
+                    else if (newProvider === 'openai') setAvailable(openaiService.isConfigured())
+                    else setAvailable(false)
+                  }
+                }}
+              >
+                {recommended.map(p => (
+                  <option
+                    key={p.id}
+                    value={p.id}
+                    disabled={p.id === 'webllm' && deviceType !== 'desktop'}
+                  >
+                    {p.name}{p.id === 'webllm' && deviceType !== 'desktop' ? ' (desktop only)' : ''}
+                  </option>
+                ))}
+              </select>
+              <span className={styles.deviceProviderHint}>
+                {recommended.find(p => p.id === settings.provider)?.reason || ''}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      <h3 className={styles.sectionTitle} style={{ marginTop: 24 }}>
+        {currentDeviceName} Configuration
+      </h3>
 
       <div className={styles.radioGroup}>
         <label className={styles.radioOption}>

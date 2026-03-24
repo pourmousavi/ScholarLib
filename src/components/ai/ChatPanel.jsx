@@ -12,6 +12,7 @@ import { openaiService } from '../../services/ai/OpenAIService'
 import { indexService } from '../../services/indexing/IndexService'
 import { chatHistoryService } from '../../services/ai/ChatHistoryService'
 import { LibraryService } from '../../services/library/LibraryService'
+import { getDeviceType, getDeviceName, getRecommendedProviders } from '../../utils/deviceDetection'
 import { Btn, HistoryIcon, PlusIcon } from '../ui'
 import ScopeSelector from './ScopeSelector'
 import styles from './ChatPanel.module.css'
@@ -536,6 +537,42 @@ export default function ChatPanel() {
             <br />
             Keys are stored locally and never sent to our servers.
           </span>
+          <Btn onClick={() => setShowModal('settings')} style={{ marginTop: 16 }}>
+            Open Settings
+          </Btn>
+        </div>
+      </div>
+    )
+  }
+
+  // Render AI disabled state (provider === 'none')
+  if (provider === 'none') {
+    const deviceType = getDeviceType()
+    const deviceName = getDeviceName(deviceType)
+    const recommended = getRecommendedProviders(deviceType).filter(p => p.id !== 'none')
+
+    return (
+      <div className={styles.panel}>
+        <div className={styles.header}>
+          <ScopeSelector />
+          {renderStatus()}
+        </div>
+        <div className={styles.empty}>
+          <span className={styles.emptyIcon}>AI</span>
+          <span className={styles.emptyText}>AI is disabled on {deviceName}</span>
+          <span className={styles.emptyHint}>
+            Configure an AI provider in Settings to enable AI chat.
+            <br />
+            <br />
+            <strong>Recommended for {deviceName}:</strong>
+            <br />
+            {recommended.slice(0, 2).map(p => (
+              <span key={p.id}>• {p.name} — {p.reason}<br /></span>
+            ))}
+          </span>
+          <Btn gold onClick={() => setShowModal('settings')} style={{ marginTop: 16 }}>
+            Configure AI
+          </Btn>
         </div>
       </div>
     )

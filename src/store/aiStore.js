@@ -1,18 +1,101 @@
 import { create } from 'zustand'
+import { getDeviceType, DEVICE_TYPES } from '../utils/deviceDetection'
 
-// Read initial values from localStorage
-const getInitialProvider = () => localStorage.getItem('sv_ai_provider') || 'ollama'
-const getInitialModel = () => localStorage.getItem('sv_ai_model') || 'llama3.2'
+// Get per-device AI settings from localStorage
+const getDeviceSettings = () => {
+  const deviceType = getDeviceType()
+  const savedSettings = localStorage.getItem('sv_ai_device_settings')
+
+  if (savedSettings) {
+    try {
+      const settings = JSON.parse(savedSettings)
+      return settings[deviceType] || getDefaultSettings(deviceType)
+    } catch {
+      // Fall back to defaults
+    }
+  }
+
+  // Migration: check for old single-device settings
+  const legacyProvider = localStorage.getItem('sv_ai_provider')
+  const legacyModel = localStorage.getItem('sv_ai_model')
+  if (legacyProvider) {
+    return { provider: legacyProvider, model: legacyModel || 'llama3.2' }
+  }
+
+  return getDefaultSettings(deviceType)
+}
+
+// Default settings per device type
+const getDefaultSettings = (deviceType) => {
+  switch (deviceType) {
+    case DEVICE_TYPES.MOBILE:
+      return { provider: 'none', model: '' } // Disabled by default on mobile
+    case DEVICE_TYPES.TABLET:
+      return { provider: 'none', model: '' } // Disabled by default on tablet
+    case DEVICE_TYPES.DESKTOP:
+    default:
+      return { provider: 'ollama', model: 'llama3.2' }
+  }
+}
+
+// Save per-device settings
+const saveDeviceSettings = (deviceType, provider, model) => {
+  const savedSettings = localStorage.getItem('sv_ai_device_settings')
+  let settings = {}
+
+  if (savedSettings) {
+    try {
+      settings = JSON.parse(savedSettings)
+    } catch {
+      settings = {}
+    }
+  }
+
+  settings[deviceType] = { provider, model }
+  localStorage.setItem('sv_ai_device_settings', JSON.stringify(settings))
+}
+
+// Get all device settings for display in settings panel
+const getAllDeviceSettings = () => {
+  const savedSettings = localStorage.getItem('sv_ai_device_settings')
+  let settings = {}
+
+  if (savedSettings) {
+    try {
+      settings = JSON.parse(savedSettings)
+    } catch {
+      settings = {}
+    }
+  }
+
+  // Fill in defaults for any missing device types
+  for (const deviceType of Object.values(DEVICE_TYPES)) {
+    if (!settings[deviceType]) {
+      settings[deviceType] = getDefaultSettings(deviceType)
+    }
+  }
+
+  return settings
+}
+
+const initialSettings = getDeviceSettings()
 
 /**
  * AI Store - Manages AI provider state and chat
+ * Supports per-device AI provider settings
  */
 export const useAIStore = create((set, get) => ({
-  // Provider configuration - initialize from localStorage
-  provider: getInitialProvider(),
-  model: getInitialModel(),
+  // Current device type
+  currentDeviceType: getDeviceType(),
+
+  // Provider configuration - initialize from per-device localStorage
+  provider: initialSettings.provider,
+  model: initialSettings.model,
   isAvailable: false,
   isChecking: true,
+
+  // All device settings (for settings panel)
+  allDeviceSettings: getAllDeviceSettings(),
 
   // WebLLM specific
   webllmStatus: 'idle', // idle | downloading | ready | error
@@ -42,11 +125,50 @@ export const useAIStore = create((set, get) => ({
     docCount: 1
   },
 
-  // Provider actions
-  setProvider: (provider) => set({ provider }),
-  setModel: (model) => set({ model }),
+  // Provider actions - saves per-device
+  setProvider: (provider) => {
+    const deviceType = getDeviceType()
+    const { model } = get()
+    saveDeviceSettings(deviceType, provider, model)
+    set({
+      provider,
+      allDeviceSettings: getAllDeviceSettings()
+    })
+  },
+  setModel: (model) => {
+    const deviceType = getDeviceType()
+    const { provider } = get()
+    saveDeviceSettings(deviceType, provider, model)
+    set({
+      model,
+      allDeviceSettings: getAllDeviceSettings()
+    })
+  },
   setAvailable: (isAvailable) => set({ isAvailable, isChecking: false }),
   setChecking: (isChecking) => set({ isChecking }),
+
+  // Per-device settings actions (for settings panel)
+  setDeviceProvider: (deviceType, provider, model) => {
+    saveDeviceSettings(deviceType, provider, model)
+    const newAllSettings = getAllDeviceSettings()
+    const currentDeviceType = getDeviceType()
+
+    // If changing current device, update active provider too
+    if (deviceType === currentDeviceType) {
+      set({
+        provider,
+        model,
+        allDeviceSettings: newAllSettings
+      })
+    } else {
+      set({ allDeviceSettings: newAllSettings })
+    }
+  },
+
+  getDeviceSettings: (deviceType) => {
+    const { allDeviceSettings } = get()
+    return allDeviceSettings[deviceType] || getDefaultSettings(deviceType)
+  },
 
   // WebLLM actions
   setWebLLMStatus: (status) => set({ webllmStatus: status }),

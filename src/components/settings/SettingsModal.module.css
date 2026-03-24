@@ -696,3 +696,114 @@
   cursor: pointer;
   border: none;
 }
+
+/* Per-device AI settings */
+.deviceNotice {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.deviceHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.deviceIcon {
+  font-size: 16px;
+}
+
+.deviceHint {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin: var(--space-2) 0 0 0;
+}
+
+.deviceSettings {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .deviceSettings {
+    grid-template-columns: 1fr;
+  }
+}
+
+.deviceCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  transition: all var(--transition-fast);
+}
+
+.deviceCard.currentDevice {
+  border-color: var(--accent-border);
+  background: var(--accent-dim);
+}
+
+.deviceCardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.deviceCardIcon {
+  font-size: 14px;
+}
+
+.deviceCardName {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.currentBadge {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.deviceSelect {
+  width: 100%;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  cursor: pointer;
+  margin-bottom: var(--space-1);
+}
+
+.deviceSelect:focus {
+  outline: none;
+  border-color: var(--accent-border);
+}
+
+.deviceProviderHint {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px;
+  color: var(--text-muted);
+  display: block;
+  line-height: 1.3;
+}
