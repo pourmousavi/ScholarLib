@@ -1044,4 +1044,216 @@ export const useLibraryStore = create((set, get) => ({
 
   // Clear collection filter
   clearCollectionFilter: () => set({ selectedCollections: [], collectionFilterMode: 'OR' }),
+
+  // ============================================
+  // Bulk Deletion Actions
+  // ============================================
+
+  /**
+   * Calculate impacts for bulk deletion operations
+   */
+  calculateDeletionImpacts: () => {
+    const { tagRegistry, collectionRegistry, folders, documents } = get()
+
+    const tagCount = Object.keys(tagRegistry).length
+    const collectionCount = Object.keys(collectionRegistry).length
+    const folderCount = folders.length
+    const documentCount = Object.keys(documents).length
+
+    // Count shared items
+    const sharedTagCount = Object.values(tagRegistry).filter(t => t.shared_with?.length > 0).length
+    const sharedCollectionCount = Object.values(collectionRegistry).filter(c => c.shared_with?.length > 0).length
+    const sharedFolderCount = folders.filter(f => f.shared_with?.length > 0).length
+
+    return {
+      tagCount,
+      collectionCount,
+      folderCount,
+      documentCount,
+      sharedTagCount,
+      sharedCollectionCount,
+      sharedFolderCount,
+    }
+  },
+
+  /**
+   * Delete all tags from registry and documents
+   * Also deletes all collections (they depend on tags)
+   */
+  deleteAllTags: async () => {
+    const { documents, collectionRegistry } = get()
+
+    // Remove all tags from all documents
+    const newDocuments = { ...documents }
+    for (const docId of Object.keys(newDocuments)) {
+      newDocuments[docId] = {
+        ...newDocuments[docId],
+        user_data: {
+          ...newDocuments[docId].user_data,
+          tags: []
+        }
+      }
+    }
+
+    // Clear registry and collections
+    set({
+      tagRegistry: {},
+      collectionRegistry: {},
+      documents: newDocuments,
+      selectedTags: [],
+      selectedCollections: [],
+    })
+
+    return {
+      tagsDeleted: Object.keys(get().tagRegistry).length || Object.keys(documents).length,
+      collectionsDeleted: Object.keys(collectionRegistry).length,
+    }
+  },
+
+  /**
+   * Delete all collections (independent of tags)
+   */
+  deleteAllCollections: async () => {
+    const { collectionRegistry } = get()
+    const count = Object.keys(collectionRegistry).length
+
+    set({
+      collectionRegistry: {},
+      selectedCollections: [],
+    })
+
+    return { collectionsDeleted: count }
+  },
+
+  /**
+   * Delete all folders and documents
+   * Also deletes all collections (they reference documents)
+   * Preserves tags for reuse
+   * @param {object} adapter - Storage adapter for deleting PDFs
+   * @param {function} onProgress - Optional callback for progress updates
+   */
+  deleteAllFoldersAndDocuments: async (adapter, onProgress) => {
+    const { folders, documents, collectionRegistry } = get()
+    const docIds = Object.keys(documents)
+    const folderCount = folders.length
+    const collectionCount = Object.keys(collectionRegistry).length
+
+    // Delete PDFs from storage
+    let deletedPDFs = 0
+    let failedPDFs = 0
+    const totalDocs = docIds.length
+
+    for (let i = 0; i < docIds.length; i++) {
+      const docId = docIds[i]
+      const doc = documents[docId]
+
+      if (onProgress) {
+        onProgress({
+          phase: 'deleting_pdfs',
+          current: i + 1,
+          total: totalDocs,
+          currentFile: doc.filename,
+        })
+      }
+
+      if (doc.box_path && adapter) {
+        try {
+          await adapter.deleteFile(doc.box_path)
+          deletedPDFs++
+        } catch (err) {
+          console.warn(`Failed to delete PDF: ${doc.box_path}`, err)
+          failedPDFs++
+        }
+      }
+    }
+
+    // Clear folders, documents, and collections
+    set({
+      folders: [],
+      documents: {},
+      collectionRegistry: {},
+      selectedFolderId: null,
+      selectedDocId: null,
+      expandedFolders: [],
+      selectedCollections: [],
+      selectedDocIds: [],
+      selectionMode: false,
+    })
+
+    return {
+      foldersDeleted: folderCount,
+      documentsDeleted: totalDocs,
+      collectionsDeleted: collectionCount,
+      pdfsDeleted: deletedPDFs,
+      pdfsFailed: failedPDFs,
+    }
+  },
+
+  /**
+   * Complete library reset - deletes everything
+   * @param {object} adapter - Storage adapter for deleting PDFs
+   * @param {function} onProgress - Optional callback for progress updates
+   */
+  resetLibrary: async (adapter, onProgress) => {
+    const { folders, documents, tagRegistry, collectionRegistry } = get()
+    const docIds = Object.keys(documents)
+    const totalDocs = docIds.length
+    const folderCount = folders.length
+    const tagCount = Object.keys(tagRegistry).length
+    const collectionCount = Object.keys(collectionRegistry).length
+
+    // Delete PDFs from storage
+    let deletedPDFs = 0
+    let failedPDFs = 0
+
+    for (let i = 0; i < docIds.length; i++) {
+      const docId = docIds[i]
+      const doc = documents[docId]
+
+      if (onProgress) {
+        onProgress({
+          phase: 'deleting_pdfs',
+          current: i + 1,
+          total: totalDocs,
+          currentFile: doc.filename,
+        })
+      }
+
+      if (doc.box_path && adapter) {
+        try {
+          await adapter.deleteFile(doc.box_path)
+          deletedPDFs++
+        } catch (err) {
+          console.warn(`Failed to delete PDF: ${doc.box_path}`, err)
+          failedPDFs++
+        }
+      }
+    }
+
+    // Clear everything
+    set({
+      folders: [],
+      documents: {},
+      tagRegistry: {},
+      collectionRegistry: {},
+      smartCollections: [],
+      selectedFolderId: null,
+      selectedDocId: null,
+      expandedFolders: [],
+      selectedTags: [],
+      selectedCollections: [],
+      selectedDocIds: [],
+      selectionMode: false,
+      selectedCollectionId: null,
+    })
+
+    return {
+      foldersDeleted: folderCount,
+      documentsDeleted: totalDocs,
+      tagsDeleted: tagCount,
+      collectionsDeleted: collectionCount,
+      pdfsDeleted: deletedPDFs,
+      pdfsFailed: failedPDFs,
+    }
+  },
 }))

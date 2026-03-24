@@ -16,6 +16,7 @@ import { useToast } from '../../hooks/useToast'
 import Modal from '../ui/Modal'
 import MigrationWizard from '../migration/MigrationWizard'
 import { ImportWizard } from '../import'
+import DangerousActionModal from './DangerousActionModal'
 import styles from './SettingsModal.module.css'
 
 // SVG Icons for settings sections
@@ -112,6 +113,10 @@ export default function SettingsModal({ onClose }) {
   const [showMigrationWizard, setShowMigrationWizard] = useState(false)
   const [migrationMode, setMigrationMode] = useState(null) // 'export' or 'import'
   const [showZoteroImport, setShowZoteroImport] = useState(false)
+
+  // Danger zone state
+  const [dangerAction, setDangerAction] = useState(null) // 'tags' | 'collections' | 'foldersAndDocs' | 'reset'
+  const [isDangerActionLoading, setIsDangerActionLoading] = useState(false)
 
   const provider = useAIStore((s) => s.provider)
   const model = useAIStore((s) => s.model)
@@ -507,6 +512,211 @@ export default function SettingsModal({ onClose }) {
       await LibraryService.saveLibrary(adapter, { version: '1.0', folders, documents: updatedDocs })
 
       showToast({ message: `Removed ${orphanedIds.length} orphaned document(s)`, type: 'success' })
+    }
+  }
+
+  // ============================================
+  // Danger Zone Handlers
+  // ============================================
+
+  const deletionImpacts = useLibraryStore.getState().calculateDeletionImpacts()
+
+  const handleDeleteAllTags = async () => {
+    setIsDangerActionLoading(true)
+    try {
+      const result = await useLibraryStore.getState().deleteAllTags()
+
+      // Save to storage
+      if (!isDemoMode && adapter) {
+        const state = useLibraryStore.getState()
+        await LibraryService.saveLibrary(adapter, {
+          version: '1.1',
+          folders: state.folders,
+          documents: state.documents,
+          tag_registry: state.tagRegistry,
+          collection_registry: state.collectionRegistry,
+          smart_collections: state.smartCollections,
+        })
+      }
+
+      showToast({
+        message: `Deleted all tags and ${deletionImpacts.collectionCount} collection(s)`,
+        type: 'success'
+      })
+    } finally {
+      setIsDangerActionLoading(false)
+    }
+  }
+
+  const handleDeleteAllCollections = async () => {
+    setIsDangerActionLoading(true)
+    try {
+      const result = await useLibraryStore.getState().deleteAllCollections()
+
+      // Save to storage
+      if (!isDemoMode && adapter) {
+        const state = useLibraryStore.getState()
+        await LibraryService.saveLibrary(adapter, {
+          version: '1.1',
+          folders: state.folders,
+          documents: state.documents,
+          tag_registry: state.tagRegistry,
+          collection_registry: state.collectionRegistry,
+          smart_collections: state.smartCollections,
+        })
+      }
+
+      showToast({
+        message: `Deleted ${deletionImpacts.collectionCount} collection(s)`,
+        type: 'success'
+      })
+    } finally {
+      setIsDangerActionLoading(false)
+    }
+  }
+
+  const handleDeleteAllFoldersAndDocuments = async () => {
+    setIsDangerActionLoading(true)
+    try {
+      const result = await useLibraryStore.getState().deleteAllFoldersAndDocuments(
+        isDemoMode ? null : adapter,
+        (progress) => {
+          // Could show progress in future
+          console.log('Delete progress:', progress)
+        }
+      )
+
+      // Save to storage
+      if (!isDemoMode && adapter) {
+        const state = useLibraryStore.getState()
+        await LibraryService.saveLibrary(adapter, {
+          version: '1.1',
+          folders: state.folders,
+          documents: state.documents,
+          tag_registry: state.tagRegistry,
+          collection_registry: state.collectionRegistry,
+          smart_collections: state.smartCollections,
+        })
+      }
+
+      let message = `Deleted ${result.foldersDeleted} folder(s), ${result.documentsDeleted} document(s)`
+      if (result.pdfsFailed > 0) {
+        message += ` (${result.pdfsFailed} PDF(s) failed to delete from storage)`
+        showToast({ message, type: 'warning' })
+      } else {
+        showToast({ message, type: 'success' })
+      }
+    } finally {
+      setIsDangerActionLoading(false)
+    }
+  }
+
+  const handleResetLibrary = async () => {
+    setIsDangerActionLoading(true)
+    try {
+      const result = await useLibraryStore.getState().resetLibrary(
+        isDemoMode ? null : adapter,
+        (progress) => {
+          console.log('Reset progress:', progress)
+        }
+      )
+
+      // Save to storage
+      if (!isDemoMode && adapter) {
+        const state = useLibraryStore.getState()
+        await LibraryService.saveLibrary(adapter, {
+          version: '1.1',
+          folders: state.folders,
+          documents: state.documents,
+          tag_registry: state.tagRegistry,
+          collection_registry: state.collectionRegistry,
+          smart_collections: state.smartCollections,
+        })
+      }
+
+      let message = 'Library reset complete'
+      if (result.pdfsFailed > 0) {
+        message += ` (${result.pdfsFailed} PDF(s) failed to delete from storage)`
+        showToast({ message, type: 'warning' })
+      } else {
+        showToast({ message, type: 'success' })
+      }
+    } finally {
+      setIsDangerActionLoading(false)
+    }
+  }
+
+  const getDangerActionConfig = () => {
+    switch (dangerAction) {
+      case 'tags':
+        return {
+          title: 'Delete All Tags',
+          description: 'This will permanently delete all tags from your library and remove them from all documents. Collections will also be deleted since they depend on tags.',
+          impacts: [
+            { count: deletionImpacts.tagCount, label: 'tags' },
+            { count: deletionImpacts.collectionCount, label: 'collections (depend on tags)' },
+          ].filter(i => i.count > 0),
+          warnings: [
+            'Tags will be removed from all documents',
+            'All collections will be deleted',
+            deletionImpacts.sharedTagCount > 0 && `${deletionImpacts.sharedTagCount} shared tag(s) will be unshared`,
+            deletionImpacts.sharedCollectionCount > 0 && `${deletionImpacts.sharedCollectionCount} shared collection(s) will be unshared`,
+          ].filter(Boolean),
+          confirmText: 'DELETE TAGS',
+          onConfirm: handleDeleteAllTags,
+        }
+      case 'collections':
+        return {
+          title: 'Delete All Collections',
+          description: 'This will permanently delete all collections from your library. Tags and documents will be preserved.',
+          impacts: [
+            { count: deletionImpacts.collectionCount, label: 'collections' },
+          ].filter(i => i.count > 0),
+          warnings: [
+            deletionImpacts.sharedCollectionCount > 0 && `${deletionImpacts.sharedCollectionCount} shared collection(s) will be unshared`,
+          ].filter(Boolean),
+          confirmText: 'DELETE COLLECTIONS',
+          onConfirm: handleDeleteAllCollections,
+        }
+      case 'foldersAndDocs':
+        return {
+          title: 'Delete All Folders & Documents',
+          description: 'This will permanently delete all folders and documents from your library, including PDF files from your cloud storage. Tags will be preserved for reuse.',
+          impacts: [
+            { count: deletionImpacts.folderCount, label: 'folders' },
+            { count: deletionImpacts.documentCount, label: 'documents & PDFs' },
+            { count: deletionImpacts.collectionCount, label: 'collections (reference documents)' },
+          ].filter(i => i.count > 0),
+          warnings: [
+            'PDF files will be permanently deleted from storage',
+            'Collections will be deleted (they reference documents)',
+            'Tags will be preserved for reuse',
+            deletionImpacts.sharedFolderCount > 0 && `${deletionImpacts.sharedFolderCount} shared folder(s) will be unshared`,
+          ].filter(Boolean),
+          confirmText: 'DELETE LIBRARY',
+          onConfirm: handleDeleteAllFoldersAndDocuments,
+        }
+      case 'reset':
+        return {
+          title: 'Reset Everything',
+          description: 'This will completely reset your library, deleting all tags, collections, folders, documents, and PDF files. This cannot be undone.',
+          impacts: [
+            { count: deletionImpacts.tagCount, label: 'tags' },
+            { count: deletionImpacts.collectionCount, label: 'collections' },
+            { count: deletionImpacts.folderCount, label: 'folders' },
+            { count: deletionImpacts.documentCount, label: 'documents & PDFs' },
+          ].filter(i => i.count > 0),
+          warnings: [
+            'All data will be permanently deleted',
+            'PDF files will be removed from storage',
+            'All sharing relationships will be terminated',
+            'Your library will be completely empty',
+          ],
+          confirmText: 'RESET EVERYTHING',
+          onConfirm: handleResetLibrary,
+        }
+      default:
+        return null
     }
   }
 
@@ -1530,6 +1740,111 @@ export default function SettingsModal({ onClose }) {
       <p className={styles.hint} style={{ marginTop: 8 }}>
         Orphaned documents are library entries whose PDF files no longer exist in storage.
       </p>
+
+      {/* Danger Zone */}
+      <div className={styles.dangerZone}>
+        <div className={styles.dangerZoneHeader}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.dangerZoneIcon}>
+            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <h3 className={styles.dangerZoneTitle}>Danger Zone</h3>
+        </div>
+        <p className={styles.dangerZoneDescription}>
+          These actions are destructive and cannot be undone. Make sure you have exported any important data before using these options.
+        </p>
+
+        <div className={styles.dangerActions}>
+          {/* Delete All Tags */}
+          <div className={styles.dangerAction}>
+            <div className={styles.dangerActionContent}>
+              <h4 className={styles.dangerActionTitle}>Delete All Tags</h4>
+              <p className={styles.dangerActionDesc}>
+                Removes all tags from your library. Collections will also be deleted (they depend on tags).
+              </p>
+              <div className={styles.dangerActionCounts}>
+                <span className={styles.dangerActionCount}>{deletionImpacts.tagCount} tags</span>
+                <span className={styles.dangerActionCount}>{deletionImpacts.collectionCount} collections</span>
+              </div>
+            </div>
+            <button
+              className={styles.dangerActionButton}
+              onClick={() => setDangerAction('tags')}
+              disabled={deletionImpacts.tagCount === 0}
+            >
+              Delete Tags
+            </button>
+          </div>
+
+          {/* Delete All Collections */}
+          <div className={styles.dangerAction}>
+            <div className={styles.dangerActionContent}>
+              <h4 className={styles.dangerActionTitle}>Delete All Collections</h4>
+              <p className={styles.dangerActionDesc}>
+                Removes all collections. Tags and documents are preserved.
+              </p>
+              <div className={styles.dangerActionCounts}>
+                <span className={styles.dangerActionCount}>{deletionImpacts.collectionCount} collections</span>
+              </div>
+            </div>
+            <button
+              className={styles.dangerActionButton}
+              onClick={() => setDangerAction('collections')}
+              disabled={deletionImpacts.collectionCount === 0}
+            >
+              Delete Collections
+            </button>
+          </div>
+
+          {/* Delete All Folders & Documents */}
+          <div className={styles.dangerAction}>
+            <div className={styles.dangerActionContent}>
+              <h4 className={styles.dangerActionTitle}>Delete All Folders & Documents</h4>
+              <p className={styles.dangerActionDesc}>
+                Removes all folders and documents, including PDF files from storage. Tags are preserved for reuse.
+              </p>
+              <div className={styles.dangerActionCounts}>
+                <span className={styles.dangerActionCount}>{deletionImpacts.folderCount} folders</span>
+                <span className={styles.dangerActionCount}>{deletionImpacts.documentCount} documents</span>
+              </div>
+            </div>
+            <button
+              className={styles.dangerActionButton}
+              onClick={() => setDangerAction('foldersAndDocs')}
+              disabled={deletionImpacts.folderCount === 0 && deletionImpacts.documentCount === 0}
+            >
+              Delete Library
+            </button>
+          </div>
+
+          {/* Full Reset */}
+          <div className={styles.dangerAction}>
+            <div className={styles.dangerActionContent}>
+              <h4 className={styles.dangerActionTitle}>Reset Everything</h4>
+              <p className={styles.dangerActionDesc}>
+                Complete library reset. Deletes all tags, collections, folders, documents, and PDFs.
+              </p>
+              <div className={styles.dangerActionCounts}>
+                <span className={styles.dangerActionCount}>{deletionImpacts.tagCount} tags</span>
+                <span className={styles.dangerActionCount}>{deletionImpacts.collectionCount} collections</span>
+                <span className={styles.dangerActionCount}>{deletionImpacts.folderCount} folders</span>
+                <span className={styles.dangerActionCount}>{deletionImpacts.documentCount} documents</span>
+              </div>
+            </div>
+            <button
+              className={styles.dangerActionButtonCritical}
+              onClick={() => setDangerAction('reset')}
+              disabled={
+                deletionImpacts.tagCount === 0 &&
+                deletionImpacts.collectionCount === 0 &&
+                deletionImpacts.folderCount === 0 &&
+                deletionImpacts.documentCount === 0
+              }
+            >
+              Reset Everything
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 
@@ -1610,6 +1925,14 @@ export default function SettingsModal({ onClose }) {
       {showZoteroImport && (
         <ImportWizard
           onClose={handleZoteroImportClose}
+        />
+      )}
+
+      {dangerAction && getDangerActionConfig() && (
+        <DangerousActionModal
+          {...getDangerActionConfig()}
+          onClose={() => setDangerAction(null)}
+          isLoading={isDangerActionLoading}
         />
       )}
     </>
