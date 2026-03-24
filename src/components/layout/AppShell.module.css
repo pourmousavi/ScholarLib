@@ -6,6 +6,22 @@
   background: var(--bg-base);
 }
 
+.shell.mobile {
+  padding-bottom: 60px; /* Space for mobile nav */
+}
+
+/* Mobile backdrop overlay */
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 60px; /* Above mobile nav */
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 90;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .sidebar {
   flex-shrink: 0;
   background: var(--bg-sidebar);
@@ -67,7 +83,7 @@
   overflow: hidden;
 }
 
-/* Mobile drawer mode */
+/* Tablet drawer mode */
 @media (max-width: 899px) {
   .resizeHandle {
     display: none;
@@ -84,19 +100,30 @@
   }
 }
 
+/* Mobile drawer mode */
 @media (max-width: 639px) {
   .sidebar:not(.collapsed) {
     position: fixed;
     left: 0;
     top: 0;
-    bottom: 0;
+    bottom: 60px; /* Leave space for mobile nav */
     z-index: 150;
-    width: 228px !important;
+    width: 85% !important;
+    max-width: 320px;
     box-shadow: var(--shadow-modal);
   }
 
   .docList:not(.collapsed) {
+    position: fixed;
     left: 0;
+    top: 0;
+    bottom: 60px; /* Leave space for mobile nav */
+    z-index: 100;
     width: 100% !important;
+    box-shadow: none;
+  }
+
+  .mainPanel {
+    min-width: 0;
   }
 }

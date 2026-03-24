@@ -43,6 +43,7 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
   const setShowModal = useUIStore((s) => s.setShowModal)
   const showDocCounts = useUIStore((s) => s.showDocCounts)
   const setExportDocs = useUIStore((s) => s.setExportDocs)
+  const showDocListMobile = useUIStore((s) => s.showDocListMobile)
 
   const { showToast } = useToast()
 
@@ -75,6 +76,10 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
 
   const handleClick = () => {
     setSelectedFolderId(folder.id)
+    // On mobile, auto-navigate to doc list after selecting folder
+    if (window.innerWidth < 640) {
+      showDocListMobile()
+    }
   }
 
   const handleToggle = (e) => {

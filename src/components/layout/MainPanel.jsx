@@ -9,7 +9,7 @@ import { NotesPanel } from '../notes'
 import { ChatPanel } from '../ai'
 import styles from './MainPanel.module.css'
 
-export default function MainPanel() {
+export default function MainPanel({ isMobile = false }) {
   const [pdfUrl, setPdfUrl] = useState(null)
   const [pdfError, setPdfError] = useState(null)
 
@@ -123,7 +123,8 @@ export default function MainPanel() {
       {/* Top bar */}
       <div className={styles.topBar}>
         <div className={styles.left}>
-          {(sidebarCollapsed || docListCollapsed) && (
+          {/* Only show hamburger on tablet (not mobile, which has bottom nav) */}
+          {!isMobile && (sidebarCollapsed || docListCollapsed) && (
             <button
               className={styles.menuBtn}
               onClick={() => {

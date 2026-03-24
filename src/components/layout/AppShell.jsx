@@ -1,9 +1,10 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { useUIStore } from '../../store/uiStore'
 import { useAIStore } from '../../store/aiStore'
 import Sidebar from './Sidebar'
 import DocList from '../library/DocList'
 import MainPanel from './MainPanel'
+import MobileNav from './MobileNav'
 import { SettingsModal } from '../settings'
 import { ShareModal, ActivityDashboard, MoveFolderPicker } from '../sharing'
 import { ChatHistoryModal } from '../ai'
@@ -13,12 +14,15 @@ import EditMetadataModal from '../metadata/EditMetadataModal'
 import styles from './AppShell.module.css'
 
 export default function AppShell() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
+
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const docListCollapsed = useUIStore((s) => s.docListCollapsed)
   const showModal = useUIStore((s) => s.showModal)
   const setShowModal = useUIStore((s) => s.setShowModal)
   const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed)
   const setDocListCollapsed = useUIStore((s) => s.setDocListCollapsed)
+  const closeAllOverlays = useUIStore((s) => s.closeAllOverlays)
   const setActivePanel = useUIStore((s) => s.setActivePanel)
   const toggleSplitView = useUIStore((s) => s.toggleSplitView)
 
@@ -85,6 +89,9 @@ export default function AppShell() {
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth
+      const mobile = width < 640
+      setIsMobile(mobile)
+
       if (width < 640) {
         setSidebarCollapsed(true)
         setDocListCollapsed(true)
@@ -102,6 +109,16 @@ export default function AppShell() {
     return () => window.removeEventListener('resize', handleResize)
   }, [setSidebarCollapsed, setDocListCollapsed])
 
+  // Handle backdrop click to close overlays on mobile
+  const handleBackdropClick = useCallback(() => {
+    if (isMobile) {
+      closeAllOverlays()
+    }
+  }, [isMobile, closeAllOverlays])
+
+  // Determine if backdrop should be shown (mobile with any panel open)
+  const showBackdrop = isMobile && (!sidebarCollapsed || !docListCollapsed)
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -118,14 +135,23 @@ export default function AppShell() {
 
   return (
     <>
-      <div className={styles.shell}>
+      <div className={`${styles.shell} ${isMobile ? styles.mobile : ''}`}>
+        {/* Mobile backdrop overlay */}
+        {showBackdrop && (
+          <div
+            className={styles.backdrop}
+            onClick={handleBackdropClick}
+            aria-hidden="true"
+          />
+        )}
+
         <div
           className={`${styles.sidebar} ${sidebarCollapsed ? styles.collapsed : ''}`}
           style={{ width: sidebarCollapsed ? 0 : sidebarWidth }}
         >
-          <Sidebar />
+          <Sidebar isMobile={isMobile} />
         </div>
-        {!sidebarCollapsed && (
+        {!sidebarCollapsed && !isMobile && (
           <div
             className={styles.resizeHandle}
             onMouseDown={(e) => handleMouseDown('sidebar', e)}
@@ -135,17 +161,20 @@ export default function AppShell() {
           className={`${styles.docList} ${docListCollapsed ? styles.collapsed : ''}`}
           style={{ width: docListCollapsed ? 0 : docListWidth }}
         >
-          <DocList />
+          <DocList isMobile={isMobile} />
         </div>
-        {!docListCollapsed && (
+        {!docListCollapsed && !isMobile && (
           <div
             className={styles.resizeHandle}
             onMouseDown={(e) => handleMouseDown('doclist', e)}
           />
         )}
         <div className={styles.mainPanel}>
-          <MainPanel />
+          <MainPanel isMobile={isMobile} />
         </div>
+
+        {/* Mobile bottom navigation */}
+        {isMobile && <MobileNav />}
       </div>
 
       {/* Modals */}

@@ -21,7 +21,7 @@ const FILTERS = [
   { id: 'pending', label: 'Pending' }
 ]
 
-export default function DocList() {
+export default function DocList({ isMobile = false }) {
   const [activeFilter, setActiveFilter] = useState('all')
   const [showUpload, setShowUpload] = useState(false)
 
@@ -45,6 +45,9 @@ export default function DocList() {
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
 
   const toggleDocList = useUIStore((s) => s.toggleDocList)
+  const closeAllOverlays = useUIStore((s) => s.closeAllOverlays)
+  const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed)
+  const setDocListCollapsed = useUIStore((s) => s.setDocListCollapsed)
 
   const isIndexing = useIndexStore((s) => s.isIndexing)
   const startIndexing = useIndexStore((s) => s.startIndexing)
@@ -295,6 +298,21 @@ export default function DocList() {
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerTop}>
+          {/* Mobile back button - close doclist and show sidebar */}
+          {isMobile && (
+            <button
+              className={styles.backBtn}
+              onClick={() => {
+                setDocListCollapsed(true)
+                setSidebarCollapsed(false)
+              }}
+              aria-label="Back to library"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+          )}
           <div className={styles.breadcrumb}>
           {isCollectionView ? (
             <span className={styles.collectionViewTitle}>
@@ -319,16 +337,30 @@ export default function DocList() {
             ))
           )}
         </div>
-          <button
-            className={styles.collapseBtn}
-            onClick={toggleDocList}
-            title="Collapse document list"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="11 17 6 12 11 7"/>
-              <polyline points="18 17 13 12 18 7"/>
-            </svg>
-          </button>
+          {/* Mobile close button or desktop collapse button */}
+          {isMobile ? (
+            <button
+              className={styles.closeBtn}
+              onClick={closeAllOverlays}
+              aria-label="Close document list"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          ) : (
+            <button
+              className={styles.collapseBtn}
+              onClick={toggleDocList}
+              title="Collapse document list"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="11 17 6 12 11 7"/>
+                <polyline points="18 17 13 12 18 7"/>
+              </svg>
+            </button>
+          )}
         </div>
         <div className={styles.headerMeta}>
           <span className={styles.docCount}>{allDocs.length} documents</span>

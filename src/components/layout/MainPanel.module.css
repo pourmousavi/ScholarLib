@@ -169,3 +169,27 @@
   font-size: 14px;
   font-family: 'DM Mono', monospace;
 }
+
+/* Mobile responsive adjustments */
+@media (max-width: 639px) {
+  .topBar {
+    padding: 0 var(--space-3);
+  }
+
+  .docTitle {
+    font-size: 12px;
+  }
+
+  .tabs {
+    gap: 0;
+  }
+
+  .tab {
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+
+  .actions {
+    margin-right: var(--space-2);
+  }
+}

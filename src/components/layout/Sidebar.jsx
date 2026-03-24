@@ -13,7 +13,7 @@ import CollectionsList from '../library/CollectionsList'
 import TagsList from '../library/TagsList'
 import styles from './Sidebar.module.css'
 
-export default function Sidebar() {
+export default function Sidebar({ isMobile = false }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [showResults, setShowResults] = useState(false)
@@ -35,6 +35,8 @@ export default function Sidebar() {
   const treeContainerRef = useRef(null)
 
   const setShowModal = useUIStore((s) => s.setShowModal)
+  const showDocListMobile = useUIStore((s) => s.showDocListMobile)
+  const closeAllOverlays = useUIStore((s) => s.closeAllOverlays)
   const { canInstall, install } = usePWAInstall()
 
   const provider = useAIStore((s) => s.provider)
@@ -156,8 +158,16 @@ export default function Sidebar() {
     if (result.type === 'document') {
       setSelectedFolderId(result.folderId)
       setSelectedDocId(result.id)
+      // On mobile, close sidebar to show PDF
+      if (isMobile) {
+        closeAllOverlays()
+      }
     } else if (result.type === 'folder') {
       setSelectedFolderId(result.id)
+      // On mobile, show doc list
+      if (isMobile) {
+        showDocListMobile()
+      }
     }
     setSearchQuery('')
     setShowResults(false)
@@ -269,6 +279,18 @@ export default function Sidebar() {
             {settingsService.getUserName() || 'Set up your profile'}
           </span>
         </div>
+        {isMobile && (
+          <button
+            className={styles.closeBtn}
+            onClick={closeAllOverlays}
+            aria-label="Close sidebar"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Search bar */}

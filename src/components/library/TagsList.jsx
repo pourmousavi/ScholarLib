@@ -38,6 +38,7 @@ export default function TagsList() {
 
   const setShowModal = useUIStore((s) => s.setShowModal)
   const setExportDocs = useUIStore((s) => s.setExportDocs)
+  const showDocListMobile = useUIStore((s) => s.showDocListMobile)
 
   // Helper to save library after tag changes
   const saveLibrary = useCallback(async () => {
@@ -107,6 +108,10 @@ export default function TagsList() {
     } else {
       // Single click = filter by this tag only
       selectTagFilter(slug)
+    }
+    // On mobile, auto-navigate to doc list
+    if (window.innerWidth < 640) {
+      showDocListMobile()
     }
   }
 

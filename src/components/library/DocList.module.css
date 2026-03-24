@@ -38,6 +38,53 @@
   color: var(--text-secondary);
 }
 
+/* Mobile back button */
+.backBtn {
+  width: 32px;
+  height: 32px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: var(--space-2);
+  transition: all var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.backBtn:active {
+  background: var(--bg-selected);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+/* Mobile close button */
+.closeBtn {
+  width: 32px;
+  height: 32px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.closeBtn:active {
+  background: var(--bg-selected);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
 .breadcrumb {
   font-family: 'DM Sans', sans-serif;
   font-size: 13px;

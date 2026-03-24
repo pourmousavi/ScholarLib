@@ -14,6 +14,34 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.closeBtn {
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.closeBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.closeBtn:active {
+  background: var(--bg-selected);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
 .logoIcon {
   width: 32px;
   height: 32px;

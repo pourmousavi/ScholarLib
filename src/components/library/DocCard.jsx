@@ -42,6 +42,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
 
   const setShowModal = useUIStore((s) => s.setShowModal)
   const setExportDocs = useUIStore((s) => s.setExportDocs)
+  const closeDocListMobile = useUIStore((s) => s.closeDocListMobile)
 
   const { showToast } = useToast()
 
@@ -90,6 +91,10 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
       toggleDocSelection(doc.id)
     } else {
       setSelectedDocId(doc.id)
+      // On mobile, auto-close doclist to show PDF
+      if (window.innerWidth < 640) {
+        closeDocListMobile()
+      }
     }
   }
 

@@ -38,6 +38,7 @@ export default function CollectionsList() {
 
   const setShowModal = useUIStore((s) => s.setShowModal)
   const setExportDocs = useUIStore((s) => s.setExportDocs)
+  const showDocListMobile = useUIStore((s) => s.showDocListMobile)
 
   // Helper to save library after collection changes
   const saveLibrary = useCallback(async () => {
@@ -80,6 +81,10 @@ export default function CollectionsList() {
     } else {
       // Single click = filter by this collection only
       selectCollectionFilter(slug)
+    }
+    // On mobile, auto-navigate to doc list
+    if (window.innerWidth < 640) {
+      showDocListMobile()
     }
   }
 

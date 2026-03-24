@@ -112,6 +112,13 @@ export const useUIStore = create((set) => ({
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   setDocListCollapsed: (collapsed) => set({ docListCollapsed: collapsed }),
 
+  // Mobile helper: close sidebar and show doclist
+  showDocListMobile: () => set({ sidebarCollapsed: true, docListCollapsed: false }),
+  // Mobile helper: close doclist (after selecting a doc)
+  closeDocListMobile: () => set({ docListCollapsed: true }),
+  // Mobile helper: close all overlays
+  closeAllOverlays: () => set({ sidebarCollapsed: true, docListCollapsed: true }),
+
   // Panel width setters
   setSidebarWidth: (width) => {
     const clampedWidth = Math.max(180, Math.min(400, width))
