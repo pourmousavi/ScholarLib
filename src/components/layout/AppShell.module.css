@@ -4,19 +4,20 @@
   width: 100vw;
   overflow: hidden;
   background: var(--bg-base);
+  padding-top: var(--safe-area-top);
 }
 
 .shell.mobile {
-  padding-bottom: 60px; /* Space for mobile nav */
+  padding-bottom: calc(60px + var(--safe-area-bottom)); /* Space for mobile nav + home indicator */
 }
 
 /* Mobile backdrop overlay */
 .backdrop {
   position: fixed;
-  top: 0;
+  top: var(--safe-area-top);
   left: 0;
   right: 0;
-  bottom: 60px; /* Above mobile nav */
+  bottom: calc(60px + var(--safe-area-bottom)); /* Above mobile nav + home indicator */
   background: rgba(0, 0, 0, 0.6);
   z-index: 90;
   -webkit-tap-highlight-color: transparent;
@@ -92,8 +93,8 @@
   .docList:not(.collapsed) {
     position: fixed;
     left: 228px;
-    top: 0;
-    bottom: 0;
+    top: var(--safe-area-top);
+    bottom: var(--safe-area-bottom);
     z-index: 100;
     width: 310px !important;
     box-shadow: var(--shadow-modal);
@@ -105,8 +106,8 @@
   .sidebar:not(.collapsed) {
     position: fixed;
     left: 0;
-    top: 0;
-    bottom: 60px; /* Leave space for mobile nav */
+    top: var(--safe-area-top);
+    bottom: calc(60px + var(--safe-area-bottom)); /* Leave space for mobile nav + home indicator */
     z-index: 150;
     width: 85% !important;
     max-width: 320px;
@@ -116,8 +117,8 @@
   .docList:not(.collapsed) {
     position: fixed;
     left: 0;
-    top: 0;
-    bottom: 60px; /* Leave space for mobile nav */
+    top: var(--safe-area-top);
+    bottom: calc(60px + var(--safe-area-bottom)); /* Leave space for mobile nav + home indicator */
     z-index: 100;
     width: 100% !important;
     box-shadow: none;

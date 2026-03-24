@@ -1,4 +1,10 @@
 :root {
+  /* Safe area insets for iOS PWA */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+
   /* Backgrounds */
   --bg-base:       #0f1117;
   --bg-sidebar:    #0a0d12;
