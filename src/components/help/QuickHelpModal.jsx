@@ -204,27 +204,6 @@ export default function QuickHelpModal({ onClose }) {
             </div>
           </section>
 
-          {/* Feature Highlights */}
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>New Features</h3>
-            <div className={styles.featureList}>
-              <div className={styles.featureItem}>
-                <span className={styles.featureIcon}>🖍️</span>
-                <div className={styles.featureContent}>
-                  <span className={styles.featureName}>PDF Annotations</span>
-                  <span className={styles.featureDesc}>Highlight text, add notes, and export annotations</span>
-                </div>
-              </div>
-              <div className={styles.featureItem}>
-                <span className={styles.featureIcon}>📥</span>
-                <div className={styles.featureContent}>
-                  <span className={styles.featureName}>Zotero Import</span>
-                  <span className={styles.featureDesc}>Migrate your library with tags, notes & annotations</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
           {/* Open Documentation Button */}
           <button className={styles.docsButton} onClick={openDocs}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="18" height="18">
