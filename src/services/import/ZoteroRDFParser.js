@@ -103,6 +103,9 @@ export function parseZoteroRDF(rdfContent) {
   linkAttachmentsToItems(result)
   linkNotesToItems(result)
 
+  // Link items to collections via hasPart references in collections
+  linkItemsToCollections(result, doc)
+
   return result
 }
 
@@ -516,6 +519,12 @@ function parseAttachment(el) {
     mimeType = 'application/pdf'
   }
 
+  // If no path but title looks like a PDF filename, use it as path
+  // Many Zotero exports store the filename in the title when path isn't available
+  if (!path && title?.toLowerCase().endsWith('.pdf')) {
+    path = title
+  }
+
   const attachment = {
     id: about,
     title: title,
@@ -596,6 +605,50 @@ function linkAttachmentsToItems(result) {
 function linkNotesToItems(result) {
   // Notes in Zotero RDF are typically referenced from items
   // This is handled during item parsing via the link elements
+}
+
+/**
+ * Link items to collections via hasPart references
+ * In Zotero RDF, collections contain hasPart elements that reference items
+ * @param {Object} result - The parsed result object
+ * @param {Document} doc - The parsed RDF document
+ */
+function linkItemsToCollections(result, doc) {
+  // Build a map of item ID to item for quick lookup
+  const itemById = {}
+  for (const item of result.items) {
+    itemById[item.id] = item
+  }
+
+  // Find all hasPart elements in collections
+  const collectionElements = doc.querySelectorAll('Collection, *|Collection')
+  for (const collEl of collectionElements) {
+    const collectionId = collEl.getAttributeNS(NS.rdf, 'about') || collEl.getAttribute('rdf:about')
+    if (!collectionId) continue
+
+    // Find hasPart elements within this collection
+    const hasPartElements = collEl.querySelectorAll('hasPart, *|hasPart')
+    for (const hasPart of hasPartElements) {
+      const itemRef = hasPart.getAttributeNS(NS.rdf, 'resource') ||
+                      hasPart.getAttribute('rdf:resource')
+      if (!itemRef) continue
+
+      // Link the item to this collection
+      if (itemById[itemRef]) {
+        if (!itemById[itemRef].collections.includes(collectionId)) {
+          itemById[itemRef].collections.push(collectionId)
+        }
+      }
+    }
+  }
+
+  // Log linking stats
+  const itemsWithCollections = result.items.filter(i => i.collections.length > 0).length
+  console.log('[ZoteroRDFParser] Collection linking stats:', {
+    totalItems: result.items.length,
+    itemsWithCollections,
+    itemsWithoutCollections: result.items.length - itemsWithCollections
+  })
 }
 
 /**

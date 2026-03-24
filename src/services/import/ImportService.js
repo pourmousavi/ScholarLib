@@ -267,6 +267,23 @@ export async function importDocuments(parsedData, options, onProgress) {
   const { addDocument, documents } = useLibraryStore.getState()
   const total = parsedData.items.length
 
+  // Log diagnostic info about attachments folder
+  if (attachmentsFolder instanceof FileList) {
+    const pdfFiles = []
+    for (const file of attachmentsFolder) {
+      if (file.name.toLowerCase().endsWith('.pdf')) {
+        pdfFiles.push(file.name)
+      }
+    }
+    console.log('[ImportService] Attachments folder diagnostic:', {
+      totalFiles: attachmentsFolder.length,
+      pdfCount: pdfFiles.length,
+      samplePDFs: pdfFiles.slice(0, 20),
+      hasWebkitRelativePath: attachmentsFolder[0]?.webkitRelativePath ? true : false,
+      samplePath: attachmentsFolder[0]?.webkitRelativePath || attachmentsFolder[0]?.name
+    })
+  }
+
   // Send initial progress update
   onProgress?.({
     stage: 'importing',
@@ -368,7 +385,8 @@ export async function importDocuments(parsedData, options, onProgress) {
       if (attachment && attachmentsFolder) {
         try {
           // Read PDF from attachments folder
-          const pdfFile = await findAttachmentFile(attachmentsFolder, attachment.path)
+          // Pass path, attachment title, and document title for multiple matching strategies
+          const pdfFile = await findAttachmentFile(attachmentsFolder, attachment.path, attachment.title, item.title)
 
           if (pdfFile) {
             // Upload to storage
@@ -482,10 +500,23 @@ export async function importDocuments(parsedData, options, onProgress) {
  * Find attachment file in attachments folder
  * @param {FileList|Object} attachmentsFolder - Folder containing attachments
  * @param {string} path - Relative path to file from Zotero
+ * @param {string} attachmentTitle - Attachment title (used as fallback for matching)
+ * @param {string} documentTitle - Document/item title (used for title-based matching)
  * @returns {Promise<File|Blob|null>}
  */
-async function findAttachmentFile(attachmentsFolder, path) {
-  if (!path) return null
+async function findAttachmentFile(attachmentsFolder, path, attachmentTitle, documentTitle) {
+  // Use attachment title as fallback if path is null and title looks like a filename
+  let effectivePath = path
+  if (!effectivePath && attachmentTitle?.toLowerCase().endsWith('.pdf')) {
+    effectivePath = attachmentTitle
+  }
+
+  // If still no path, try to construct one from document title
+  if (!effectivePath && documentTitle) {
+    effectivePath = documentTitle.replace(/[<>:"/\\|?*]/g, '').substring(0, 100) + '.pdf'
+  }
+
+  if (!effectivePath) return null
 
   // Normalize the path from Zotero
   // Zotero paths can be:
@@ -493,7 +524,7 @@ async function findAttachmentFile(attachmentsFolder, path) {
   // - "storage/XXXXXXXX/filename.pdf" (relative to Zotero data dir)
   // - Just "filename.pdf"
   // - Full absolute paths
-  let normalizedPath = path
+  let normalizedPath = effectivePath
 
   // Strip "attachments:" prefix if present
   if (normalizedPath.startsWith('attachments:')) {
@@ -509,6 +540,8 @@ async function findAttachmentFile(attachmentsFolder, path) {
 
   console.log('[ImportService] Looking for attachment:', {
     originalPath: path,
+    attachmentTitle,
+    documentTitle,
     normalizedPath,
     filename,
     lastTwoParts,
@@ -575,7 +608,74 @@ async function findAttachmentFile(attachmentsFolder, path) {
       }
     }
 
-    console.log('[ImportService] No match found for:', filename)
+    // Fourth pass: match by significant words in the filename
+    // Extract words from the filename and try to find files that contain most of them
+    const filenameWords = cleanFilename
+      .split(/[\s\-_.,()]+/)
+      .filter(w => w.length > 3)
+      .slice(0, 5) // Take first 5 significant words
+
+    if (filenameWords.length >= 2) {
+      for (const file of attachmentsFolder) {
+        if (!file.name.toLowerCase().endsWith('.pdf')) continue
+
+        const cleanName = file.name
+          .replace(/\.pdf$/i, '')
+          .replace(/[-_]/g, ' ')
+          .toLowerCase()
+
+        // Count how many words match
+        const matchCount = filenameWords.filter(w => cleanName.includes(w)).length
+
+        // If more than half the words match, consider it a match
+        if (matchCount >= Math.ceil(filenameWords.length / 2) && matchCount >= 2) {
+          console.log('[ImportService] Found by word match:', file.name, 'matched words:', matchCount, 'of', filenameWords.length)
+          return file
+        }
+      }
+    }
+
+    // Fifth pass: try matching by document title words
+    if (documentTitle) {
+      const titleWords = documentTitle
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 3)
+        .slice(0, 6) // Take first 6 significant words from title
+
+      if (titleWords.length >= 2) {
+        for (const file of attachmentsFolder) {
+          if (!file.name.toLowerCase().endsWith('.pdf')) continue
+
+          const cleanName = file.name
+            .replace(/\.pdf$/i, '')
+            .replace(/[-_]/g, ' ')
+            .toLowerCase()
+
+          // Count how many title words appear in the filename
+          const matchCount = titleWords.filter(w => cleanName.includes(w)).length
+
+          // If more than half the words match, consider it a match
+          if (matchCount >= Math.ceil(titleWords.length / 2) && matchCount >= 2) {
+            console.log('[ImportService] Found by document title match:', file.name, 'matched words:', matchCount, 'of', titleWords.length)
+            return file
+          }
+        }
+      }
+    }
+
+    // Log first 10 files in folder for debugging
+    const sampleFiles = []
+    let count = 0
+    for (const file of attachmentsFolder) {
+      if (file.name.toLowerCase().endsWith('.pdf')) {
+        sampleFiles.push(file.name)
+        count++
+        if (count >= 10) break
+      }
+    }
+    console.log('[ImportService] No match found for:', filename, 'documentTitle:', documentTitle, 'Sample files in folder:', sampleFiles)
   }
 
   // Handle File object
