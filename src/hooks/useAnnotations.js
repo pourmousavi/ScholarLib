@@ -76,16 +76,40 @@ export function useAnnotations(docId) {
 
   /**
    * Create a highlight annotation from text selection
+   *
+   * Coordinates are normalized to PDF units (scale=1) for storage,
+   * so they render correctly at any zoom level.
    */
   const createHighlight = useCallback((selection, options = {}) => {
     if (!adapter || !docId) return null
+
+    // Get current scale from selection (passed from PDFViewer)
+    const scale = selection.scale || 1
+
+    // Normalize coordinates to PDF units (divide by scale)
+    const normalizeRect = (rect) => ({
+      x1: rect.x1 / scale,
+      y1: rect.y1 / scale,
+      x2: rect.x2 / scale,
+      y2: rect.y2 / scale,
+      width: rect.width / scale,
+      height: rect.height / scale
+    })
+
+    const normalizedRects = selection.rects.map(normalizeRect)
+    const normalizedBoundingRect = selection.boundingRect ? {
+      x1: selection.boundingRect.x1 / scale,
+      y1: selection.boundingRect.y1 / scale,
+      x2: selection.boundingRect.x2 / scale,
+      y2: selection.boundingRect.y2 / scale
+    } : null
 
     const annotation = AnnotationService.createAnnotation(
       'highlight',
       {
         page: selection.page,
-        rects: selection.rects,
-        boundingRect: selection.boundingRect
+        rects: normalizedRects,
+        boundingRect: normalizedBoundingRect
       },
       {
         text: selection.text,

@@ -98,6 +98,7 @@ const AnnotationHighlight = memo(function AnnotationHighlight({
       role="button"
       tabIndex={0}
       aria-label={`Annotation: ${comment || 'No comment'}`}
+      data-annotation
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           onClick(e, annotation)

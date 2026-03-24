@@ -9,7 +9,8 @@
 }
 
 .highlight {
-  pointer-events: none;
+  /* Allow pointer events on the highlight wrapper so clicks register */
+  pointer-events: auto;
 }
 
 .highlight:focus {

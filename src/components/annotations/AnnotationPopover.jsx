@@ -118,6 +118,7 @@ function AnnotationPopover({
       }}
       role="dialog"
       aria-label="Annotation details"
+      data-annotation-popover
     >
       {/* Header with color and actions */}
       <div className={styles.header}>

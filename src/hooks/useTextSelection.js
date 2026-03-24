@@ -7,30 +7,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  * Works with PDF.js text layer.
  *
  * @param {Object} options - Configuration options
- * @param {React.RefObject} options.containerRef - Reference to the PDF viewer container
+ * @param {React.RefObject} options.containerRef - Reference to the page wrapper
  * @param {number} options.currentPage - Current page number
  * @param {function} options.onSelectionChange - Callback when selection changes
  * @returns {Object} Selection state and methods
  */
 export function useTextSelection({ containerRef, currentPage, onSelectionChange }) {
   const [selection, setSelection] = useState(null)
-  const [isSelecting, setIsSelecting] = useState(false)
-  const selectionTimeoutRef = useRef(null)
+  const isMouseDownRef = useRef(false)
+  const lastProcessedRef = useRef(null)
 
   /**
-   * Get page number from a DOM element within text layer
-   */
-  const getPageFromElement = useCallback((element) => {
-    const pageContainer = element.closest('[data-page-number]')
-    if (pageContainer) {
-      return parseInt(pageContainer.dataset.pageNumber, 10)
-    }
-    return currentPage
-  }, [currentPage])
-
-  /**
-   * Convert client rects to PDF coordinates
-   * Normalizes coordinates relative to the page container
+   * Convert client rects to page-relative coordinates
    */
   const getRectsRelativeToPage = useCallback((range, pageElement) => {
     if (!pageElement) return []
@@ -65,8 +53,8 @@ export function useTextSelection({ containerRef, currentPage, onSelectionChange 
     // Sort by y position, then x
     const sorted = [...rects].sort((a, b) => {
       const yDiff = a.y1 - b.y1
-      if (Math.abs(yDiff) > 5) return yDiff // Different lines
-      return a.x1 - b.x1 // Same line, sort by x
+      if (Math.abs(yDiff) > 5) return yDiff
+      return a.x1 - b.x1
     })
 
     const merged = []
@@ -74,15 +62,10 @@ export function useTextSelection({ containerRef, currentPage, onSelectionChange 
 
     for (let i = 1; i < sorted.length; i++) {
       const rect = sorted[i]
-
-      // Check if same line (within 5px tolerance)
       const sameLine = Math.abs(rect.y1 - current.y1) < 5
-
-      // Check if adjacent (within 3px gap)
       const adjacent = sameLine && (rect.x1 - current.x2) < 3
 
       if (adjacent) {
-        // Extend current rect
         current.x2 = Math.max(current.x2, rect.x2)
         current.y2 = Math.max(current.y2, rect.y2)
         current.width = current.x2 - current.x1
@@ -123,103 +106,86 @@ export function useTextSelection({ containerRef, currentPage, onSelectionChange 
     const windowSelection = window.getSelection()
 
     if (!windowSelection || windowSelection.isCollapsed || !windowSelection.rangeCount) {
-      setSelection(null)
-      onSelectionChange?.(null)
-      return
+      return null
     }
 
     const range = windowSelection.getRangeAt(0)
     const text = windowSelection.toString().trim()
 
     if (!text) {
-      setSelection(null)
-      onSelectionChange?.(null)
-      return
+      return null
     }
 
-    // Check if selection is within our container
-    if (containerRef?.current && !containerRef.current.contains(range.commonAncestorContainer)) {
-      return
-    }
-
-    // Get the page element
+    // Get the page element containing the selection
     const startContainer = range.startContainer.nodeType === Node.TEXT_NODE
       ? range.startContainer.parentElement
       : range.startContainer
     const pageElement = startContainer?.closest('[data-page-number]')
 
     if (!pageElement) {
-      // Selection not in a page, ignore
-      return
+      return null
     }
 
-    const page = parseInt(pageElement.dataset.pageNumber, 10)
+    // Check if this selection belongs to our page
+    const selectionPage = parseInt(pageElement.dataset.pageNumber, 10)
+    if (selectionPage !== currentPage) {
+      return null
+    }
+
     const rawRects = getRectsRelativeToPage(range, pageElement)
     const rects = mergeAdjacentRects(rawRects)
     const boundingRect = getBoundingRect(rects)
 
     if (rects.length === 0) {
-      setSelection(null)
-      onSelectionChange?.(null)
-      return
+      return null
     }
 
-    const selectionData = {
+    return {
       text,
-      page,
+      page: selectionPage,
       rects,
-      boundingRect,
-      range: range.cloneRange() // Clone to preserve after selection changes
+      boundingRect
     }
-
-    setSelection(selectionData)
-    onSelectionChange?.(selectionData)
-  }, [containerRef, getRectsRelativeToPage, mergeAdjacentRects, getBoundingRect, onSelectionChange])
+  }, [currentPage, getRectsRelativeToPage, mergeAdjacentRects, getBoundingRect])
 
   /**
-   * Handle mouse up - process selection
+   * Handle mouse up - check for selection
    */
   const handleMouseUp = useCallback(() => {
-    // Small delay to ensure selection is complete
-    selectionTimeoutRef.current = setTimeout(() => {
-      processSelection()
-      setIsSelecting(false)
-    }, 10)
-  }, [processSelection])
+    isMouseDownRef.current = false
+
+    // Small delay to ensure selection is finalized
+    requestAnimationFrame(() => {
+      const selectionData = processSelection()
+
+      if (selectionData) {
+        // Avoid duplicate processing
+        const selectionKey = `${selectionData.page}:${selectionData.text}`
+        if (lastProcessedRef.current === selectionKey) {
+          return
+        }
+        lastProcessedRef.current = selectionKey
+
+        setSelection(selectionData)
+        onSelectionChange?.(selectionData)
+      }
+    })
+  }, [processSelection, onSelectionChange])
 
   /**
-   * Handle mouse down - start selection
+   * Handle mouse down - track selection start
    */
-  const handleMouseDown = useCallback(() => {
-    setIsSelecting(true)
-    // Clear any pending timeout
-    if (selectionTimeoutRef.current) {
-      clearTimeout(selectionTimeoutRef.current)
+  const handleMouseDown = useCallback((e) => {
+    isMouseDownRef.current = true
+    lastProcessedRef.current = null
+
+    // If clicking inside text layer, allow new selection
+    const textLayer = e.target.closest('.textLayer')
+    if (textLayer) {
+      // Selection is starting, will be processed on mouseup
+      setSelection(null)
     }
   }, [])
-
-  /**
-   * Handle selection change from document
-   */
-  const handleSelectionChange = useCallback(() => {
-    if (isSelecting) {
-      // During drag, update selection state but don't finalize
-      return
-    }
-
-    const windowSelection = window.getSelection()
-    if (!windowSelection || windowSelection.isCollapsed) {
-      // Selection cleared (e.g., user clicked elsewhere)
-      // Don't clear immediately to allow for toolbar interaction
-      selectionTimeoutRef.current = setTimeout(() => {
-        const currentSelection = window.getSelection()
-        if (!currentSelection || currentSelection.isCollapsed) {
-          setSelection(null)
-          onSelectionChange?.(null)
-        }
-      }, 200)
-    }
-  }, [isSelecting, onSelectionChange])
 
   /**
    * Clear selection programmatically
@@ -227,49 +193,27 @@ export function useTextSelection({ containerRef, currentPage, onSelectionChange 
   const clearSelection = useCallback(() => {
     window.getSelection()?.removeAllRanges()
     setSelection(null)
+    lastProcessedRef.current = null
     onSelectionChange?.(null)
   }, [onSelectionChange])
 
-  /**
-   * Restore selection from saved range
-   */
-  const restoreSelection = useCallback((selectionData) => {
-    if (!selectionData?.range) return
-
-    try {
-      const windowSelection = window.getSelection()
-      windowSelection?.removeAllRanges()
-      windowSelection?.addRange(selectionData.range)
-    } catch (error) {
-      console.warn('Could not restore selection:', error)
-    }
-  }, [])
-
-  // Set up event listeners
+  // Set up event listeners on the container
   useEffect(() => {
     const container = containerRef?.current
     if (!container) return
 
     container.addEventListener('mousedown', handleMouseDown)
     container.addEventListener('mouseup', handleMouseUp)
-    document.addEventListener('selectionchange', handleSelectionChange)
 
     return () => {
       container.removeEventListener('mousedown', handleMouseDown)
       container.removeEventListener('mouseup', handleMouseUp)
-      document.removeEventListener('selectionchange', handleSelectionChange)
-
-      if (selectionTimeoutRef.current) {
-        clearTimeout(selectionTimeoutRef.current)
-      }
     }
-  }, [containerRef, handleMouseDown, handleMouseUp, handleSelectionChange])
+  }, [containerRef, handleMouseDown, handleMouseUp])
 
   return {
     selection,
-    isSelecting,
     clearSelection,
-    restoreSelection,
     processSelection
   }
 }

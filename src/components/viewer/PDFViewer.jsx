@@ -65,9 +65,26 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
 
   // Handle text selection from pages
   const handleTextSelection = useCallback((selection) => {
-    setTextSelection(selection)
-    // Clear annotation popover when selecting text
     if (selection) {
+      // New selection - update state and clear popover
+      setTextSelection(selection)
+      setPopoverAnnotation(null)
+      clearSelection()
+    }
+    // Note: we don't clear textSelection when selection is null
+    // because the toolbar needs time to process clicks
+  }, [clearSelection])
+
+  // Handle click on container to clear selection (but not on toolbar or text layer)
+  const handleContainerClick = useCallback((e) => {
+    // Don't clear if clicking on toolbar, popover, or during selection
+    const isToolbar = e.target.closest('[role="toolbar"]')
+    const isPopover = e.target.closest('[data-annotation-popover]')
+    const isTextLayer = e.target.closest('.textLayer')
+    const isAnnotation = e.target.closest('[data-annotation]')
+
+    if (!isToolbar && !isPopover && !isTextLayer && !isAnnotation) {
+      setTextSelection(null)
       setPopoverAnnotation(null)
       clearSelection()
     }
@@ -77,7 +94,11 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
   const handleCreateHighlight = useCallback((options = {}) => {
     if (!textSelection) return
 
-    const annotation = createHighlight(textSelection, {
+    // Pass current zoom scale so coordinates can be normalized to PDF units
+    const annotation = createHighlight({
+      ...textSelection,
+      scale: zoom / 100
+    }, {
       color: highlightColor,
       comment: options.withComment ? '' : undefined
     })
@@ -319,7 +340,7 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
         showAnnotationSidebar={showAnnotationSidebar}
       />
       <div className={styles.viewerContent}>
-        <div className={styles.container} ref={containerRef}>
+        <div className={styles.container} ref={containerRef} onClick={handleContainerClick}>
           <div className={styles.pages}>
             {renderedPages.map((pageNum) => (
               <PageCanvas
