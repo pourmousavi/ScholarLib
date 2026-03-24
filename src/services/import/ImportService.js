@@ -228,6 +228,14 @@ export async function importDocuments(parsedData, options, onProgress) {
   const { createDocument, documents } = useLibraryStore.getState()
   const total = parsedData.items.length
 
+  // Send initial progress update
+  onProgress?.({
+    stage: 'importing',
+    current: 0,
+    total,
+    item: 'Starting import...'
+  })
+
   for (let i = 0; i < parsedData.items.length; i++) {
     const item = parsedData.items[i]
     onProgress?.({
@@ -239,10 +247,12 @@ export async function importDocuments(parsedData, options, onProgress) {
 
     try {
       // Check for duplicate resolution
+      // Resolution can be either a string ('skip') or object ({ action: 'skip' })
       const duplicateKey = `${i}`
       const resolution = duplicateResolutions?.[duplicateKey]
+      const resolutionAction = typeof resolution === 'string' ? resolution : resolution?.action
 
-      if (resolution === 'skip') {
+      if (resolutionAction === 'skip') {
         results.skipped.push({
           title: item.title,
           reason: 'User chose to skip duplicate'
@@ -267,11 +277,11 @@ export async function importDocuments(parsedData, options, onProgress) {
           .filter(Boolean)
       }
 
-      // Handle duplicate resolution
-      if (resolution && resolution.action !== 'skip') {
-        const existingDocId = resolution.existingDocId
+      // Handle duplicate resolution (replace or merge)
+      if (resolution && resolutionAction && resolutionAction !== 'skip' && resolutionAction !== 'keep_both') {
+        const existingDocId = typeof resolution === 'object' ? resolution.existingDocId : null
         if (existingDocId && documents[existingDocId]) {
-          doc = resolveDuplicate(documents[existingDocId], doc, resolution.action)
+          doc = resolveDuplicate(documents[existingDocId], doc, resolutionAction)
           doc.id = existingDocId // Keep existing ID
         }
       }
@@ -351,7 +361,7 @@ export async function importDocuments(parsedData, options, onProgress) {
       }
 
       // Create document in store
-      if (resolution?.action === 'replace' || resolution?.action === 'merge_metadata') {
+      if (resolutionAction === 'replace' || resolutionAction === 'merge_metadata') {
         // Update existing document
         useLibraryStore.getState().updateDocument(doc.id, doc)
       } else {

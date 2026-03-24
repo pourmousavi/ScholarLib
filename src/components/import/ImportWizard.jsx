@@ -117,16 +117,32 @@ export default function ImportWizard({ onClose }) {
 
   // Step 4 -> 5: Start import
   const handleStartImport = useCallback(async () => {
-    if (!parsedData || !adapter) return
+    if (!parsedData) {
+      setError('No data to import')
+      return
+    }
+    if (!adapter) {
+      setError('Storage not connected. Please connect to Box or Dropbox first.')
+      return
+    }
 
     setState(IMPORT_STATES.IMPORTING)
     setStep(5)
     setError(null)
 
+    // Set initial progress immediately so UI shows total
+    setProgress({
+      current: 0,
+      total: parsedData.items.length,
+      stage: 'preparing',
+      item: 'Preparing import...'
+    })
+
     try {
       // Create folder structure if enabled
       let finalFolderMapping = folderMapping
       if (importOptions.importFolders && parsedData.collections.length > 0) {
+        setProgress(prev => ({ ...prev, stage: 'folders', item: 'Creating folders...' }))
         finalFolderMapping = createFolderMapping(parsedData.collections, defaultFolderId)
         setFolderMapping(finalFolderMapping)
       }
@@ -134,6 +150,7 @@ export default function ImportWizard({ onClose }) {
       // Create tags if enabled
       let tagMapping = {}
       if (importOptions.importTags && parsedData.tags.length > 0) {
+        setProgress(prev => ({ ...prev, stage: 'tags', item: 'Registering tags...' }))
         tagMapping = createTagMapping(parsedData.tags)
       }
 
