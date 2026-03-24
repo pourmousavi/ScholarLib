@@ -9,6 +9,7 @@ import { useStorageStore } from './store/storageStore'
 import { useLibraryStore } from './store/libraryStore'
 import { LibraryService } from './services/library/LibraryService'
 import { indexService } from './services/indexing/IndexService'
+import { PortalProvider } from './contexts/PortalContext'
 
 function ToastProvider({ children }) {
   const toasts = useToastStore((state) => state.toasts)
@@ -180,8 +181,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AppContent />
-    </ToastProvider>
+    <PortalProvider>
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
+    </PortalProvider>
   )
 }

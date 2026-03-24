@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useAIStore } from '../../store/aiStore'
 import { tagService } from '../../services/tags/TagService'
+import { usePortalContainer } from '../../contexts/PortalContext'
 import styles from './TagScopeSelector.module.css'
 
 /**
@@ -17,6 +18,7 @@ export default function TagScopeSelector() {
   const triggerRef = useRef(null)
   const dropdownRef = useRef(null)
 
+  const portalContainer = usePortalContainer()
   const tagRegistry = useLibraryStore((s) => s.tagRegistry)
   const documents = useLibraryStore((s) => s.documents)
 
@@ -188,7 +190,7 @@ export default function TagScopeSelector() {
             </div>
           )}
         </div>,
-        document.body
+        portalContainer
       )}
     </div>
   )

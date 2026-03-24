@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import ReactMarkdown from 'react-markdown'
+import { usePortalContainer } from '../../contexts/PortalContext'
 import { useAIStore } from '../../store/aiStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
@@ -40,6 +41,8 @@ export default function ChatPanel() {
   const inputRef = useRef(null)
   const modelSelectorRef = useRef(null)
   const modelDropdownRef = useRef(null)
+
+  const portalContainer = usePortalContainer()
 
   const provider = useAIStore((s) => s.provider)
   const model = useAIStore((s) => s.model)
@@ -742,7 +745,7 @@ export default function ChatPanel() {
                     </button>
                   ))}
                 </div>,
-                document.body
+                portalContainer
               )}
             </div>
             {costEstimate && input.trim() && (
