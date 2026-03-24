@@ -9,7 +9,7 @@ export default function QuickHelpModal({ onClose }) {
   }
 
   return (
-    <Modal onClose={onClose} width={520}>
+    <Modal onClose={onClose} width={560}>
       <div className={styles.container}>
         {/* Header */}
         <div className={styles.header}>
@@ -46,7 +46,7 @@ export default function QuickHelpModal({ onClose }) {
                   <span className={styles.keys}>
                     <kbd>Esc</kbd>
                   </span>
-                  <span className={styles.action}>Close modal</span>
+                  <span className={styles.action}>Close modal / Cancel</span>
                 </div>
               </div>
             </div>
@@ -65,6 +65,30 @@ export default function QuickHelpModal({ onClose }) {
                     <kbd>⌘</kbd><kbd>,</kbd>
                   </span>
                   <span className={styles.action}>Open settings</span>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.shortcutGroup}>
+              <h4 className={styles.groupTitle}>PDF Annotations</h4>
+              <div className={styles.shortcutList}>
+                <div className={styles.shortcutItem}>
+                  <span className={styles.keys}>
+                    <kbd>Select text</kbd>
+                  </span>
+                  <span className={styles.action}>Show highlight toolbar</span>
+                </div>
+                <div className={styles.shortcutItem}>
+                  <span className={styles.keys}>
+                    <kbd>Enter</kbd>
+                  </span>
+                  <span className={styles.action}>Save annotation comment</span>
+                </div>
+                <div className={styles.shortcutItem}>
+                  <span className={styles.keys}>
+                    <kbd>Shift</kbd><kbd>Enter</kbd>
+                  </span>
+                  <span className={styles.action}>New line in comment</span>
                 </div>
               </div>
             </div>
@@ -90,7 +114,7 @@ export default function QuickHelpModal({ onClose }) {
 
           {/* Quick Links Section */}
           <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Quick Links</h3>
+            <h3 className={styles.sectionTitle}>Documentation</h3>
             <div className={styles.linkList}>
               <a
                 href={`${DOCS_URL}`}
@@ -107,6 +131,36 @@ export default function QuickHelpModal({ onClose }) {
                 <span>Getting Started Guide</span>
               </a>
               <a
+                href={`${DOCS_URL}annotations`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.link}
+              >
+                <span className={styles.linkIcon}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M15.54 3.5l4.95 4.95-9.9 9.9H5.64v-4.95l9.9-9.9z"/>
+                    <path d="M16.95 2.09l1.41 1.41-4.95 4.95-1.41-1.41z"/>
+                    <path d="M4.91 19.5h12v2h-12z"/>
+                  </svg>
+                </span>
+                <span>PDF Annotations</span>
+              </a>
+              <a
+                href={`${DOCS_URL}import`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.link}
+              >
+                <span className={styles.linkIcon}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </span>
+                <span>Import from Zotero</span>
+              </a>
+              <a
                 href={`${DOCS_URL}ai/setup`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -119,6 +173,19 @@ export default function QuickHelpModal({ onClose }) {
                   </svg>
                 </span>
                 <span>AI Setup</span>
+              </a>
+              <a
+                href={`${DOCS_URL}ai-chat`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.link}
+              >
+                <span className={styles.linkIcon}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                  </svg>
+                </span>
+                <span>AI Chat Guide</span>
               </a>
               <a
                 href={`${DOCS_URL}library/tags`}
@@ -134,19 +201,27 @@ export default function QuickHelpModal({ onClose }) {
                 </span>
                 <span>Tags & Collections</span>
               </a>
-              <a
-                href={`${DOCS_URL}ai-chat`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.link}
-              >
-                <span className={styles.linkIcon}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-                  </svg>
-                </span>
-                <span>AI Chat Guide</span>
-              </a>
+            </div>
+          </section>
+
+          {/* Feature Highlights */}
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>New Features</h3>
+            <div className={styles.featureList}>
+              <div className={styles.featureItem}>
+                <span className={styles.featureIcon}>🖍️</span>
+                <div className={styles.featureContent}>
+                  <span className={styles.featureName}>PDF Annotations</span>
+                  <span className={styles.featureDesc}>Highlight text, add notes, and export annotations</span>
+                </div>
+              </div>
+              <div className={styles.featureItem}>
+                <span className={styles.featureIcon}>📥</span>
+                <div className={styles.featureContent}>
+                  <span className={styles.featureName}>Zotero Import</span>
+                  <span className={styles.featureDesc}>Migrate your library with tags, notes & annotations</span>
+                </div>
+              </div>
             </div>
           </section>
 
