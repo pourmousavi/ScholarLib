@@ -76,24 +76,102 @@ Runs AI on your computer via a local server. Fast, private, and supports larger 
 
 ### CORS Configuration (Required)
 
-Ollama needs CORS enabled to work with web apps.
+Ollama needs CORS enabled to work with web apps. Without this, ScholarLib cannot connect to Ollama.
 
-**macOS (temporary):**
+#### macOS - Permanent Setup (Recommended)
+
+Create a LaunchAgent that starts Ollama automatically with CORS enabled:
+
+```bash
+# 1. Quit Ollama completely first
+pkill -f ollama
+
+# 2. Create the LaunchAgent
+cat > ~/Library/LaunchAgents/com.ollama.serve.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ollama.serve</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/ollama</string>
+        <string>serve</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>OLLAMA_ORIGINS</key>
+        <string>*</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
+# 3. Load it (starts now and on every login)
+launchctl load ~/Library/LaunchAgents/com.ollama.serve.plist
+```
+
+:::warning Don't use Ollama.app
+After setting up the LaunchAgent, don't open the Ollama.app anymore - the LaunchAgent handles everything. Disable "Launch at login" in Ollama.app preferences to avoid conflicts.
+:::
+
+#### macOS - Manual (Temporary)
+
+If you prefer to start Ollama manually each session:
+
 ```bash
 OLLAMA_ORIGINS="*" ollama serve
 ```
 
-**macOS (permanent):**
+#### Linux - Permanent Setup
+
+Create a systemd service:
+
 ```bash
-launchctl setenv OLLAMA_ORIGINS "*"
+sudo tee /etc/systemd/system/ollama.service << 'EOF'
+[Unit]
+Description=Ollama Service
+After=network.target
+
+[Service]
+Environment="OLLAMA_ORIGINS=*"
+ExecStart=/usr/local/bin/ollama serve
+Restart=always
+User=YOUR_USERNAME
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable ollama
+sudo systemctl start ollama
 ```
 
-**Linux:**
+#### Linux - Manual (Temporary)
+
 ```bash
 OLLAMA_ORIGINS="*" ollama serve
 ```
 
-**Windows (PowerShell):**
+#### Windows - Permanent Setup
+
+Set the environment variable system-wide:
+
+1. Open Start → Search "environment variables"
+2. Click "Environment Variables..."
+3. Under "User variables", click "New"
+4. Variable name: `OLLAMA_ORIGINS`
+5. Variable value: `*`
+6. Click OK and restart Ollama
+
+#### Windows - Manual (PowerShell)
+
 ```powershell
 $env:OLLAMA_ORIGINS="*"; ollama serve
 ```
@@ -145,15 +223,32 @@ Access GPT-4o and other OpenAI models.
 
 ## Troubleshooting
 
-### "Cannot reach Ollama"
+### "Cannot reach Ollama" or "CORS blocked"
 
-This usually means CORS is not configured. Make sure to start Ollama with:
+This means CORS is not configured. Ollama is running but blocking web requests.
 
+**Quick fix:**
 ```bash
+# Kill existing Ollama process
+pkill -f ollama
+
+# Restart with CORS enabled
 OLLAMA_ORIGINS="*" ollama serve
 ```
 
-If Ollama is already running, quit it completely first, then restart with the command above.
+**Permanent fix:** See the [CORS Configuration](#cors-configuration-required) section above to set up a LaunchAgent (macOS), systemd service (Linux), or environment variable (Windows).
+
+### "Address already in use" error
+
+Another Ollama process is already running:
+
+```bash
+# Kill the existing process
+pkill -f ollama
+
+# Then start with CORS
+OLLAMA_ORIGINS="*" ollama serve
+```
 
 ### "WebGPU not supported"
 

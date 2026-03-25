@@ -30,18 +30,60 @@ git --version
 
 ### 1.3 Install Ollama on Mac
 - [ ] Download from https://ollama.ai
-- [ ] Install and run: `ollama serve`
+- [ ] **Important:** Set up with CORS enabled (required for web apps):
+
+```bash
+# Quit Ollama if running
+pkill -f ollama
+
+# Create LaunchAgent for automatic startup with CORS
+cat > ~/Library/LaunchAgents/com.ollama.serve.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ollama.serve</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/ollama</string>
+        <string>serve</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>OLLAMA_ORIGINS</key>
+        <string>*</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
+# Load it (starts now and on every login)
+launchctl load ~/Library/LaunchAgents/com.ollama.serve.plist
+```
+
 - [ ] Download required models:
 ```bash
-ollama pull llama3.2          # ~5GB — main LLM
+ollama pull llama3.2          # ~2GB — main LLM
 ollama pull nomic-embed-text  # ~270MB — embeddings
 ```
 - [ ] Verify: `curl http://localhost:11434/api/tags`
+
+⚠️ **Note:** After setting up the LaunchAgent, don't open Ollama.app - the LaunchAgent handles everything.
 
 ### 1.4 Install Ollama on Windows (University PC)
 Try the portable method first (no admin needed):
 - [ ] Download `ollama-windows-amd64.zip` from https://github.com/ollama/ollama/releases
 - [ ] Extract to `C:\Users\[YourName]\ollama\`
+- [ ] Set CORS environment variable:
+  - Open Start → Search "environment variables" → "Environment Variables..."
+  - Under "User variables", click "New"
+  - Name: `OLLAMA_ORIGINS`, Value: `*`
+  - Click OK
 - [ ] Run `ollama.exe serve` from that folder
 - [ ] If blocked by IT: use WebLLM in browser instead (configured in Settings, Stage 12)
 - [ ] Pull same models as Mac if portable method works
