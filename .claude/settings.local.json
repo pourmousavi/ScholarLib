@@ -26,7 +26,11 @@
       "Bash(wc:*)",
       "Bash(npm info:*)",
       "WebFetch(domain:www.npmjs.com)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(env:*)",
+      "Bash(npm run lint:*)"
     ]
   }
 }

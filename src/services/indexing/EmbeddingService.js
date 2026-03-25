@@ -72,20 +72,25 @@ class EmbeddingService {
     // Truncate very long text (embedding models have limits)
     const truncatedText = text.slice(0, 8000)
 
-    // Try Ollama first if it's the provider
-    if (provider === 'ollama') {
-      try {
-        const ollamaAvailable = await ollamaService.isAvailable()
-        if (ollamaAvailable) {
-          return await this.embedWithOllama(truncatedText)
-        }
-      } catch (error) {
-        console.log('Ollama embedding failed, falling back to browser:', error.message)
+    // Always try Ollama first for embeddings (regardless of chat provider)
+    // This ensures consistency between indexing and search
+    try {
+      const ollamaAvailable = await ollamaService.isAvailable()
+      console.log('[EmbeddingService] Ollama available:', ollamaAvailable, 'provider:', provider)
+      if (ollamaAvailable) {
+        const embedding = await this.embedWithOllama(truncatedText)
+        console.log('[EmbeddingService] Using Ollama embeddings, dimensions:', embedding.length)
+        return embedding
       }
+    } catch (error) {
+      console.log('[EmbeddingService] Ollama embedding failed:', error.message)
     }
 
-    // Use browser-based embeddings (works with WebLLM and as fallback)
-    return await this.embedWithBrowser(truncatedText, onProgress)
+    // Use browser-based embeddings as fallback
+    console.log('[EmbeddingService] Using browser embeddings (fallback)')
+    const embedding = await this.embedWithBrowser(truncatedText, onProgress)
+    console.log('[EmbeddingService] Browser embedding dimensions:', embedding.length)
+    return embedding
   }
 
   /**

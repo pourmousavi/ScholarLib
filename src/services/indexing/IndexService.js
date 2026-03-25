@@ -275,13 +275,18 @@ class IndexService {
 
       if (storedDim !== queryDim) {
         console.error('DIMENSION MISMATCH!')
-        console.error(`Stored embeddings have ${storedDim} dimensions, but query has ${queryDim} dimensions.`)
-        console.error('This happens when the embedding model changes (e.g., Ollama vs browser fallback).')
-        console.error('Solution: Re-index documents with the same embedding model you want to use for search.')
+        console.error(`Stored embeddings: ${storedDim} dims, Query: ${queryDim} dims`)
         // Clear the cache to force re-download of index
         this.indexCache = null
         this.chunkTextCache = null
-        return []
+        // Throw an error that can be caught and shown to user
+        const error = new Error(
+          storedDim === 768 && queryDim === 384
+            ? 'Ollama is not responding. Documents were indexed with Ollama but it\'s currently unavailable. Please ensure Ollama is running.'
+            : `Embedding dimension mismatch (${storedDim} vs ${queryDim}). Please re-index documents.`
+        )
+        error.code = 'DIMENSION_MISMATCH'
+        throw error
       }
     }
 

@@ -315,11 +315,17 @@ export default function ChatPanel() {
 
           // Log if no chunks found for an indexed document
           if (retrievedChunks.length === 0 && scope.type === 'document' && selectedDocId) {
-            console.warn('No chunks found for indexed document. Check browser console for dimension mismatch errors.')
+            console.warn('No chunks found for indexed document.')
           }
         } catch (err) {
           console.error('RAG search failed:', err)
-          // Continue without RAG if search fails
+          // Show dimension mismatch errors to the user
+          if (err.code === 'DIMENSION_MISMATCH') {
+            setError(err.message)
+            setStreaming(false)
+            return
+          }
+          // Continue without RAG for other errors
         }
       } else {
         console.log('RAG search skipped - adapter:', !!adapter, 'isDemoMode:', isDemoMode)
