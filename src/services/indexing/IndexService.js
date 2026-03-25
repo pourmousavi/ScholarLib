@@ -274,8 +274,10 @@ class IndexService {
       console.log('Embedding dimensions:', { query: queryDim, stored: storedDim })
 
       if (storedDim !== queryDim) {
-        console.error('DIMENSION MISMATCH! Index needs to be rebuilt with current embedding model.')
-        console.log('To fix: Re-index all documents using "Index All Documents" button')
+        console.error('DIMENSION MISMATCH!')
+        console.error(`Stored embeddings have ${storedDim} dimensions, but query has ${queryDim} dimensions.`)
+        console.error('This happens when the embedding model changes (e.g., Ollama vs browser fallback).')
+        console.error('Solution: Re-index documents with the same embedding model you want to use for search.')
         // Clear the cache to force re-download of index
         this.indexCache = null
         this.chunkTextCache = null

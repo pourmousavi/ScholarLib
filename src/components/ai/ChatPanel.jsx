@@ -295,6 +295,7 @@ export default function ChatPanel() {
           // Check if document is indexed first
           if (scope.type === 'document' && selectedDocId) {
             const isIndexed = await indexService.isIndexed(selectedDocId, adapter)
+            console.log('Document indexed check:', { docId: selectedDocId, isIndexed })
             if (!isIndexed) {
               console.log('Document not indexed yet, skipping RAG search')
             }
@@ -305,10 +306,17 @@ export default function ChatPanel() {
             docId: selectedDocId,
             folderId: selectedFolderId
           }
+          console.log('Search scope:', searchScope)
+
           // Use fewer chunks for WebLLM (smaller context window)
           const topK = provider === 'webllm' ? 3 : 6
           retrievedChunks = await indexService.search(trimmedInput, searchScope, adapter, topK)
           console.log('RAG search results:', retrievedChunks.length, 'chunks found')
+
+          // Log if no chunks found for an indexed document
+          if (retrievedChunks.length === 0 && scope.type === 'document' && selectedDocId) {
+            console.warn('No chunks found for indexed document. Check browser console for dimension mismatch errors.')
+          }
         } catch (err) {
           console.error('RAG search failed:', err)
           // Continue without RAG if search fails
