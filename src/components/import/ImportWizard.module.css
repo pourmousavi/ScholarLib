@@ -473,3 +473,54 @@
 .warningBox li {
   margin-top: var(--space-1);
 }
+
+/* Cancel/Resume UI */
+.cancelSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cancelHint {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0;
+}
+
+.cancellingInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid #fbbf24;
+  border-radius: var(--radius-sm);
+}
+
+.cancellingInfo p {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: #fbbf24;
+  margin: 0;
+}
+
+.resumeInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.resumeInfo p {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}

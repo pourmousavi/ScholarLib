@@ -285,9 +285,11 @@ function buildFileLookupMaps(attachmentsFolder) {
  * @param {Object} parsedData - Parsed import data
  * @param {Object} options - Import options
  * @param {Function} onProgress - Progress callback
+ * @param {AbortSignal} signal - Optional AbortSignal for cancellation
+ * @param {Function} onCheckpoint - Callback called after checkpoint saves
  * @returns {Promise<Object>} Import results
  */
-export async function importDocuments(parsedData, options, onProgress) {
+export async function importDocuments(parsedData, options, onProgress, signal, onCheckpoint) {
   const {
     adapter,
     folderMapping,
@@ -295,7 +297,8 @@ export async function importDocuments(parsedData, options, onProgress) {
     duplicateResolutions,
     attachmentsFolder, // Path to folder containing PDFs
     extractAnnotations = true,
-    importNotes = true
+    importNotes = true,
+    startIndex = 0 // Support resuming from a specific index
   } = options
 
   const results = {
@@ -303,7 +306,9 @@ export async function importDocuments(parsedData, options, onProgress) {
     skipped: [],
     failed: [],
     annotationsExtracted: 0,
-    notesImported: 0
+    notesImported: 0,
+    cancelled: false,
+    lastCompletedIndex: startIndex - 1
   }
 
   const { addDocument, documents } = useLibraryStore.getState()
@@ -326,12 +331,29 @@ export async function importDocuments(parsedData, options, onProgress) {
   // Send initial progress update
   onProgress?.({
     stage: 'importing',
-    current: 0,
+    current: startIndex,
     total,
-    item: 'Starting import...'
+    item: startIndex > 0 ? 'Resuming import...' : 'Starting import...'
   })
 
-  for (let i = 0; i < parsedData.items.length; i++) {
+  for (let i = startIndex; i < parsedData.items.length; i++) {
+    // Check for cancellation before processing each item
+    if (signal?.aborted) {
+      results.cancelled = true
+      // Save library before returning
+      try {
+        const { folders, documents: updatedDocs } = useLibraryStore.getState()
+        await LibraryService.saveLibrary(adapter, {
+          version: '1.0',
+          last_modified: new Date().toISOString(),
+          folders,
+          documents: updatedDocs
+        })
+      } catch (saveError) {
+        console.error('Failed to save library on cancellation:', saveError)
+      }
+      return results
+    }
     const item = parsedData.items[i]
     onProgress?.({
       stage: 'importing',
@@ -504,6 +526,25 @@ export async function importDocuments(parsedData, options, onProgress) {
         id: doc.id,
         title: doc.metadata.title
       })
+
+      // Update last completed index
+      results.lastCompletedIndex = i
+
+      // Checkpoint: save library every 10 items
+      if (results.imported.length % 10 === 0) {
+        try {
+          const { folders, documents: updatedDocs } = useLibraryStore.getState()
+          await LibraryService.saveLibrary(adapter, {
+            version: '1.0',
+            last_modified: new Date().toISOString(),
+            folders,
+            documents: updatedDocs
+          })
+          onCheckpoint?.({ lastCompletedIndex: i, results: { ...results } })
+        } catch (saveError) {
+          console.error('Failed to save checkpoint:', saveError)
+        }
+      }
 
     } catch (error) {
       console.error('Failed to import item:', error)

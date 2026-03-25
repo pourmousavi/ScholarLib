@@ -14,6 +14,54 @@ import {
 import { indexService } from '../../services/indexing'
 import styles from './ImportWizard.module.css'
 
+// Resume state localStorage key
+const RESUME_STATE_KEY = 'sv_import_resume_state'
+// Resume state expiry time (24 hours)
+const RESUME_STATE_EXPIRY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Save resume state to localStorage
+ */
+function saveResumeState(state) {
+  try {
+    localStorage.setItem(RESUME_STATE_KEY, JSON.stringify(state))
+  } catch (e) {
+    console.error('Failed to save resume state:', e)
+  }
+}
+
+/**
+ * Load resume state from localStorage
+ */
+function loadResumeState() {
+  try {
+    const saved = localStorage.getItem(RESUME_STATE_KEY)
+    if (!saved) return null
+    const state = JSON.parse(saved)
+    // Check if state is expired
+    const startedAt = new Date(state.startedAt).getTime()
+    if (Date.now() - startedAt > RESUME_STATE_EXPIRY_MS) {
+      clearResumeState()
+      return null
+    }
+    return state
+  } catch (e) {
+    console.error('Failed to load resume state:', e)
+    return null
+  }
+}
+
+/**
+ * Clear resume state from localStorage
+ */
+function clearResumeState() {
+  try {
+    localStorage.removeItem(RESUME_STATE_KEY)
+  } catch (e) {
+    console.error('Failed to clear resume state:', e)
+  }
+}
+
 /**
  * ImportWizard - Multi-step wizard for importing library data
  *
@@ -66,9 +114,191 @@ export default function ImportWizard({ onClose }) {
   // Step 6: Results
   const [results, setResults] = useState(null)
 
+  // Cancellation
+  const [isCancelling, setIsCancelling] = useState(false)
+  const abortControllerRef = useRef(null)
+
+  // Resume state
+  const [resumeState, setResumeState] = useState(null)
+  const [showResumePrompt, setShowResumePrompt] = useState(false)
+  const [needsAttachmentsFolder, setNeedsAttachmentsFolder] = useState(false)
+
   // File input refs
   const rdfInputRef = useRef(null)
   const attachmentsInputRef = useRef(null)
+
+  // Check for resume state on mount
+  useEffect(() => {
+    const saved = loadResumeState()
+    if (saved && saved.lastCompletedIndex >= 0) {
+      setResumeState(saved)
+      setShowResumePrompt(true)
+    }
+  }, [])
+
+  // Handle starting fresh (discarding resume state)
+  const handleStartFresh = useCallback(() => {
+    clearResumeState()
+    setResumeState(null)
+    setShowResumePrompt(false)
+    setNeedsAttachmentsFolder(false)
+  }, [])
+
+  // Tag mapping state (needed for resume)
+  const [tagMapping, setTagMapping] = useState({})
+
+  // Track if we should auto-continue after resume state restoration
+  const [shouldAutoContinue, setShouldAutoContinue] = useState(false)
+
+  // Handle resuming import
+  const handleResumeImport = useCallback(() => {
+    if (!resumeState) return
+
+    // Restore state from resume data
+    setSourceType(resumeState.sourceType)
+    setParsedData(resumeState.parsedData)
+    setImportStats(resumeState.importStats)
+    setFolderMapping(resumeState.folderMapping || {})
+    setTagMapping(resumeState.tagMapping || {})
+    setDuplicateResolutions(resumeState.duplicateResolutions || {})
+    setDefaultFolderId(resumeState.defaultFolderId || 'root')
+    setImportOptions(resumeState.importOptions || {
+      importFolders: true,
+      importTags: true,
+      importNotes: true,
+      extractAnnotations: true,
+      indexDocuments: false
+    })
+    setResults(resumeState.partialResults || {
+      imported: [],
+      skipped: [],
+      failed: [],
+      annotationsExtracted: 0,
+      notesImported: 0
+    })
+
+    // Check if we need attachments folder re-selection
+    if (resumeState.needsAttachmentsFolder) {
+      setNeedsAttachmentsFolder(true)
+      setShowResumePrompt(false)
+      setStep(1) // Go to step 1 to select attachments folder
+    } else {
+      setShowResumePrompt(false)
+      // Ready to continue import
+      setStep(5)
+      // Flag to auto-continue (will be handled by useEffect)
+      setShouldAutoContinue(true)
+    }
+  }, [resumeState])
+
+  // Handle continuing import after resume
+  const handleContinueImport = useCallback(async () => {
+    if (!resumeState?.parsedData) {
+      setError('No resume data available')
+      return
+    }
+    if (!adapter) {
+      setError('Storage not connected. Please connect to Box or Dropbox first.')
+      return
+    }
+
+    setState(IMPORT_STATES.IMPORTING)
+    setError(null)
+    setImportStartTime(Date.now())
+
+    const startIndex = (resumeState.lastCompletedIndex ?? -1) + 1
+    const total = resumeState.parsedData.items.length
+
+    setProgress({
+      current: startIndex,
+      total,
+      stage: 'importing',
+      item: 'Resuming import...'
+    })
+
+    // Create abort controller for cancellation
+    abortControllerRef.current = new AbortController()
+
+    try {
+      // Run import from where we left off
+      const importResults = await importDocuments(resumeState.parsedData, {
+        adapter,
+        folderMapping: resumeState.folderMapping || {},
+        tagMapping: resumeState.tagMapping || {},
+        duplicateResolutions: resumeState.duplicateResolutions || {},
+        attachmentsFolder,
+        extractAnnotations: resumeState.importOptions?.extractAnnotations ?? true,
+        importNotes: resumeState.importOptions?.importNotes ?? true,
+        defaultFolderId: resumeState.defaultFolderId || 'root',
+        startIndex
+      }, (progress) => {
+        setProgress({
+          current: progress.current || 0,
+          total: progress.total || total,
+          stage: progress.stage,
+          item: progress.item
+        })
+      }, abortControllerRef.current.signal, (checkpoint) => {
+        // Update resume state on checkpoint
+        saveResumeState({
+          ...resumeState,
+          lastCompletedIndex: checkpoint.lastCompletedIndex,
+          partialResults: checkpoint.results
+        })
+      })
+
+      // Merge with previous results
+      const mergedResults = {
+        imported: [...(resumeState.partialResults?.imported || []), ...importResults.imported],
+        skipped: [...(resumeState.partialResults?.skipped || []), ...importResults.skipped],
+        failed: [...(resumeState.partialResults?.failed || []), ...importResults.failed],
+        annotationsExtracted: (resumeState.partialResults?.annotationsExtracted || 0) + importResults.annotationsExtracted,
+        notesImported: (resumeState.partialResults?.notesImported || 0) + importResults.notesImported,
+        cancelled: importResults.cancelled,
+        lastCompletedIndex: importResults.lastCompletedIndex
+      }
+
+      if (importResults.cancelled) {
+        // Update resume state for next time
+        saveResumeState({
+          ...resumeState,
+          lastCompletedIndex: importResults.lastCompletedIndex,
+          partialResults: mergedResults
+        })
+        setResults(mergedResults)
+        setState(IMPORT_STATES.COMPLETE)
+        setStep(6)
+      } else {
+        // Import completed - clear resume state
+        clearResumeState()
+        setResults(mergedResults)
+        setState(IMPORT_STATES.COMPLETE)
+        setStep(6)
+      }
+
+      setIsCancelling(false)
+    } catch (err) {
+      setError(err.message)
+      setState(IMPORT_STATES.ERROR)
+      setIsCancelling(false)
+    }
+  }, [resumeState, adapter, attachmentsFolder])
+
+  // Handle cancel import
+  const handleCancelImport = useCallback(() => {
+    if (abortControllerRef.current) {
+      setIsCancelling(true)
+      abortControllerRef.current.abort()
+    }
+  }, [])
+
+  // Auto-continue import after state restoration
+  useEffect(() => {
+    if (shouldAutoContinue && resumeState?.parsedData && adapter) {
+      setShouldAutoContinue(false)
+      handleContinueImport()
+    }
+  }, [shouldAutoContinue, resumeState, adapter, handleContinueImport])
 
   // Step 1: Handle file selection
   const handleFileSelect = useCallback(async (file) => {
@@ -134,6 +364,9 @@ export default function ImportWizard({ onClose }) {
     setError(null)
     setImportStartTime(Date.now())
 
+    // Create abort controller for cancellation
+    abortControllerRef.current = new AbortController()
+
     // Set initial progress immediately so UI shows total
     setProgress({
       current: 0,
@@ -152,17 +385,38 @@ export default function ImportWizard({ onClose }) {
       }
 
       // Create tags if enabled
-      let tagMapping = {}
+      let finalTagMapping = {}
       if (importOptions.importTags && parsedData.tags.length > 0) {
         setProgress(prev => ({ ...prev, stage: 'tags', item: 'Registering tags...' }))
-        tagMapping = createTagMapping(parsedData.tags)
+        finalTagMapping = createTagMapping(parsedData.tags)
+        setTagMapping(finalTagMapping)
       }
+
+      // Save initial resume state
+      const initialResumeState = {
+        startedAt: new Date().toISOString(),
+        sourceType,
+        parsedData,
+        importStats,
+        importOptions,
+        folderMapping: finalFolderMapping,
+        tagMapping: finalTagMapping,
+        duplicateResolutions,
+        defaultFolderId,
+        lastCompletedIndex: -1,
+        partialResults: { imported: [], skipped: [], failed: [], annotationsExtracted: 0, notesImported: 0 },
+        needsAttachmentsFolder: attachmentsFolder instanceof FileList && attachmentsFolder.length > 0,
+        originalAttachmentsFolderInfo: attachmentsFolder instanceof FileList
+          ? { fileCount: attachmentsFolder.length }
+          : null
+      }
+      saveResumeState(initialResumeState)
 
       // Run import
       const importResults = await importDocuments(parsedData, {
         adapter,
         folderMapping: finalFolderMapping,
-        tagMapping,
+        tagMapping: finalTagMapping,
         duplicateResolutions,
         attachmentsFolder,
         extractAnnotations: importOptions.extractAnnotations,
@@ -174,6 +428,13 @@ export default function ImportWizard({ onClose }) {
           total: progress.total || parsedData.items.length,
           stage: progress.stage,
           item: progress.item
+        })
+      }, abortControllerRef.current.signal, (checkpoint) => {
+        // Update resume state on checkpoint
+        saveResumeState({
+          ...initialResumeState,
+          lastCompletedIndex: checkpoint.lastCompletedIndex,
+          partialResults: checkpoint.results
         })
       })
 
@@ -211,14 +472,45 @@ export default function ImportWizard({ onClose }) {
         importResults.indexingFailed = indexingFailed
       }
 
+      // Handle cancellation
+      if (importResults.cancelled) {
+        // Update resume state for next time
+        saveResumeState({
+          startedAt: new Date().toISOString(),
+          sourceType,
+          parsedData,
+          importStats,
+          importOptions,
+          folderMapping: finalFolderMapping,
+          tagMapping: finalTagMapping,
+          duplicateResolutions,
+          defaultFolderId,
+          lastCompletedIndex: importResults.lastCompletedIndex,
+          partialResults: importResults,
+          needsAttachmentsFolder: attachmentsFolder instanceof FileList && attachmentsFolder.length > 0,
+          originalAttachmentsFolderInfo: attachmentsFolder instanceof FileList
+            ? { fileCount: attachmentsFolder.length }
+            : null
+        })
+        setResults(importResults)
+        setState(IMPORT_STATES.COMPLETE)
+        setStep(6)
+        setIsCancelling(false)
+        return
+      }
+
+      // Import completed - clear resume state
+      clearResumeState()
       setResults(importResults)
       setState(IMPORT_STATES.COMPLETE)
       setStep(6)
+      setIsCancelling(false)
     } catch (err) {
       setError(err.message)
       setState(IMPORT_STATES.ERROR)
+      setIsCancelling(false)
     }
-  }, [parsedData, adapter, folderMapping, importOptions, duplicateResolutions, attachmentsFolder, defaultFolderId])
+  }, [parsedData, adapter, folderMapping, importOptions, duplicateResolutions, attachmentsFolder, defaultFolderId, sourceType, importStats])
 
   // Duplicate resolution handler
   const handleDuplicateResolution = useCallback((index, action, existingDocId) => {
@@ -240,6 +532,17 @@ export default function ImportWizard({ onClose }) {
 
   // Render step content
   const renderStep = () => {
+    // Show resume prompt if available
+    if (showResumePrompt && resumeState) {
+      return (
+        <ResumePrompt
+          resumeState={resumeState}
+          onResume={handleResumeImport}
+          onStartFresh={handleStartFresh}
+        />
+      )
+    }
+
     switch (step) {
       case 1:
         return (
@@ -254,7 +557,9 @@ export default function ImportWizard({ onClose }) {
             attachmentsInputRef={attachmentsInputRef}
             state={state}
             error={error}
-            onNext={handleParse}
+            onNext={needsAttachmentsFolder ? handleContinueImport : handleParse}
+            isResuming={needsAttachmentsFolder}
+            resumeState={resumeState}
           />
         )
 
@@ -304,6 +609,8 @@ export default function ImportWizard({ onClose }) {
             state={state}
             error={error}
             startTime={importStartTime}
+            isCancelling={isCancelling}
+            onCancel={handleCancelImport}
           />
         )
 
@@ -312,6 +619,7 @@ export default function ImportWizard({ onClose }) {
           <Step6_Complete
             results={results}
             onClose={onClose}
+            parsedData={parsedData}
           />
         )
 
@@ -342,6 +650,45 @@ export default function ImportWizard({ onClose }) {
   )
 }
 
+// Resume Prompt
+function ResumePrompt({ resumeState, onResume, onStartFresh }) {
+  const imported = resumeState.partialResults?.imported?.length || 0
+  const total = resumeState.parsedData?.items?.length || 0
+  const remaining = total - (resumeState.lastCompletedIndex + 1)
+
+  return (
+    <div className={styles.step}>
+      <h3 className={styles.stepTitle}>Resume Import?</h3>
+
+      <div className={styles.resumeInfo}>
+        <p>
+          A previous import was interrupted. Would you like to resume?
+        </p>
+        <div className={styles.stats}>
+          <div className={styles.statItem}>
+            <span className={styles.statValue}>{imported}</span>
+            <span className={styles.statLabel}>Imported</span>
+          </div>
+          <div className={styles.statItem}>
+            <span className={styles.statValue}>{remaining}</span>
+            <span className={styles.statLabel}>Remaining</span>
+          </div>
+        </div>
+        {resumeState.needsAttachmentsFolder && (
+          <p className={styles.hint}>
+            Note: You'll need to re-select the attachments folder to include PDFs.
+          </p>
+        )}
+      </div>
+
+      <div className={styles.actions}>
+        <Btn onClick={onStartFresh}>Start Fresh</Btn>
+        <Btn gold onClick={onResume}>Resume Import</Btn>
+      </div>
+    </div>
+  )
+}
+
 // Step 1: Select Source
 function Step1_SelectSource({
   sourceType,
@@ -354,8 +701,66 @@ function Step1_SelectSource({
   attachmentsInputRef,
   state,
   error,
-  onNext
+  onNext,
+  isResuming,
+  resumeState
 }) {
+  // If resuming, show simplified UI for re-selecting attachments folder
+  if (isResuming && resumeState) {
+    const imported = resumeState.partialResults?.imported?.length || 0
+    const remaining = (resumeState.parsedData?.items?.length || 0) - (resumeState.lastCompletedIndex + 1)
+
+    return (
+      <div className={styles.step}>
+        <h3 className={styles.stepTitle}>Re-select Attachments Folder</h3>
+
+        <div className={styles.resumeInfo}>
+          <p>
+            To continue importing with PDFs, please re-select the attachments folder.
+          </p>
+          <p className={styles.hint}>
+            {imported} documents imported, {remaining} remaining.
+          </p>
+        </div>
+
+        <div className={styles.fileSection}>
+          <label className={styles.label}>Attachments Folder</label>
+          <p className={styles.hint}>
+            Select the same folder you used before ({resumeState.originalAttachmentsFolderInfo?.fileCount || 0} files expected)
+          </p>
+          <div className={styles.fileInput}>
+            <input
+              ref={attachmentsInputRef}
+              type="file"
+              webkitdirectory=""
+              directory=""
+              multiple
+              onChange={(e) => onAttachmentsSelect(e.target.files)}
+              className={styles.hiddenInput}
+            />
+            <Btn small onClick={() => attachmentsInputRef.current?.click()}>
+              Choose Folder
+            </Btn>
+            <span className={styles.fileName}>
+              {attachmentsFolder ? `${attachmentsFolder.length} files` : 'No folder selected'}
+            </span>
+          </div>
+        </div>
+
+        {error && <div className={styles.error}>{error}</div>}
+
+        <div className={styles.actions}>
+          <Btn onClick={onNext} disabled={!attachmentsFolder}>
+            Continue Without PDFs
+          </Btn>
+          <Btn gold onClick={onNext} disabled={!attachmentsFolder}>
+            Continue Import
+          </Btn>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.step}>
       <h3 className={styles.stepTitle}>Select Import Source</h3>
@@ -738,7 +1143,7 @@ function Step4_ReviewDuplicates({
 }
 
 // Step 5: Import Progress
-function Step5_ImportProgress({ progress, state, error, startTime }) {
+function Step5_ImportProgress({ progress, state, error, startTime, isCancelling, onCancel }) {
   const [, forceUpdate] = useState(0)
 
   // Update every second to show elapsed time
@@ -781,7 +1186,9 @@ function Step5_ImportProgress({ progress, state, error, startTime }) {
 
   // Determine title and status text based on stage
   const isIndexing = progress.stage === 'indexing'
-  const title = isIndexing ? 'Indexing for AI...' : 'Importing...'
+  const title = isCancelling
+    ? 'Cancelling...'
+    : isIndexing ? 'Indexing for AI...' : 'Importing...'
 
   let statusText = `${progress.current} / ${progress.total} items`
   if (isIndexing) {
@@ -789,7 +1196,9 @@ function Step5_ImportProgress({ progress, state, error, startTime }) {
   }
 
   let itemText = progress.item
-  if (progress.stage === 'extracting_annotations') {
+  if (isCancelling) {
+    itemText = 'Finishing current document...'
+  } else if (progress.stage === 'extracting_annotations') {
     itemText = `Extracting annotations from: ${progress.item}`
   } else if (progress.stage === 'indexing') {
     itemText = progress.item
@@ -830,15 +1239,38 @@ function Step5_ImportProgress({ progress, state, error, startTime }) {
       <div className={styles.importingSpinner}>
         <Spinner size={32} />
       </div>
+
+      {/* Cancel section */}
+      {!isCancelling && (
+        <div className={styles.cancelSection}>
+          <Btn onClick={onCancel}>Cancel Import</Btn>
+          <p className={styles.cancelHint}>
+            Documents already imported will be saved.
+            You can resume this import later.
+          </p>
+        </div>
+      )}
+
+      {isCancelling && (
+        <div className={styles.cancellingInfo}>
+          <p>Finishing current document and saving progress...</p>
+        </div>
+      )}
     </div>
   )
 }
 
 // Step 6: Complete
-function Step6_Complete({ results, onClose }) {
+function Step6_Complete({ results, onClose, parsedData }) {
+  const isCancelled = results?.cancelled
+  const total = parsedData?.items?.length || 0
+  const remaining = total - (results?.lastCompletedIndex ?? -1) - 1
+
   return (
     <div className={styles.step}>
-      <h3 className={styles.stepTitle}>Import Complete!</h3>
+      <h3 className={styles.stepTitle}>
+        {isCancelled ? 'Import Cancelled' : 'Import Complete!'}
+      </h3>
 
       <div className={styles.results}>
         <div className={styles.resultItem}>
@@ -847,6 +1279,15 @@ function Step6_Complete({ results, onClose }) {
             {results?.imported?.length || 0} documents imported
           </span>
         </div>
+
+        {isCancelled && remaining > 0 && (
+          <div className={styles.resultItem}>
+            <span className={styles.resultIcon}>⏸</span>
+            <span className={styles.resultText}>
+              {remaining} remaining (can resume later)
+            </span>
+          </div>
+        )}
 
         {results?.skipped?.length > 0 && (
           <div className={styles.resultItem}>
@@ -902,6 +1343,12 @@ function Step6_Complete({ results, onClose }) {
           </div>
         )}
       </div>
+
+      {isCancelled && (
+        <p className={styles.hint}>
+          Your progress has been saved. Reopen the Import wizard to resume.
+        </p>
+      )}
 
       <div className={styles.actions}>
         <Btn gold onClick={onClose}>Done</Btn>
