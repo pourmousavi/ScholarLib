@@ -74,10 +74,17 @@ export function usePDFLoader(url, initialZoom = 100) {
       extractAllText(pdfDoc)
     } catch (err) {
       loadingTaskRef.current = null
-      if (err.name !== 'PromiseCancelled' && err.name !== 'AbortException') {
-        setError(err.message || 'Failed to load PDF')
-        setLoading(false)
+      // Ignore cancellation and worker destruction errors (common during React StrictMode double-mount)
+      if (err.name === 'PromiseCancelled' ||
+          err.name === 'AbortException' ||
+          err.message?.includes('Worker was destroyed') ||
+          err.message?.includes('transport is destroyed')) {
+        // These are expected during rapid mount/unmount cycles
+        // Don't set error state - loading will be retried by the next mount
+        return
       }
+      setError(err.message || 'Failed to load PDF')
+      setLoading(false)
     }
   }, [url])
 
