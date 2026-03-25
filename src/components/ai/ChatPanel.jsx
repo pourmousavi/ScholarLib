@@ -148,7 +148,9 @@ export default function ChatPanel() {
   useEffect(() => {
     const checkAvailability = async () => {
       if (provider === 'ollama') {
-        const available = await ollamaService.isAvailable()
+        // Force a fresh check (bypass cache) on provider change
+        ollamaService.clearCache()
+        const available = await ollamaService.isAvailable(true)
         setAvailable(available)
       } else if (provider === 'claude') {
         setAvailable(claudeService.isConfigured())
@@ -158,8 +160,8 @@ export default function ChatPanel() {
     }
 
     checkAvailability()
-    // Check every 30 seconds for local providers
-    const interval = setInterval(checkAvailability, 30000)
+    // Check every 15 seconds for local providers (was 30s)
+    const interval = setInterval(checkAvailability, 15000)
     return () => clearInterval(interval)
   }, [provider, setAvailable])
 
@@ -499,6 +501,9 @@ export default function ChatPanel() {
 
   // Render not available state
   if (!isAvailable && !isChecking && provider === 'ollama') {
+    const lastError = ollamaService.getLastError()
+    const isCorsError = lastError?.includes('CORS')
+
     return (
       <div className={styles.panel}>
         <div className={styles.header}>
@@ -507,11 +512,35 @@ export default function ChatPanel() {
         </div>
         <div className={styles.empty}>
           <span className={styles.emptyIcon}>AI</span>
-          <span className={styles.emptyText}>Ollama is not running</span>
+          <span className={styles.emptyText}>
+            {isCorsError ? 'Ollama needs CORS enabled' : 'Cannot connect to Ollama'}
+          </span>
           <span className={styles.emptyHint}>
-            Start Ollama with: ollama serve
-            <br />
-            Then run: ollama pull llama3.2
+            {isCorsError ? (
+              <>
+                Ollama is running but blocking web requests.
+                <br /><br />
+                <strong>Restart Ollama with:</strong>
+                <br />
+                <code style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '4px', display: 'inline-block', marginTop: '4px' }}>
+                  OLLAMA_ORIGINS="*" ollama serve
+                </code>
+              </>
+            ) : (
+              <>
+                1. Start Ollama with CORS enabled:
+                <br />
+                <code style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '4px', display: 'inline-block', marginTop: '4px' }}>
+                  OLLAMA_ORIGINS="*" ollama serve
+                </code>
+                <br /><br />
+                2. Download a model:
+                <br />
+                <code style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '4px', display: 'inline-block', marginTop: '4px' }}>
+                  ollama pull llama3.2
+                </code>
+              </>
+            )}
           </span>
         </div>
       </div>

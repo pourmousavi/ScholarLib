@@ -3,25 +3,104 @@
  *
  * Requires Ollama running locally: ollama serve
  * Default endpoint: http://localhost:11434
+ *
+ * IMPORTANT: Ollama must be started with CORS enabled:
+ *   OLLAMA_ORIGINS="*" ollama serve
  */
 class OllamaService {
   constructor() {
     this.baseURL = 'http://localhost:11434'
+    this.lastError = null
+    this.lastCheckTime = 0
+    this.cachedAvailability = null
+    this.cacheExpiry = 5000 // Cache result for 5 seconds to avoid hammering
   }
 
   /**
    * Check if Ollama is available
+   * Uses caching to avoid repeated checks
+   * @param {boolean} forceCheck - Bypass cache and check immediately
    * @returns {Promise<boolean>}
    */
-  async isAvailable() {
-    try {
-      const res = await fetch(`${this.baseURL}/api/tags`, {
-        signal: AbortSignal.timeout(2000)
-      })
-      return res.ok
-    } catch {
-      return false
+  async isAvailable(forceCheck = false) {
+    // Return cached result if recent
+    const now = Date.now()
+    if (!forceCheck && this.cachedAvailability !== null && (now - this.lastCheckTime) < this.cacheExpiry) {
+      return this.cachedAvailability
     }
+
+    // Try the check with retry
+    const result = await this._checkWithRetry()
+    this.cachedAvailability = result
+    this.lastCheckTime = now
+    return result
+  }
+
+  /**
+   * Internal check with retry logic
+   * @returns {Promise<boolean>}
+   */
+  async _checkWithRetry() {
+    // Try up to 2 times with different approaches
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
+        const res = await fetch(`${this.baseURL}/api/tags`, {
+          method: 'GET',
+          signal: controller.signal,
+          // Don't set mode: 'cors' explicitly - let browser handle it
+          // This allows the request to work in more scenarios
+        })
+
+        clearTimeout(timeoutId)
+
+        if (res.ok) {
+          this.lastError = null
+          return true
+        }
+
+        // Non-OK response
+        this.lastError = `Ollama returned status ${res.status}`
+        return false
+      } catch (err) {
+        // Categorize the error for better debugging
+        if (err.name === 'AbortError') {
+          this.lastError = 'Connection timeout - Ollama may not be running'
+        } else if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
+          // This usually means CORS blocked or network error
+          this.lastError = 'Cannot reach Ollama - check CORS settings'
+        } else if (err.message?.includes('NetworkError')) {
+          this.lastError = 'Network error - is Ollama running?'
+        } else {
+          this.lastError = err.message || 'Unknown error connecting to Ollama'
+        }
+
+        // Small delay before retry
+        if (attempt < 1) {
+          await new Promise(r => setTimeout(r, 500))
+        }
+      }
+    }
+
+    return false
+  }
+
+  /**
+   * Get the last error message (useful for UI)
+   * @returns {string|null}
+   */
+  getLastError() {
+    return this.lastError
+  }
+
+  /**
+   * Clear cached availability (force re-check on next call)
+   */
+  clearCache() {
+    this.cachedAvailability = null
+    this.lastCheckTime = 0
   }
 
   /**
@@ -30,11 +109,20 @@ class OllamaService {
    */
   async getModels() {
     try {
-      const res = await fetch(`${this.baseURL}/api/tags`)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+      const res = await fetch(`${this.baseURL}/api/tags`, {
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+
       if (!res.ok) return []
       const data = await res.json()
       return data.models || []
-    } catch {
+    } catch (err) {
+      console.warn('[OllamaService] Failed to get models:', err.message)
       return []
     }
   }

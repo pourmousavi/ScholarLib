@@ -66,7 +66,9 @@ export default function Sidebar({ isMobile = false }) {
 
       switch (provider) {
         case 'ollama':
-          available = await ollamaService.isAvailable()
+          // Force fresh check on mount (bypass cache)
+          ollamaService.clearCache()
+          available = await ollamaService.isAvailable(true)
           break
         case 'webllm':
           // Check if already ready

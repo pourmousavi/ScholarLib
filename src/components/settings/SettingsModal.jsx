@@ -81,7 +81,7 @@ export default function SettingsModal({ onClose }) {
   // AI state
   const [claudeKey, setClaudeKey] = useState('')
   const [openaiKey, setOpenaiKey] = useState('')
-  const [ollamaStatus, setOllamaStatus] = useState({ available: false, models: [] })
+  const [ollamaStatus, setOllamaStatus] = useState({ available: false, models: [], lastError: null })
   const [testingOllama, setTestingOllama] = useState(false)
   const [testingClaude, setTestingClaude] = useState(false)
   const [testingOpenai, setTestingOpenai] = useState(false)
@@ -224,22 +224,32 @@ export default function SettingsModal({ onClose }) {
   }
 
   const checkOllamaStatus = async () => {
-    const available = await ollamaService.isAvailable()
+    // Force fresh check
+    ollamaService.clearCache()
+    const available = await ollamaService.isAvailable(true)
     const models = available ? await ollamaService.getModels() : []
-    setOllamaStatus({ available, models })
+    const lastError = ollamaService.getLastError()
+    setOllamaStatus({ available, models, lastError })
   }
 
   const handleTestOllama = async () => {
     setTestingOllama(true)
     try {
-      const available = await ollamaService.isAvailable()
+      // Force fresh check
+      ollamaService.clearCache()
+      const available = await ollamaService.isAvailable(true)
       if (available) {
         const models = await ollamaService.getModels()
-        setOllamaStatus({ available: true, models })
+        setOllamaStatus({ available: true, models, lastError: null })
+        setAvailable(true)
         showToast({ message: `Ollama connected - ${models.length} model${models.length !== 1 ? 's' : ''} available`, type: 'success' })
       } else {
-        setOllamaStatus({ available: false, models: [] })
-        showToast({ message: 'Cannot reach Ollama - is it running?', type: 'error' })
+        const lastError = ollamaService.getLastError()
+        setOllamaStatus({ available: false, models: [], lastError })
+        const errorMsg = lastError?.includes('CORS')
+          ? 'CORS blocked - restart Ollama with: OLLAMA_ORIGINS="*" ollama serve'
+          : 'Cannot reach Ollama - is it running?'
+        showToast({ message: errorMsg, type: 'error' })
       }
     } finally {
       setTestingOllama(false)
@@ -881,7 +891,14 @@ export default function SettingsModal({ onClose }) {
         <div className={styles.providerConfig}>
           <div className={styles.statusRow}>
             <span className={`${styles.statusDot} ${ollamaStatus.available ? styles.available : ''}`} />
-            <span>{ollamaStatus.available ? `Connected - ${ollamaStatus.models.length} model${ollamaStatus.models.length !== 1 ? 's' : ''}` : 'Not connected'}</span>
+            <span>
+              {ollamaStatus.available
+                ? `Connected - ${ollamaStatus.models.length} model${ollamaStatus.models.length !== 1 ? 's' : ''}`
+                : ollamaStatus.lastError?.includes('CORS')
+                  ? 'CORS blocked - see instructions below'
+                  : 'Not connected'
+              }
+            </span>
             <button
               className={styles.testBtn}
               onClick={handleTestOllama}
@@ -996,24 +1013,37 @@ export default function SettingsModal({ onClose }) {
 
           {!ollamaStatus.available && (
             <>
-              <div className={styles.hint}>
-                <strong>Setup Instructions:</strong>
-                <ol style={{ margin: '8px 0 0', paddingLeft: 20 }}>
-                  <li>Download Ollama from <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">ollama.ai</a></li>
-                  <li>Start with CORS enabled (see command below)</li>
-                  <li>Click "Test connection" above</li>
-                </ol>
-              </div>
+              {ollamaStatus.lastError?.includes('CORS') ? (
+                <div className={styles.corsHint} style={{ borderColor: 'var(--color-warning)', background: 'rgba(251, 191, 36, 0.15)' }}>
+                  <strong style={{ color: 'var(--color-warning)' }}>CORS Configuration Required</strong>
+                  <p>Ollama is running but blocking web requests. Restart with:</p>
+                  <code>OLLAMA_ORIGINS="*" ollama serve</code>
+                  <p style={{ marginTop: 8, fontSize: '12px', opacity: 0.8 }}>
+                    On macOS, set permanently: <code style={{ fontSize: '11px' }}>launchctl setenv OLLAMA_ORIGINS "*"</code>
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className={styles.hint}>
+                    <strong>Setup Instructions:</strong>
+                    <ol style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+                      <li>Download Ollama from <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">ollama.ai</a></li>
+                      <li>Start with CORS enabled (see command below)</li>
+                      <li>Click "Test connection" above</li>
+                    </ol>
+                  </div>
 
-              <div className={styles.corsHint}>
-                <strong>CORS Configuration Required</strong>
-                <p>To allow ScholarLib to connect, start Ollama with:</p>
-                <code>OLLAMA_ORIGINS="*" ollama serve</code>
-                <p style={{ marginTop: 8 }}>
-                  On macOS, you can set this permanently with:
-                </p>
-                <code>launchctl setenv OLLAMA_ORIGINS "*"</code>
-              </div>
+                  <div className={styles.corsHint}>
+                    <strong>CORS Configuration Required</strong>
+                    <p>To allow ScholarLib to connect, start Ollama with:</p>
+                    <code>OLLAMA_ORIGINS="*" ollama serve</code>
+                    <p style={{ marginTop: 8 }}>
+                      On macOS, you can set this permanently with:
+                    </p>
+                    <code>launchctl setenv OLLAMA_ORIGINS "*"</code>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
