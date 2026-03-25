@@ -195,6 +195,13 @@ export const AIExtractor = {
     const abstractMatch = text.match(/"abstract"\s*:\s*"([^"]+)"/i)
     if (abstractMatch) result.abstract = abstractMatch[1]
 
+    // Extract keywords
+    const keywordsMatch = text.match(/"keywords"\s*:\s*\[([\s\S]*?)\]/i)
+    if (keywordsMatch) {
+      const kwMatches = keywordsMatch[1].matchAll(/"([^"]+)"/g)
+      result.keywords = Array.from(kwMatches).map(m => m[1]).slice(0, 10)
+    }
+
     return Object.keys(result).length > 0 ? result : null
   },
 

@@ -160,6 +160,13 @@ export const OpenAlexService = {
       enriched.url = `https://doi.org/${openAlexData.doi}`
     }
 
+    // Merge keywords from OpenAlex concepts
+    if (openAlexData.keywords && openAlexData.keywords.length > 0) {
+      const existingKeywords = new Set((enriched.keywords || []).map(k => k.toLowerCase()))
+      const newKeywords = openAlexData.keywords.filter(k => !existingKeywords.has(k.toLowerCase()))
+      enriched.keywords = [...(enriched.keywords || []), ...newKeywords].slice(0, 15)
+    }
+
     // Update extraction source
     const currentSource = enriched.extraction_source || 'unknown'
     enriched.extraction_source = currentSource.includes('openalex')

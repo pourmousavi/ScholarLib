@@ -57,6 +57,9 @@ export const CrossRefService = {
                  work.issued?.['date-parts']?.[0]?.[0] ||
                  null
 
+    // Extract keywords from subject field (CrossRef provides these for many papers)
+    const keywords = (work.subject || []).slice(0, 10)
+
     return {
       title: work.title?.[0] || '',
       authors,
@@ -67,6 +70,7 @@ export const CrossRefService = {
       pages: work.page || '',
       doi: work.DOI || '',
       abstract: work.abstract ? this.stripHtml(work.abstract) : '',
+      keywords,
       type: work.type || 'journal-article',
       url: work.URL || (work.DOI ? `https://doi.org/${work.DOI}` : ''),
       extraction_source: 'crossref',

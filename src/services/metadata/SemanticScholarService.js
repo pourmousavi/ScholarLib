@@ -2,7 +2,7 @@ const SS_API = 'https://api.semanticscholar.org/graph/v1/paper'
 
 export const SemanticScholarService = {
   async search(title) {
-    const fields = 'title,authors,year,venue,externalIds,abstract,citationCount'
+    const fields = 'title,authors,year,venue,externalIds,abstract,citationCount,fieldsOfStudy'
     const url = `${SS_API}/search?query=${encodeURIComponent(title)}&fields=${fields}&limit=3`
 
     try {
@@ -41,7 +41,7 @@ export const SemanticScholarService = {
   },
 
   async lookupByDOI(doi) {
-    const url = `${SS_API}/DOI:${encodeURIComponent(doi)}?fields=title,authors,year,venue,externalIds,abstract`
+    const url = `${SS_API}/DOI:${encodeURIComponent(doi)}?fields=title,authors,year,venue,externalIds,abstract,fieldsOfStudy`
 
     try {
       const response = await fetch(url)
@@ -64,6 +64,12 @@ export const SemanticScholarService = {
       return { last, first, orcid: null }
     })
 
+    // Extract keywords from fieldsOfStudy
+    const keywords = (paper.fieldsOfStudy || [])
+      .map(f => typeof f === 'string' ? f : f.category)
+      .filter(Boolean)
+      .slice(0, 10)
+
     return {
       title: paper.title || '',
       authors,
@@ -74,6 +80,7 @@ export const SemanticScholarService = {
       pages: '',
       doi: paper.externalIds?.DOI || '',
       abstract: paper.abstract || '',
+      keywords,
       type: 'journal-article',
       url: paper.externalIds?.DOI ? `https://doi.org/${paper.externalIds.DOI}` : '',
       extraction_source: 'semantic_scholar',

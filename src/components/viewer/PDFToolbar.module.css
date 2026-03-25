@@ -94,6 +94,12 @@
   gap: var(--space-2);
 }
 
+.annotationTools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .toolBtn {
   width: 28px;
   height: 28px;
@@ -234,6 +240,11 @@
   .actions {
     gap: var(--space-1);
     flex-shrink: 0;
+  }
+
+  /* Hide annotation tools on mobile - not practical on small screens */
+  .annotationTools {
+    display: none;
   }
 
   .toolBtn,
