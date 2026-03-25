@@ -676,9 +676,11 @@ export default function ChatPanel() {
             </span>
             {scope.type === 'document' && selectedDoc && selectedDoc.index_status?.status !== 'indexed' ? (
               <>
-                <span className={styles.emptyWarning}>
-                  {isIndexingDoc ? indexingProgress : 'This document needs to be indexed for AI chat.'}
-                </span>
+                {!isIndexingDoc && (
+                  <span className={styles.emptyWarning}>
+                    This document needs to be indexed for AI chat.
+                  </span>
+                )}
                 <Btn
                   gold
                   onClick={handleIndexNow}
