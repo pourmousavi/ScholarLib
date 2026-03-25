@@ -130,8 +130,27 @@ class IndexService {
         onProgress?.({ stage: 'embedding', docId, progress: (i + 1) / chunks.length, current: i + 1, total: chunks.length })
       }
 
+      // Check embedding dimensions
+      const newDimensions = embeddings[0]?.length
+      console.log('[IndexService] New embedding dimensions:', newDimensions)
+
       // 4. Load existing index
-      const { indexData, meta } = await this.loadIndex(adapter)
+      let { indexData, meta } = await this.loadIndex(adapter)
+
+      // Check for dimension mismatch with existing index
+      if (indexData.length > 0 && newDimensions) {
+        const existingDimensions = indexData[0]?.length
+        if (existingDimensions && existingDimensions !== newDimensions) {
+          console.log(`[IndexService] Dimension mismatch detected: existing=${existingDimensions}, new=${newDimensions}`)
+          console.log('[IndexService] Clearing old index to use new embedding model...')
+          onProgress?.({ stage: 'clearing', docId, progress: 0 })
+          await this.clearIndex(adapter)
+          // Reload (will be empty now)
+          const reloaded = await this.loadIndex(adapter)
+          indexData = reloaded.indexData
+          meta = reloaded.meta
+        }
+      }
 
       // 5. Add new document chunks
       const offset = meta.total_chunks
@@ -463,6 +482,48 @@ class IndexService {
   clearCache() {
     this.indexCache = null
     this.chunkTextCache = null
+  }
+
+  /**
+   * Clear entire index from storage (use when embedding model changes)
+   * @param {StorageAdapter} adapter
+   */
+  async clearIndex(adapter) {
+    try {
+      // Delete index files from storage
+      await adapter.deleteFile('_system/index/embeddings_v1.bin').catch(() => {})
+      await adapter.deleteFile('_system/index/index_meta.json').catch(() => {})
+      await adapter.deleteFile('_system/index/chunks_meta.json').catch(() => {})
+
+      // Clear cache
+      this.indexCache = null
+      this.chunkTextCache = null
+
+      // Clear index_status from all documents in library
+      const { documents } = useLibraryStore.getState()
+      const updateDocument = useLibraryStore.getState().updateDocument
+
+      for (const docId of Object.keys(documents)) {
+        if (documents[docId].index_status?.status === 'indexed') {
+          updateDocument(docId, { index_status: null })
+        }
+      }
+
+      // Save library
+      const { folders, documents: updatedDocs } = useLibraryStore.getState()
+      await LibraryService.saveLibrary(adapter, {
+        version: '1.0',
+        last_modified: new Date().toISOString(),
+        folders,
+        documents: updatedDocs
+      })
+
+      console.log('Index cleared successfully')
+      return true
+    } catch (error) {
+      console.error('Failed to clear index:', error)
+      throw error
+    }
   }
 
   /**
