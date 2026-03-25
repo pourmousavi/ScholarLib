@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Modal, Btn, Spinner } from '../ui'
 import { useStorageStore } from '../../store/storageStore'
 import { useLibraryStore } from '../../store/libraryStore'
@@ -61,6 +61,7 @@ export default function ImportWizard({ onClose }) {
 
   // Step 5: Progress
   const [progress, setProgress] = useState({ current: 0, total: 0 })
+  const [importStartTime, setImportStartTime] = useState(null)
 
   // Step 6: Results
   const [results, setResults] = useState(null)
@@ -131,6 +132,7 @@ export default function ImportWizard({ onClose }) {
     setState(IMPORT_STATES.IMPORTING)
     setStep(5)
     setError(null)
+    setImportStartTime(Date.now())
 
     // Set initial progress immediately so UI shows total
     setProgress({
@@ -301,6 +303,7 @@ export default function ImportWizard({ onClose }) {
             progress={progress}
             state={state}
             error={error}
+            startTime={importStartTime}
           />
         )
 
@@ -735,10 +738,46 @@ function Step4_ReviewDuplicates({
 }
 
 // Step 5: Import Progress
-function Step5_ImportProgress({ progress, state, error }) {
+function Step5_ImportProgress({ progress, state, error, startTime }) {
+  const [, forceUpdate] = useState(0)
+
+  // Update every second to show elapsed time
+  useEffect(() => {
+    const interval = setInterval(() => forceUpdate(n => n + 1), 1000)
+    return () => clearInterval(interval)
+  }, [])
+
   const percent = progress.total > 0
     ? Math.round((progress.current / progress.total) * 100)
     : 0
+
+  // Calculate elapsed time and ETA
+  const elapsed = startTime ? Date.now() - startTime : 0
+  const elapsedSeconds = Math.floor(elapsed / 1000)
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60)
+  const elapsedSecondsRemainder = elapsedSeconds % 60
+
+  // Format elapsed time
+  const elapsedText = elapsedMinutes > 0
+    ? `${elapsedMinutes}m ${elapsedSecondsRemainder}s`
+    : `${elapsedSecondsRemainder}s`
+
+  // Estimate remaining time (only if we have progress)
+  let remainingText = ''
+  if (progress.current > 0 && progress.total > 0 && elapsed > 0) {
+    const msPerItem = elapsed / progress.current
+    const remainingItems = progress.total - progress.current
+    const remainingMs = msPerItem * remainingItems
+    const remainingSeconds = Math.floor(remainingMs / 1000)
+    const remainingMinutes = Math.floor(remainingSeconds / 60)
+    const remainingSecondsRemainder = remainingSeconds % 60
+
+    if (remainingMinutes > 0) {
+      remainingText = `~${remainingMinutes}m ${remainingSecondsRemainder}s remaining`
+    } else if (remainingSeconds > 0) {
+      remainingText = `~${remainingSeconds}s remaining`
+    }
+  }
 
   // Determine title and status text based on stage
   const isIndexing = progress.stage === 'indexing'
@@ -772,6 +811,12 @@ function Step5_ImportProgress({ progress, state, error }) {
         <span className={styles.progressText}>
           {statusText}
         </span>
+      </div>
+
+      {/* Time info */}
+      <div className={styles.timeInfo}>
+        <span>Elapsed: {elapsedText}</span>
+        {remainingText && <span>{remainingText}</span>}
       </div>
 
       {itemText && (
