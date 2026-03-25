@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Modal, Btn, Input, Tag, ConfBar, Spinner } from '../ui'
+import { Modal, Btn, Input, Tag, TagInput, ConfBar, Spinner } from '../ui'
 import { MetadataExtractor } from '../../services/metadata/MetadataExtractor'
 import styles from './MetadataModal.module.css'
 
@@ -11,8 +11,9 @@ export default function MetadataModal({
   isExtracting = false
 }) {
   const [metadata, setMetadata] = useState(initialMetadata)
+  const [userTags, setUserTags] = useState([])
   const [isSaving, setIsSaving] = useState(false)
-  const [tagInput, setTagInput] = useState('')
+  const [keywordInput, setKeywordInput] = useState('')
 
   const overallConfidence = MetadataExtractor.getOverallConfidence(metadata)
   const hasLowConfidence = Object.values(metadata.extraction_confidence || {})
@@ -43,31 +44,31 @@ export default function MetadataModal({
       .join(', ')
   }
 
-  const handleAddTag = () => {
-    if (!tagInput.trim()) return
-    const newTags = [...(metadata.keywords || []), tagInput.trim()]
-    setMetadata(prev => ({ ...prev, keywords: newTags }))
-    setTagInput('')
+  const handleAddKeyword = () => {
+    if (!keywordInput.trim()) return
+    const newKeywords = [...(metadata.keywords || []), keywordInput.trim()]
+    setMetadata(prev => ({ ...prev, keywords: newKeywords }))
+    setKeywordInput('')
   }
 
-  const handleRemoveTag = (tag) => {
+  const handleRemoveKeyword = (keyword) => {
     setMetadata(prev => ({
       ...prev,
-      keywords: (prev.keywords || []).filter(t => t !== tag)
+      keywords: (prev.keywords || []).filter(k => k !== keyword)
     }))
   }
 
-  const handleTagKeyDown = (e) => {
+  const handleKeywordKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      handleAddTag()
+      handleAddKeyword()
     }
   }
 
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      await onSave(metadata)
+      await onSave({ metadata, userTags })
     } finally {
       setIsSaving(false)
     }
@@ -240,21 +241,33 @@ export default function MetadataModal({
                 />
               </div>
 
-              {/* Tags */}
+              {/* Keywords (from paper metadata) */}
               <div className={styles.field}>
-                <label className={styles.label}>Tags</label>
+                <label className={styles.label}>Keywords (from paper)</label>
                 <div className={styles.tags}>
-                  {(metadata.keywords || []).map(tag => (
-                    <Tag key={tag} label={tag} onRemove={() => handleRemoveTag(tag)} />
+                  {(metadata.keywords || []).map(keyword => (
+                    <Tag key={keyword} label={keyword} onRemove={() => handleRemoveKeyword(keyword)} />
                   ))}
                   <input
                     className={styles.tagInput}
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={handleTagKeyDown}
-                    placeholder="Add tag..."
+                    value={keywordInput}
+                    onChange={(e) => setKeywordInput(e.target.value)}
+                    onKeyDown={handleKeywordKeyDown}
+                    placeholder="Add keyword..."
                   />
                 </div>
+                <span className={styles.hint}>Machine-extracted keywords from the paper</span>
+              </div>
+
+              {/* User Tags (for organization) */}
+              <div className={styles.field}>
+                <label className={styles.label}>Tags (for organization)</label>
+                <TagInput
+                  tags={userTags}
+                  onChange={setUserTags}
+                  placeholder="Add organizational tags..."
+                />
+                <span className={styles.hint}>Your personal tags for organizing this document</span>
               </div>
             </div>
 

@@ -224,7 +224,7 @@ export default function DocList({ isMobile = false }) {
     }
   }
 
-  const handleUploadComplete = async ({ file, metadata, folderId }) => {
+  const handleUploadComplete = async ({ file, metadata, userTags, folderId }) => {
     if (!adapter || !isConnected) {
       showToast({ message: 'Storage not connected', type: 'error' })
       return
@@ -247,7 +247,7 @@ export default function DocList({ isMobile = false }) {
           ...metadata,
           extraction_date: new Date().toISOString()
         },
-        tags: metadata.keywords || []
+        tags: userTags || []
       }, file)
 
       // Update local store

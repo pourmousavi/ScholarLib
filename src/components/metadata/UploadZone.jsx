@@ -163,11 +163,12 @@ export default function UploadZone({
     return textParts.join('\n\n')
   }
 
-  const handleSave = async (finalMetadata) => {
+  const handleSave = async ({ metadata: finalMetadata, userTags }) => {
     if (onUploadComplete) {
       await onUploadComplete({
         file,
         metadata: finalMetadata,
+        userTags,
         folderId,
         extractedText
       })
