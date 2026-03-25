@@ -128,7 +128,7 @@
   margin-bottom: var(--space-4);
 }
 
-.field > label:first-child {
+.field > label:first-child:not(.toggle) {
   display: block;
   font-family: 'DM Sans', sans-serif;
   font-size: 12px;
