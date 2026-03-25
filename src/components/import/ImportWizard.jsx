@@ -11,6 +11,7 @@ import {
   importDocuments,
   getImportStats
 } from '../../services/import'
+import { indexService } from '../../services/indexing'
 import styles from './ImportWizard.module.css'
 
 /**
@@ -54,7 +55,8 @@ export default function ImportWizard({ onClose }) {
     importFolders: true,
     importTags: true,
     importNotes: true,
-    extractAnnotations: true
+    extractAnnotations: true,
+    indexDocuments: false
   })
 
   // Step 5: Progress
@@ -171,13 +173,41 @@ export default function ImportWizard({ onClose }) {
           stage: progress.stage,
           item: progress.item
         })
-
-        if (progress.stage === 'complete') {
-          setResults(progress.results)
-          setState(IMPORT_STATES.COMPLETE)
-          setStep(6)
-        }
       })
+
+      // If indexing is enabled, run post-import indexing
+      if (importOptions.indexDocuments && importResults.imported.length > 0) {
+        const totalToIndex = importResults.imported.length
+        let indexed = 0
+        let indexingFailed = 0
+
+        for (const doc of importResults.imported) {
+          setProgress({
+            current: indexed + 1,
+            total: totalToIndex,
+            stage: 'indexing',
+            item: `Indexing: ${doc.title || 'document'}`
+          })
+
+          try {
+            // Get the document from the store to find its PDF URL
+            const documents = useLibraryStore.getState().documents
+            const fullDoc = documents[doc.id]
+
+            if (fullDoc?.box_path) {
+              const pdfURL = await adapter.getDownloadURL(fullDoc.box_path)
+              await indexService.indexDocument(doc.id, pdfURL, adapter)
+              indexed++
+            }
+          } catch (indexErr) {
+            console.error('Failed to index document:', doc.id, indexErr)
+            indexingFailed++
+          }
+        }
+
+        importResults.indexed = indexed
+        importResults.indexingFailed = indexingFailed
+      }
 
       setResults(importResults)
       setState(IMPORT_STATES.COMPLETE)
@@ -431,6 +461,10 @@ function Step2_ScanResults({
   onBack,
   onNext
 }) {
+  // Calculate if we should show a time warning
+  const pdfCount = importStats?.totalAttachments || 0
+  const showTimeWarning = pdfCount > 50 && importOptions.extractAnnotations
+
   return (
     <div className={styles.step}>
       <h3 className={styles.stepTitle}>Library Scan Results</h3>
@@ -467,6 +501,17 @@ function Step2_ScanResults({
       {importStats?.duplicateCount > 0 && (
         <div className={styles.warning}>
           Found {importStats.duplicateCount} potential duplicate(s) matching existing documents
+        </div>
+      )}
+
+      {showTimeWarning && (
+        <div className={styles.warningBox}>
+          <strong>Large import detected</strong>
+          <ul>
+            <li>Importing {pdfCount} PDFs with annotation extraction may take a long time.</li>
+            <li>Consider disabling "Extract PDF annotations" for faster import.</li>
+            <li>You can extract annotations later from individual documents.</li>
+          </ul>
         </div>
       )}
 
@@ -518,6 +563,24 @@ function Step2_ScanResults({
           />
           Extract PDF annotations
         </label>
+
+        <label className={styles.checkbox}>
+          <input
+            type="checkbox"
+            checked={importOptions.indexDocuments}
+            onChange={(e) => setImportOptions(prev => ({
+              ...prev,
+              indexDocuments: e.target.checked
+            }))}
+          />
+          Index documents for AI chat
+        </label>
+        {importOptions.indexDocuments && (
+          <p className={styles.optionHint}>
+            Indexing enables AI chat to search document content. This adds significant time to the import.
+            You can also index documents later from the document list.
+          </p>
+        )}
       </div>
 
       <div className={styles.actions}>
@@ -677,9 +740,27 @@ function Step5_ImportProgress({ progress, state, error }) {
     ? Math.round((progress.current / progress.total) * 100)
     : 0
 
+  // Determine title and status text based on stage
+  const isIndexing = progress.stage === 'indexing'
+  const title = isIndexing ? 'Indexing for AI...' : 'Importing...'
+
+  let statusText = `${progress.current} / ${progress.total} items`
+  if (isIndexing) {
+    statusText = `${progress.current} / ${progress.total} documents`
+  }
+
+  let itemText = progress.item
+  if (progress.stage === 'extracting_annotations') {
+    itemText = `Extracting annotations from: ${progress.item}`
+  } else if (progress.stage === 'indexing') {
+    itemText = progress.item
+  } else if (progress.item) {
+    itemText = `Importing: ${progress.item}`
+  }
+
   return (
     <div className={styles.step}>
-      <h3 className={styles.stepTitle}>Importing...</h3>
+      <h3 className={styles.stepTitle}>{title}</h3>
 
       <div className={styles.progressSection}>
         <div className={styles.progressBar}>
@@ -689,16 +770,13 @@ function Step5_ImportProgress({ progress, state, error }) {
           />
         </div>
         <span className={styles.progressText}>
-          {progress.current} / {progress.total} items
+          {statusText}
         </span>
       </div>
 
-      {progress.item && (
+      {itemText && (
         <p className={styles.currentItem}>
-          {progress.stage === 'extracting_annotations'
-            ? `Extracting annotations from: ${progress.item}`
-            : `Importing: ${progress.item}`
-          }
+          {itemText}
         </p>
       )}
 
@@ -757,6 +835,24 @@ function Step6_Complete({ results, onClose }) {
             <span className={styles.resultIcon}>✓</span>
             <span className={styles.resultText}>
               {results.notesImported} notes imported
+            </span>
+          </div>
+        )}
+
+        {results?.indexed > 0 && (
+          <div className={styles.resultItem}>
+            <span className={styles.resultIcon}>✓</span>
+            <span className={styles.resultText}>
+              {results.indexed} documents indexed for AI
+            </span>
+          </div>
+        )}
+
+        {results?.indexingFailed > 0 && (
+          <div className={styles.resultItem}>
+            <span className={styles.resultIcon}>–</span>
+            <span className={styles.resultText}>
+              {results.indexingFailed} indexing failures
             </span>
           </div>
         )}

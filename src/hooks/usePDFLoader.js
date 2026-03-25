@@ -15,6 +15,7 @@ export function usePDFLoader(url, initialZoom = 100) {
 
   const pdfRef = useRef(null)
   const loadingTaskRef = useRef(null)
+  const extractionAbortRef = useRef(null)
 
   const loadPDF = useCallback(async () => {
     if (!url) {
@@ -37,6 +38,12 @@ export function usePDFLoader(url, initialZoom = 100) {
         // Ignore errors from destroying already-completed tasks
       }
       loadingTaskRef.current = null
+    }
+
+    // Abort any ongoing text extraction before destroying the PDF
+    if (extractionAbortRef.current) {
+      extractionAbortRef.current.abort()
+      extractionAbortRef.current = null
     }
 
     // Clean up previous PDF document
@@ -75,16 +82,60 @@ export function usePDFLoader(url, initialZoom = 100) {
   }, [url])
 
   const extractAllText = async (pdfDoc) => {
+    // Create abort controller for this extraction
+    const abortController = new AbortController()
+    extractionAbortRef.current = abortController
+
     try {
       const textParts = []
       for (let i = 1; i <= pdfDoc.numPages; i++) {
-        const page = await pdfDoc.getPage(i)
-        const textContent = await page.getTextContent()
-        const pageText = textContent.items.map(item => item.str).join(' ')
-        textParts.push(pageText)
+        // Check if extraction was aborted
+        if (abortController.signal.aborted) {
+          return
+        }
+
+        // Also verify the PDF document is still the current one
+        if (pdfRef.current !== pdfDoc) {
+          return
+        }
+
+        try {
+          const page = await pdfDoc.getPage(i)
+
+          // Check abort again after async operation
+          if (abortController.signal.aborted || pdfRef.current !== pdfDoc) {
+            return
+          }
+
+          const textContent = await page.getTextContent()
+
+          // Check abort again
+          if (abortController.signal.aborted || pdfRef.current !== pdfDoc) {
+            return
+          }
+
+          const pageText = textContent.items.map(item => item.str).join(' ')
+          textParts.push(pageText)
+        } catch (pageErr) {
+          // Gracefully handle worker destruction errors
+          if (pageErr.message?.includes('Worker was destroyed') ||
+              pageErr.message?.includes('transport is destroyed')) {
+            return
+          }
+          throw pageErr
+        }
       }
-      setExtractedText(textParts.join('\n\n'))
+
+      // Only set text if we weren't aborted and PDF is still current
+      if (!abortController.signal.aborted && pdfRef.current === pdfDoc) {
+        setExtractedText(textParts.join('\n\n'))
+      }
     } catch (err) {
+      // Ignore worker destruction errors
+      if (err.message?.includes('Worker was destroyed') ||
+          err.message?.includes('transport is destroyed')) {
+        return
+      }
       console.error('Text extraction failed:', err)
     }
   }
@@ -100,6 +151,11 @@ export function usePDFLoader(url, initialZoom = 100) {
           // Ignore
         }
         loadingTaskRef.current = null
+      }
+      // Abort any ongoing text extraction
+      if (extractionAbortRef.current) {
+        extractionAbortRef.current.abort()
+        extractionAbortRef.current = null
       }
       // Clean up PDF document on unmount
       if (pdfRef.current) {

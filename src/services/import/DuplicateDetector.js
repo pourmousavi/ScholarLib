@@ -9,23 +9,139 @@
  */
 
 /**
- * Find potential duplicates for a document
+ * Build lookup indices for existing documents
+ * Pre-indexes by DOI and normalized title for O(1) lookups
+ * @param {Object} existingDocs - Existing documents keyed by ID
+ * @returns {Object} Lookup indices
+ */
+function buildDocumentIndex(existingDocs) {
+  const byDOI = new Map()
+  const byNormalizedTitle = new Map()
+  const allDocs = []
+
+  for (const [docId, doc] of Object.entries(existingDocs)) {
+    const meta = doc.metadata || {}
+
+    // Index by DOI
+    if (meta.doi) {
+      const normalizedDoi = normalizeDOI(meta.doi)
+      if (normalizedDoi) {
+        byDOI.set(normalizedDoi, { docId, doc })
+      }
+    }
+
+    // Index by normalized title
+    if (meta.title) {
+      const normalizedTitle = normalizeTitle(meta.title)
+      if (normalizedTitle.length > 10) {
+        // Store as array to handle title collisions
+        if (!byNormalizedTitle.has(normalizedTitle)) {
+          byNormalizedTitle.set(normalizedTitle, [])
+        }
+        byNormalizedTitle.get(normalizedTitle).push({ docId, doc })
+      }
+    }
+
+    allDocs.push({ docId, doc })
+  }
+
+  return { byDOI, byNormalizedTitle, allDocs }
+}
+
+/**
+ * Find potential duplicates for a document using indexed lookups
  * @param {Object} importDoc - Document being imported
  * @param {Object} existingDocs - Existing documents keyed by ID
+ * @param {Object} index - Pre-built document index (optional)
  * @returns {Array<{docId: string, confidence: number, reason: string}>}
  */
-export function findDuplicates(importDoc, existingDocs) {
+export function findDuplicates(importDoc, existingDocs, index = null) {
   const duplicates = []
+  const importMeta = importDoc.metadata || {}
 
-  for (const [docId, existingDoc] of Object.entries(existingDocs)) {
-    const match = checkMatch(importDoc, existingDoc)
-    if (match) {
-      duplicates.push({
-        docId,
-        document: existingDoc,
-        confidence: match.confidence,
-        reason: match.reason
-      })
+  // Use provided index or fall back to checking all docs
+  if (index) {
+    // O(1) DOI lookup
+    if (importMeta.doi) {
+      const normalizedDoi = normalizeDOI(importMeta.doi)
+      if (normalizedDoi && index.byDOI.has(normalizedDoi)) {
+        const { docId, doc } = index.byDOI.get(normalizedDoi)
+        duplicates.push({
+          docId,
+          document: doc,
+          confidence: 100,
+          reason: 'Exact DOI match'
+        })
+        return duplicates // DOI is definitive
+      }
+    }
+
+    // O(1) Exact title lookup
+    if (importMeta.title) {
+      const normalizedTitle = normalizeTitle(importMeta.title)
+      if (normalizedTitle.length > 10 && index.byNormalizedTitle.has(normalizedTitle)) {
+        const matches = index.byNormalizedTitle.get(normalizedTitle)
+        for (const { docId, doc } of matches) {
+          duplicates.push({
+            docId,
+            document: doc,
+            confidence: 90,
+            reason: 'Exact title match'
+          })
+        }
+        if (duplicates.length > 0) {
+          duplicates.sort((a, b) => b.confidence - a.confidence)
+          return duplicates
+        }
+      }
+
+      // Fuzzy title matching still needs linear scan but only if exact didn't match
+      for (const { docId, doc } of index.allDocs) {
+        const existingMeta = doc.metadata || {}
+        if (!existingMeta.title) continue
+
+        const existingTitle = normalizeTitle(existingMeta.title)
+        const similarity = calculateSimilarity(normalizedTitle, existingTitle)
+
+        if (similarity > 0.85) {
+          duplicates.push({
+            docId,
+            document: doc,
+            confidence: Math.round(85 * similarity),
+            reason: `Title similarity: ${Math.round(similarity * 100)}%`
+          })
+        } else if (similarity > 0.7) {
+          // Title + Year + First Author check
+          const sameYear = importMeta.year && existingMeta.year &&
+                           importMeta.year === existingMeta.year
+          const sameFirstAuthor = checkFirstAuthorMatch(
+            importMeta.authors,
+            existingMeta.authors
+          )
+
+          if (sameYear && sameFirstAuthor) {
+            duplicates.push({
+              docId,
+              document: doc,
+              confidence: 80,
+              reason: 'Title + Year + First Author match'
+            })
+          }
+        }
+      }
+    }
+  } else {
+    // Fallback: Original O(n) implementation
+    for (const [docId, existingDoc] of Object.entries(existingDocs)) {
+      const match = checkMatch(importDoc, existingDoc)
+      if (match) {
+        duplicates.push({
+          docId,
+          document: existingDoc,
+          confidence: match.confidence,
+          reason: match.reason
+        })
+      }
     }
   }
 
@@ -206,6 +322,7 @@ function getBigrams(str) {
 
 /**
  * Batch check for duplicates
+ * Uses pre-built index for O(n) total complexity instead of O(n*m)
  * @param {Array} importDocs - Documents being imported
  * @param {Object} existingDocs - Existing documents keyed by ID
  * @returns {Map<number, Array>} Map of import index to duplicate matches
@@ -213,8 +330,11 @@ function getBigrams(str) {
 export function batchFindDuplicates(importDocs, existingDocs) {
   const results = new Map()
 
+  // Build index once, use for all documents
+  const index = buildDocumentIndex(existingDocs)
+
   for (let i = 0; i < importDocs.length; i++) {
-    const duplicates = findDuplicates(importDocs[i], existingDocs)
+    const duplicates = findDuplicates(importDocs[i], existingDocs, index)
     if (duplicates.length > 0) {
       results.set(i, duplicates)
     }

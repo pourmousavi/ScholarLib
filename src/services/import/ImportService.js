@@ -239,6 +239,48 @@ export function convertNoteToMarkdown(htmlContent) {
 }
 
 /**
+ * Build file lookup maps for fast O(1) attachment matching
+ * @param {FileList} attachmentsFolder
+ * @returns {Object} Maps for different matching strategies
+ */
+function buildFileLookupMaps(attachmentsFolder) {
+  if (!(attachmentsFolder instanceof FileList)) {
+    return null
+  }
+
+  const byExactName = new Map()
+  const byLowerName = new Map()
+  const byPathParts = new Map()
+
+  for (const file of attachmentsFolder) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) continue
+
+    const exactName = file.name
+    const lowerName = file.name.toLowerCase()
+    const relativePath = file.webkitRelativePath || file.name
+
+    // Store by exact filename
+    if (!byExactName.has(exactName)) {
+      byExactName.set(exactName, file)
+    }
+
+    // Store by lowercase filename
+    if (!byLowerName.has(lowerName)) {
+      byLowerName.set(lowerName, file)
+    }
+
+    // Store by last two path parts (for Zotero storage structure)
+    const pathParts = relativePath.replace(/\\/g, '/').split('/')
+    const lastTwoParts = pathParts.slice(-2).join('/').toLowerCase()
+    if (!byPathParts.has(lastTwoParts)) {
+      byPathParts.set(lastTwoParts, file)
+    }
+  }
+
+  return { byExactName, byLowerName, byPathParts }
+}
+
+/**
  * Import documents from parsed data
  * @param {Object} parsedData - Parsed import data
  * @param {Object} options - Import options
@@ -267,18 +309,15 @@ export async function importDocuments(parsedData, options, onProgress) {
   const { addDocument, documents } = useLibraryStore.getState()
   const total = parsedData.items.length
 
+  // Pre-build file lookup maps for O(1) matching (instead of O(n) per document)
+  const fileLookupMaps = buildFileLookupMaps(attachmentsFolder)
+
   // Log diagnostic info about attachments folder
   if (attachmentsFolder instanceof FileList) {
-    const pdfFiles = []
-    for (const file of attachmentsFolder) {
-      if (file.name.toLowerCase().endsWith('.pdf')) {
-        pdfFiles.push(file.name)
-      }
-    }
+    const pdfCount = fileLookupMaps?.byExactName?.size || 0
     console.log('[ImportService] Attachments folder diagnostic:', {
       totalFiles: attachmentsFolder.length,
-      pdfCount: pdfFiles.length,
-      samplePDFs: pdfFiles.slice(0, 20),
+      pdfCount,
       hasWebkitRelativePath: attachmentsFolder[0]?.webkitRelativePath ? true : false,
       samplePath: attachmentsFolder[0]?.webkitRelativePath || attachmentsFolder[0]?.name
     })
@@ -386,7 +425,7 @@ export async function importDocuments(parsedData, options, onProgress) {
         try {
           // Read PDF from attachments folder
           // Pass path, attachment title, and document title for multiple matching strategies
-          const pdfFile = await findAttachmentFile(attachmentsFolder, attachment.path, attachment.title, item.title)
+          const pdfFile = await findAttachmentFile(attachmentsFolder, attachment.path, attachment.title, item.title, fileLookupMaps)
 
           if (pdfFile) {
             // Upload to storage
@@ -502,9 +541,10 @@ export async function importDocuments(parsedData, options, onProgress) {
  * @param {string} path - Relative path to file from Zotero
  * @param {string} attachmentTitle - Attachment title (used as fallback for matching)
  * @param {string} documentTitle - Document/item title (used for title-based matching)
+ * @param {Object} lookupMaps - Pre-built lookup maps for O(1) matching
  * @returns {Promise<File|Blob|null>}
  */
-async function findAttachmentFile(attachmentsFolder, path, attachmentTitle, documentTitle) {
+async function findAttachmentFile(attachmentsFolder, path, attachmentTitle, documentTitle, lookupMaps) {
   // Use attachment title as fallback if path is null and title looks like a filename
   let effectivePath = path
   if (!effectivePath && attachmentTitle?.toLowerCase().endsWith('.pdf')) {
@@ -538,144 +578,81 @@ async function findAttachmentFile(attachmentsFolder, path, attachmentTitle, docu
   const pathParts = normalizedPath.replace(/\\/g, '/').split('/')
   const lastTwoParts = pathParts.slice(-2).join('/').toLowerCase()
 
-  console.log('[ImportService] Looking for attachment:', {
-    originalPath: path,
-    attachmentTitle,
-    documentTitle,
-    normalizedPath,
-    filename,
-    lastTwoParts,
-    totalFilesInFolder: attachmentsFolder?.length || 0
-  })
-
   // Handle FileList (from file input with webkitdirectory)
-  if (attachmentsFolder instanceof FileList) {
-    // First pass: try exact filename match
-    for (const file of attachmentsFolder) {
-      // Skip non-PDF files
-      if (!file.name.toLowerCase().endsWith('.pdf')) continue
+  if (attachmentsFolder instanceof FileList && lookupMaps) {
+    const { byExactName, byLowerName, byPathParts } = lookupMaps
 
-      const relativePath = file.webkitRelativePath || file.name
-
-      // Try various matching strategies
-      if (file.name === filename) {
-        console.log('[ImportService] Found by filename match:', file.name)
-        return file
-      }
-
-      if (relativePath.endsWith(filename)) {
-        console.log('[ImportService] Found by path ending match:', relativePath)
-        return file
-      }
-
-      // Check if the relative path contains the last two parts of Zotero's path
-      if (lastTwoParts && relativePath.toLowerCase().includes(lastTwoParts)) {
-        console.log('[ImportService] Found by partial path match:', relativePath)
-        return file
-      }
+    // O(1) lookups using pre-built maps
+    // 1. Exact filename match
+    if (byExactName.has(filename)) {
+      return byExactName.get(filename)
     }
 
-    // Second pass: case-insensitive filename match
+    // 2. Case-insensitive filename match
     const lowerFilename = filename.toLowerCase()
-    for (const file of attachmentsFolder) {
-      if (!file.name.toLowerCase().endsWith('.pdf')) continue
-
-      if (file.name.toLowerCase() === lowerFilename) {
-        console.log('[ImportService] Found by case-insensitive match:', file.name)
-        return file
-      }
+    if (byLowerName.has(lowerFilename)) {
+      return byLowerName.get(lowerFilename)
     }
 
-    // Third pass: fuzzy match on title-like filenames
-    // Zotero sometimes renames files, so try to match by similarity
+    // 3. Path parts match (for Zotero storage structure)
+    if (lastTwoParts && byPathParts.has(lastTwoParts)) {
+      return byPathParts.get(lastTwoParts)
+    }
+
+    // Fallback to slower fuzzy matching for edge cases
+    // These are still needed for cases where filenames were renamed
+
+    // Fuzzy match on title-like filenames
     const cleanFilename = filename
       .replace(/\.pdf$/i, '')
       .replace(/[-_]/g, ' ')
       .toLowerCase()
 
-    for (const file of attachmentsFolder) {
-      if (!file.name.toLowerCase().endsWith('.pdf')) continue
-
-      const cleanName = file.name
-        .replace(/\.pdf$/i, '')
-        .replace(/[-_]/g, ' ')
-        .toLowerCase()
-
-      // Check if the filenames share significant words
-      if (cleanFilename.length > 10 && cleanName.includes(cleanFilename.substring(0, 20))) {
-        console.log('[ImportService] Found by fuzzy match:', file.name)
-        return file
-      }
-    }
-
-    // Fourth pass: match by significant words in the filename
-    // Extract words from the filename and try to find files that contain most of them
-    const filenameWords = cleanFilename
-      .split(/[\s\-_.,()]+/)
-      .filter(w => w.length > 3)
-      .slice(0, 5) // Take first 5 significant words
-
-    if (filenameWords.length >= 2) {
-      for (const file of attachmentsFolder) {
-        if (!file.name.toLowerCase().endsWith('.pdf')) continue
-
-        const cleanName = file.name
-          .replace(/\.pdf$/i, '')
-          .replace(/[-_]/g, ' ')
-          .toLowerCase()
-
-        // Count how many words match
-        const matchCount = filenameWords.filter(w => cleanName.includes(w)).length
-
-        // If more than half the words match, consider it a match
-        if (matchCount >= Math.ceil(filenameWords.length / 2) && matchCount >= 2) {
-          console.log('[ImportService] Found by word match:', file.name, 'matched words:', matchCount, 'of', filenameWords.length)
+    if (cleanFilename.length > 10) {
+      const prefix = cleanFilename.substring(0, 20)
+      for (const [lowerName, file] of byLowerName) {
+        const cleanName = lowerName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ')
+        if (cleanName.includes(prefix)) {
           return file
         }
       }
     }
 
-    // Fifth pass: try matching by document title words
+    // Match by significant words in the filename
+    const filenameWords = cleanFilename
+      .split(/[\s\-_.,()]+/)
+      .filter(w => w.length > 3)
+      .slice(0, 5)
+
+    if (filenameWords.length >= 2) {
+      for (const [lowerName, file] of byLowerName) {
+        const cleanName = lowerName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ')
+        const matchCount = filenameWords.filter(w => cleanName.includes(w)).length
+        if (matchCount >= Math.ceil(filenameWords.length / 2) && matchCount >= 2) {
+          return file
+        }
+      }
+    }
+
+    // Match by document title words
     if (documentTitle) {
       const titleWords = documentTitle
         .toLowerCase()
         .replace(/[^\w\s]/g, ' ')
         .split(/\s+/)
         .filter(w => w.length > 3)
-        .slice(0, 6) // Take first 6 significant words from title
+        .slice(0, 6)
 
       if (titleWords.length >= 2) {
-        for (const file of attachmentsFolder) {
-          if (!file.name.toLowerCase().endsWith('.pdf')) continue
-
-          const cleanName = file.name
-            .replace(/\.pdf$/i, '')
-            .replace(/[-_]/g, ' ')
-            .toLowerCase()
-
-          // Count how many title words appear in the filename
+        for (const [lowerName, file] of byLowerName) {
+          const cleanName = lowerName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ')
           const matchCount = titleWords.filter(w => cleanName.includes(w)).length
-
-          // If more than half the words match, consider it a match
           if (matchCount >= Math.ceil(titleWords.length / 2) && matchCount >= 2) {
-            console.log('[ImportService] Found by document title match:', file.name, 'matched words:', matchCount, 'of', titleWords.length)
             return file
           }
         }
       }
     }
-
-    // Log first 10 files in folder for debugging
-    const sampleFiles = []
-    let count = 0
-    for (const file of attachmentsFolder) {
-      if (file.name.toLowerCase().endsWith('.pdf')) {
-        sampleFiles.push(file.name)
-        count++
-        if (count >= 10) break
-      }
-    }
-    console.log('[ImportService] No match found for:', filename, 'documentTitle:', documentTitle, 'Sample files in folder:', sampleFiles)
   }
 
   // Handle File object
