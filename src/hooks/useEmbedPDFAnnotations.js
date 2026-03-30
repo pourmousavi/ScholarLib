@@ -202,11 +202,12 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
 
   /**
    * Create a highlight annotation at the current selection
+   * @param {number} pageIndex - The page index (0-based)
+   * @param {Array} selectionData - The selection data from getFormattedSelection()
+   * @param {string} text - The selected text
    */
-  const createHighlight = useCallback((pageIndex, quadPoints, text = '') => {
-    console.log('[EmbedPDF Annotations] createHighlight called:', { pageIndex, quadPoints, text })
-    console.log('[EmbedPDF Annotations] annotationApi:', annotationApi)
-    console.log('[EmbedPDF Annotations] annotationApi methods:', annotationApi ? Object.keys(annotationApi) : 'null')
+  const createHighlight = useCallback((pageIndex, selectionData, text = '') => {
+    console.log('[EmbedPDF Annotations] createHighlight called:', { pageIndex, selectionData, text })
 
     if (!annotationApi) {
       console.error('[EmbedPDF Annotations] No annotationApi available')
@@ -214,42 +215,63 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
     }
 
     try {
-      const result = annotationApi.createAnnotation?.(pageIndex, {
-        type: 'highlight',
-        quadPoints,
-        color: { ...hexToRgbaInternal(highlightColor), a: 0.35 },
-        contents: '',
-        _scholarlib: {
-          content: { text, image: null },
-          tags: [],
-          ai_context: { include_in_embeddings: true },
-          source: 'user'
-        }
-      })
+      // Extract segmentRects from selection data
+      // selectionData is an array with objects containing { pageIndex, rect, segmentRects }
+      const segmentRects = selectionData.flatMap(item => item.segmentRects || [])
+      console.log('[EmbedPDF Annotations] Extracted segmentRects:', segmentRects)
+
+      if (segmentRects.length === 0) {
+        console.warn('[EmbedPDF Annotations] No segmentRects found in selection data')
+        return null
+      }
+
+      // Create highlight annotation with correct EmbedPDF format
+      // type: 9 is PdfAnnotationSubtype.HIGHLIGHT
+      const annotation = {
+        type: 9, // HIGHLIGHT enum value
+        segmentRects,
+        strokeColor: highlightColor,
+        opacity: 0.35,
+        contents: typeof text === 'string' ? text : ''
+      }
+
+      console.log('[EmbedPDF Annotations] Creating annotation:', annotation)
+      const result = annotationApi.createAnnotation?.(pageIndex, annotation)
       console.log('[EmbedPDF Annotations] createAnnotation result:', result)
+      return result
     } catch (error) {
       console.error('[EmbedPDF Annotations] createAnnotation failed:', error)
+      return null
     }
   }, [annotationApi, highlightColor])
 
   /**
    * Create an underline annotation
+   * @param {number} pageIndex - The page index (0-based)
+   * @param {Array} selectionData - The selection data from getFormattedSelection()
+   * @param {string} text - The selected text
    */
-  const createUnderline = useCallback((pageIndex, quadPoints, text = '') => {
+  const createUnderline = useCallback((pageIndex, selectionData, text = '') => {
     if (!annotationApi) return null
 
-    annotationApi.createAnnotation?.(pageIndex, {
-      type: 'underline',
-      quadPoints,
-      color: { ...hexToRgbaInternal(highlightColor), a: 1 },
-      contents: '',
-      _scholarlib: {
-        content: { text, image: null },
-        tags: [],
-        ai_context: { include_in_embeddings: true },
-        source: 'user'
+    try {
+      const segmentRects = selectionData.flatMap(item => item.segmentRects || [])
+      if (segmentRects.length === 0) return null
+
+      // type: 10 is PdfAnnotationSubtype.UNDERLINE
+      const annotation = {
+        type: 10, // UNDERLINE enum value
+        segmentRects,
+        strokeColor: highlightColor,
+        opacity: 1,
+        contents: typeof text === 'string' ? text : ''
       }
-    })
+
+      return annotationApi.createAnnotation?.(pageIndex, annotation)
+    } catch (error) {
+      console.error('[EmbedPDF Annotations] createUnderline failed:', error)
+      return null
+    }
   }, [annotationApi, highlightColor])
 
   /**

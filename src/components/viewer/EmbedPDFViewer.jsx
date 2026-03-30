@@ -72,12 +72,25 @@ function TextSelectionMenu({
 
     try {
       const docSelection = selectionCapability.forDocument(documentId)
-      console.log('[EmbedPDF TextSelectionMenu] docSelection methods:', docSelection ? Object.keys(docSelection) : 'null')
 
       const formatted = docSelection.getFormattedSelection()
       console.log('[EmbedPDF TextSelectionMenu] formatted selection:', formatted)
 
-      const text = await docSelection.getSelectedText()
+      // getSelectedText returns a Task/Promise-like object, try to resolve it
+      let text = ''
+      try {
+        const textResult = docSelection.getSelectedText()
+        // Check if it's a promise or task
+        if (textResult && typeof textResult.toPromise === 'function') {
+          text = await textResult.toPromise()
+        } else if (textResult && typeof textResult.then === 'function') {
+          text = await textResult
+        } else {
+          text = textResult || ''
+        }
+      } catch (textErr) {
+        console.warn('[EmbedPDF] Could not get selected text:', textErr)
+      }
       console.log('[EmbedPDF TextSelectionMenu] selected text:', text)
 
       if (formatted && formatted.length > 0) {
@@ -99,7 +112,20 @@ function TextSelectionMenu({
     try {
       const docSelection = selectionCapability.forDocument(documentId)
       const formatted = docSelection.getFormattedSelection()
-      const text = await docSelection.getSelectedText()
+
+      let text = ''
+      try {
+        const textResult = docSelection.getSelectedText()
+        if (textResult && typeof textResult.toPromise === 'function') {
+          text = await textResult.toPromise()
+        } else if (textResult && typeof textResult.then === 'function') {
+          text = await textResult
+        } else {
+          text = textResult || ''
+        }
+      } catch (textErr) {
+        console.warn('[EmbedPDF] Could not get selected text:', textErr)
+      }
 
       if (formatted && formatted.length > 0) {
         onUnderline(pageIndex, formatted, text)
@@ -524,39 +550,27 @@ function EmbedPDFContent({
   }, [annotationApi])
 
   // Handle highlight creation from text selection
-  const handleHighlight = useCallback((pageIndex, selectionRects, text) => {
-    console.log('[EmbedPDF] handleHighlight called:', { pageIndex, selectionRects, text })
-    console.log('[EmbedPDF] selectionRects structure:', JSON.stringify(selectionRects, null, 2))
+  const handleHighlight = useCallback((pageIndex, selectionData, text) => {
+    console.log('[EmbedPDF] handleHighlight called:', { pageIndex, selectionData, text })
 
-    // Convert selection rects to quadPoints
-    // selectionRects from EmbedPDF contain bounds per page
-    const quadPoints = selectionRects.flatMap(rect => {
-      // Each rect has highlightRects array
-      return rect.highlightRects || []
-    })
+    // Resolve text if it's a promise-like object
+    const textStr = typeof text === 'string' ? text : ''
 
-    console.log('[EmbedPDF] Extracted quadPoints:', quadPoints)
-
-    if (quadPoints.length > 0) {
-      createHighlight(pageIndex, quadPoints, text || '')
+    // Pass the selection data directly - it already has the correct format
+    // with segmentRects that createHighlight will extract
+    if (selectionData && selectionData.length > 0) {
+      createHighlight(pageIndex, selectionData, textStr)
     } else {
-      console.warn('[EmbedPDF] No quadPoints extracted from selection')
-      // Try using selectionRects directly if they have the right structure
-      if (selectionRects && selectionRects.length > 0) {
-        console.log('[EmbedPDF] Trying selectionRects directly')
-        createHighlight(pageIndex, selectionRects, text || '')
-      }
+      console.warn('[EmbedPDF] No selection data available')
     }
   }, [createHighlight])
 
   // Handle underline creation
-  const handleUnderline = useCallback((pageIndex, selectionRects, text) => {
-    const quadPoints = selectionRects.flatMap(rect => {
-      return rect.highlightRects || []
-    })
+  const handleUnderline = useCallback((pageIndex, selectionData, text) => {
+    const textStr = typeof text === 'string' ? text : ''
 
-    if (quadPoints.length > 0) {
-      createUnderline(pageIndex, quadPoints, text || '')
+    if (selectionData && selectionData.length > 0) {
+      createUnderline(pageIndex, selectionData, textStr)
     }
   }, [createUnderline])
 
