@@ -30,7 +30,11 @@
       "Bash(curl:*)",
       "Bash(lsof:*)",
       "Bash(env:*)",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "WebFetch(domain:danielarnould.github.io)",
+      "WebFetch(domain:www.embedpdf.com)",
+      "WebFetch(domain:embedpdf.com)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

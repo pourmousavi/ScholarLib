@@ -357,12 +357,49 @@ function EmbedPDFToolbar({
 function EmbedPDFContent({
   documentId,
   docId,
+  totalPages,
   onTotalPagesChange,
   onToggleFullscreen,
   isFullscreen
 }) {
   const { provides: annotationApi } = useAnnotation(documentId)
   const { provides: exportApi } = useExport(documentId)
+  const { provides: zoomApi } = useZoom(documentId)
+  const { provides: scrollApi } = useScroll(documentId)
+
+  // Force a viewport refresh on mount to ensure the document renders
+  // This is needed because EmbedPDF sometimes doesn't render until interaction
+  const hasInitialized = useRef(false)
+  useEffect(() => {
+    if (hasInitialized.current) return
+
+    // Use a small delay to ensure EmbedPDF has fully processed
+    const timer = setTimeout(() => {
+      console.log('[EmbedPDF] Triggering initial viewport refresh')
+
+      // Method 1: Trigger window resize event to force viewport recalculation
+      window.dispatchEvent(new Event('resize'))
+
+      // Method 2: Scroll to first page to ensure viewport is positioned correctly
+      if (scrollApi) {
+        try {
+          console.log('[EmbedPDF] Scrolling to first page')
+          scrollApi.scrollToPage?.(0)
+        } catch (e) {
+          console.log('[EmbedPDF] Scroll to page not available:', e)
+        }
+      }
+
+      hasInitialized.current = true
+    }, 150)
+
+    return () => clearTimeout(timer)
+  }, [scrollApi, documentId])
+
+  // Reset initialization flag when document changes
+  useEffect(() => {
+    hasInitialized.current = false
+  }, [documentId])
 
   // Use annotation management hook
   const {
@@ -539,11 +576,9 @@ function EmbedPDFContent({
           )
         }
 
-        const pageCount = pdfDoc?.pageCount ?? 0
-        console.log('[EmbedPDF] Page count:', pageCount)
-        if (pageCount > 0) {
-          setTimeout(() => onTotalPagesChange(pageCount), 0)
-        }
+        // Use the passed totalPages from DocumentLoader, fallback to pdfDoc.pageCount
+        const pageCount = totalPages || pdfDoc?.pageCount || 0
+        console.log('[EmbedPDF] Page count:', pageCount, 'from props:', totalPages, 'from doc:', pdfDoc?.pageCount)
 
         return (
           <>
@@ -564,20 +599,22 @@ function EmbedPDFContent({
               onSetActiveTool={handleSetActiveTool}
             />
             <div className={styles.viewerContent}>
-              <div className={styles.container}>
-                <ZoomGestureWrapper
-                  documentId={documentId}
-                  enablePinch
-                  enableWheel
-                >
-                  <Viewport
+              <div className={styles.embedpdfContainer}>
+                <div className={styles.embedpdfViewport}>
+                  <ZoomGestureWrapper
                     documentId={documentId}
-                    style={{
-                      backgroundColor: 'var(--bg-surface)',
-                      height: '100%',
-                      width: '100%'
-                    }}
+                    enablePinch
+                    enableWheel
+                    style={{ height: '100%', width: '100%' }}
                   >
+                    <Viewport
+                      documentId={documentId}
+                      style={{
+                        backgroundColor: 'var(--bg-surface)',
+                        height: '100%',
+                        width: '100%'
+                      }}
+                    >
                     <Scroller
                       documentId={documentId}
                       renderPage={({ width, height, pageIndex }) => (
@@ -622,7 +659,8 @@ function EmbedPDFContent({
                       )}
                     />
                   </Viewport>
-                </ZoomGestureWrapper>
+                  </ZoomGestureWrapper>
+                </div>
               </div>
 
               {/* Annotation sidebar */}
@@ -672,6 +710,8 @@ function DocumentLoader({
   const { provides: documentManager } = useDocumentManagerCapability()
   const [isDocumentLoading, setIsDocumentLoading] = useState(false)
   const [documentError, setDocumentError] = useState(null)
+  const [loadedPageCount, setLoadedPageCount] = useState(0)
+  const [documentReady, setDocumentReady] = useState(false)
   const loadedDocRef = useRef(null)
 
   // Load document when we have pdfData and documentManager
@@ -684,6 +724,7 @@ function DocumentLoader({
     const loadDocument = async () => {
       setIsDocumentLoading(true)
       setDocumentError(null)
+      setDocumentReady(false)
 
       try {
         console.log('[EmbedPDF] Loading document via openDocumentBuffer...')
@@ -695,6 +736,20 @@ function DocumentLoader({
 
         console.log('[EmbedPDF] Document loaded:', result)
         loadedDocRef.current = pdfData
+
+        // Extract page count from result
+        const pageCount = result?.pageCount || result?.document?.pageCount || 0
+        console.log('[EmbedPDF] Setting page count:', pageCount)
+        setLoadedPageCount(pageCount)
+        if (pageCount > 0) {
+          onTotalPagesChange(pageCount)
+        }
+
+        // Small delay to ensure EmbedPDF has processed the document
+        // then mark as ready to trigger viewport render
+        setTimeout(() => {
+          setDocumentReady(true)
+        }, 50)
       } catch (err) {
         console.error('[EmbedPDF] Failed to load document:', err)
         setDocumentError(err.message || 'Failed to load document')
@@ -704,13 +759,15 @@ function DocumentLoader({
     }
 
     loadDocument()
-  }, [documentManager, pdfData, docId])
+  }, [documentManager, pdfData, docId, onTotalPagesChange])
 
   console.log('[EmbedPDF] DocumentLoader state:', {
     hasDocumentManager: !!documentManager,
     hasPdfData: !!pdfData,
     activeDocumentId,
     isDocumentLoading,
+    documentReady,
+    loadedPageCount,
     documentError
   })
 
@@ -723,7 +780,7 @@ function DocumentLoader({
     )
   }
 
-  if (!activeDocumentId || isDocumentLoading) {
+  if (!activeDocumentId || isDocumentLoading || !documentReady) {
     return (
       <div className={styles.loading}>
         <Spinner size={24} />
@@ -736,6 +793,7 @@ function DocumentLoader({
     <EmbedPDFContent
       documentId={activeDocumentId}
       docId={docId}
+      totalPages={loadedPageCount}
       onTotalPagesChange={onTotalPagesChange}
       onToggleFullscreen={onToggleFullscreen}
       isFullscreen={isFullscreen}

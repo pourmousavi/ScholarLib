@@ -11,6 +11,7 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  min-height: 0; /* Important for flex children to shrink properly */
 }
 
 .container {
@@ -19,6 +20,25 @@
   padding: var(--space-6);
   scroll-behavior: smooth;
   position: relative;
+  min-height: 0; /* Important for flex children to shrink properly */
+}
+
+/* EmbedPDF-specific container styles - no padding/overflow as EmbedPDF handles this */
+.embedpdfContainer {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* EmbedPDF viewport wrapper - uses absolute positioning for reliable sizing */
+.embedpdfViewport {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-surface);
 }
 
 .pages {
