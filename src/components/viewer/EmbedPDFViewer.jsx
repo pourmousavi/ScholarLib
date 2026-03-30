@@ -237,19 +237,6 @@ function EmbedPDFToolbar({
   // Get total pages from scroll state, fallback to prop
   const totalPages = scrollState?.totalPages || scrollState?.pageCount || scrollState?.numPages || totalPagesProp || 0
 
-  // Debug: log scroll and zoom state to find correct property names
-  useEffect(() => {
-    if (scrollState) {
-      console.log('[EmbedPDF Toolbar] scrollState:', JSON.stringify(scrollState, null, 2))
-    }
-    if (zoomState) {
-      console.log('[EmbedPDF Toolbar] zoomState:', JSON.stringify(zoomState, null, 2))
-    }
-    if (zoom) {
-      console.log('[EmbedPDF Toolbar] zoom API methods:', Object.keys(zoom))
-    }
-  }, [scrollState, zoomState, zoom])
-
   const handleZoomIn = useCallback(() => {
     zoom?.zoomIn()
   }, [zoom])
@@ -474,14 +461,6 @@ function EmbedPDFContent({
   const { provides: zoomApi, state: zoomState } = useZoom(documentId)
   const { provides: scrollApi, state: scrollState } = useScroll(documentId)
 
-  // Debug: log annotation APIs
-  useEffect(() => {
-    console.log('[EmbedPDF Content] annotationScope:', annotationScope)
-    console.log('[EmbedPDF Content] annotationScope methods:', annotationScope ? Object.keys(annotationScope) : 'null')
-    console.log('[EmbedPDF Content] annotationCapability:', annotationCapability)
-    console.log('[EmbedPDF Content] annotationCapability methods:', annotationCapability ? Object.keys(annotationCapability) : 'null')
-  }, [annotationScope, annotationCapability])
-
   // Force a viewport refresh on mount by setting the zoom level
   // This triggers the viewport to render and respects the default zoom setting
   const hasInitialized = useRef(false)
@@ -491,27 +470,21 @@ function EmbedPDFContent({
     // Use a delay to ensure EmbedPDF has fully processed the document
     const timer = setTimeout(() => {
       const targetZoom = defaultZoom / 100
-      console.log('[EmbedPDF] Initializing viewport with default zoom:', targetZoom)
 
       try {
-        // Use requestZoom to set the zoom level (this is the correct EmbedPDF API)
         if (typeof zoomApi.requestZoom === 'function') {
           zoomApi.requestZoom(targetZoom)
-          console.log('[EmbedPDF] requestZoom called with:', targetZoom)
-        } else {
+        } else if (typeof zoomApi.zoomOut === 'function') {
           // Fallback: trigger a zoom cycle to force render
-          console.log('[EmbedPDF] requestZoom not available, using zoom cycle')
-          if (typeof zoomApi.zoomOut === 'function') {
-            zoomApi.zoomOut()
-            setTimeout(() => {
-              if (typeof zoomApi.zoomIn === 'function') {
-                zoomApi.zoomIn()
-              }
-            }, 50)
-          }
+          zoomApi.zoomOut()
+          setTimeout(() => {
+            if (typeof zoomApi.zoomIn === 'function') {
+              zoomApi.zoomIn()
+            }
+          }, 50)
         }
       } catch (e) {
-        console.log('[EmbedPDF] Zoom initialization failed:', e)
+        // Zoom initialization failed, continue silently
       }
 
       hasInitialized.current = true
@@ -568,17 +541,9 @@ function EmbedPDFContent({
 
   // Handle highlight creation from text selection
   const handleHighlight = useCallback((pageIndex, selectionData, text) => {
-    console.log('[EmbedPDF] handleHighlight called:', { pageIndex, selectionData, text })
-
-    // Resolve text if it's a promise-like object
     const textStr = typeof text === 'string' ? text : ''
-
-    // Pass the selection data directly - it already has the correct format
-    // with segmentRects that createHighlight will extract
     if (selectionData && selectionData.length > 0) {
       createHighlight(pageIndex, selectionData, textStr)
-    } else {
-      console.warn('[EmbedPDF] No selection data available')
     }
   }, [createHighlight])
 
@@ -671,15 +636,6 @@ function EmbedPDFContent({
   return (
     <DocumentContent documentId={documentId}>
       {({ isLoaded, document: pdfDoc, error: docError }) => {
-        // Debug logging
-        console.log('[EmbedPDF] DocumentContent state:', {
-          documentId,
-          isLoaded,
-          hasDoc: !!pdfDoc,
-          pageCount: pdfDoc?.pageCount,
-          error: docError?.message
-        })
-
         if (docError) {
           return (
             <div className={styles.error}>
@@ -702,7 +658,6 @@ function EmbedPDFContent({
 
         // Use the passed totalPages from DocumentLoader, fallback to pdfDoc.pageCount
         const pageCount = totalPages || pdfDoc?.pageCount || 0
-        console.log('[EmbedPDF] Page count:', pageCount, 'from props:', totalPages, 'from doc:', pdfDoc?.pageCount)
 
         return (
           <>
@@ -856,31 +811,26 @@ function DocumentLoader({
       setDocumentReady(false)
 
       try {
-        console.log('[EmbedPDF] Loading document via openDocumentBuffer...')
         const result = await documentManager.openDocumentBuffer({
           buffer: pdfData,
           name: docId || 'document.pdf',
           autoActivate: true
         }).toPromise()
 
-        console.log('[EmbedPDF] Document loaded:', result)
         loadedDocRef.current = pdfData
 
-        // Extract page count from result
         const pageCount = result?.pageCount || result?.document?.pageCount || 0
-        console.log('[EmbedPDF] Setting page count:', pageCount)
         setLoadedPageCount(pageCount)
         if (pageCount > 0) {
           onTotalPagesChange(pageCount)
         }
 
         // Small delay to ensure EmbedPDF has processed the document
-        // then mark as ready to trigger viewport render
         setTimeout(() => {
           setDocumentReady(true)
         }, 50)
       } catch (err) {
-        console.error('[EmbedPDF] Failed to load document:', err)
+        console.error('Failed to load document:', err)
         setDocumentError(err.message || 'Failed to load document')
       } finally {
         setIsDocumentLoading(false)
@@ -889,16 +839,6 @@ function DocumentLoader({
 
     loadDocument()
   }, [documentManager, pdfData, docId, onTotalPagesChange])
-
-  console.log('[EmbedPDF] DocumentLoader state:', {
-    hasDocumentManager: !!documentManager,
-    hasPdfData: !!pdfData,
-    activeDocumentId,
-    isDocumentLoading,
-    documentReady,
-    loadedPageCount,
-    documentError
-  })
 
   if (documentError) {
     return (
@@ -957,16 +897,14 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
       setIsLoadingPdf(true)
       setError(null)
       try {
-        console.log('[EmbedPDF] Fetching PDF from URL:', url.substring(0, 80))
         const response = await fetch(url)
         if (!response.ok) {
           throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`)
         }
         const arrayBuffer = await response.arrayBuffer()
-        console.log('[EmbedPDF] PDF fetched, size:', arrayBuffer.byteLength)
         setPdfData(arrayBuffer)
       } catch (err) {
-        console.error('[EmbedPDF] Failed to fetch PDF:', err)
+        console.error('Failed to fetch PDF:', err)
         setError(err.message || 'Failed to load PDF')
       } finally {
         setIsLoadingPdf(false)
@@ -1075,7 +1013,6 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
   }
 
   if (!engine || engineError) {
-    console.error('[EmbedPDF] Engine error:', engineError)
     return (
       <div className={styles.viewer}>
         <div className={styles.error}>
@@ -1111,17 +1048,6 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
       </div>
     )
   }
-
-  console.log('[EmbedPDF] Rendering main component:', {
-    hasUrl: !!url,
-    hasPdfData: !!pdfData,
-    pdfDataSize: pdfData?.byteLength,
-    hasEngine: !!engine,
-    engineLoading,
-    isLoadingPdf,
-    engineError: engineError?.message,
-    pluginCount: plugins.length
-  })
 
   return (
     <div className={styles.viewer} ref={viewerRef}>

@@ -55,15 +55,12 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
   useEffect(() => {
     if (!adapter || isLoaded) return
 
-    console.log('[EmbedPDF Annotations] Loading annotations from storage...')
-
     const loadAnnotations = async () => {
       try {
         const annotations = await AnnotationService.loadAnnotations(adapter)
-        console.log('[EmbedPDF Annotations] Loaded annotations:', annotations)
         setAnnotationsCache(annotations)
       } catch (error) {
-        console.error('[EmbedPDF Annotations] Failed to load annotations:', error)
+        console.error('Failed to load annotations:', error)
       }
     }
 
@@ -80,35 +77,21 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
   // Import existing annotations into EmbedPDF when API is ready
   useEffect(() => {
-    console.log('[EmbedPDF Annotations] Import effect check:', {
-      hasScope: !!annotationScope,
-      docId,
-      isInitialized,
-      isLoaded
-    })
-
     if (!annotationScope || !docId || isInitialized || !isLoaded) return
 
-    console.log('[EmbedPDF Annotations] Importing annotations for doc:', docId)
-
     const existingAnnotations = AnnotationService.getAnnotationsForDoc(docId)
-    console.log('[EmbedPDF Annotations] Found existing annotations:', existingAnnotations.length)
 
     if (existingAnnotations.length > 0) {
       try {
         // Convert to EmbedPDF format and import
         const embedAnnotations = toEmbedPDFArray(existingAnnotations)
-        console.log('[EmbedPDF Annotations] Converted to EmbedPDF format:', embedAnnotations)
 
         // EmbedPDF importAnnotations expects ImportAnnotationItem[] format
         // where each item is { annotation: T, ctx?: AnnotationCreateContext<T> }
         const importItems = embedAnnotations.map(ann => ({ annotation: ann }))
-        console.log('[EmbedPDF Annotations] Import items:', importItems)
-
         annotationScope.importAnnotations?.(importItems)
-        console.log(`[EmbedPDF Annotations] Imported ${importItems.length} annotations into EmbedPDF`)
       } catch (error) {
-        console.error('[EmbedPDF Annotations] Failed to import annotations:', error)
+        console.error('Failed to import annotations:', error)
       }
     }
 
@@ -125,52 +108,28 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
     }
 
     const handleAnnotationEvent = (event) => {
-      console.log('[EmbedPDF Annotations] Event received:', {
-        type: event.type,
-        committed: event.committed,
-        annotationId: event.annotationId,
-        hasAnnotation: !!event.annotation
-      })
-
       // Skip non-committed create/update events (interim changes during editing)
-      // But always process committed events for persistence
       if ((event.type === 'create' || event.type === 'update') && !event.committed) {
-        console.log('[EmbedPDF Annotations] Skipping non-committed event')
         return
       }
 
       const converted = fromEmbedPDFEvent(event)
-      console.log('[EmbedPDF Annotations] Converted event:', converted)
 
       switch (event.type) {
         case 'create':
           if (converted.annotation) {
-            console.log('[EmbedPDF Annotations] Adding annotation to store:', converted.annotation.id)
-            // Add to store
             storeAddAnnotation(converted.annotation)
-
-            // Persist to storage
             AnnotationService.addAnnotation(adapter, docId, converted.annotation, {
               onSaveStart: () => setSaveStatus('saving'),
-              onSaveComplete: () => {
-                console.log('[EmbedPDF Annotations] Annotation saved successfully')
-                setSaveStatus('saved')
-              },
-              onSaveError: (err) => {
-                console.error('[EmbedPDF Annotations] Failed to save annotation:', err)
-                setSaveStatus('error')
-              }
+              onSaveComplete: () => setSaveStatus('saved'),
+              onSaveError: () => setSaveStatus('error')
             })
           }
           break
 
         case 'update':
           if (event.annotationId && converted.patch) {
-            console.log('[EmbedPDF Annotations] Updating annotation:', event.annotationId)
-            // Update store
             storeUpdateAnnotation(event.annotationId, converted.patch)
-
-            // Persist to storage
             AnnotationService.updateAnnotation(adapter, docId, event.annotationId, converted.patch, {
               onSaveStart: () => setSaveStatus('saving'),
               onSaveComplete: () => setSaveStatus('saved'),
@@ -181,11 +140,7 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
         case 'delete':
           if (event.annotationId) {
-            console.log('[EmbedPDF Annotations] Deleting annotation:', event.annotationId)
-            // Remove from store
             storeDeleteAnnotation(event.annotationId)
-
-            // Remove from storage
             AnnotationService.deleteAnnotation(adapter, docId, event.annotationId, {
               onSaveStart: () => setSaveStatus('saving'),
               onSaveComplete: () => setSaveStatus('saved'),
@@ -203,20 +158,13 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
         case 'deselect':
           setSelectedAnnotation(null)
           break
-
-        default:
-          console.log('[EmbedPDF Annotations] Unknown event type:', event.type)
-          break
       }
     }
 
-    // Subscribe to events using the capability (which has onAnnotationEvent)
-    console.log('[EmbedPDF Annotations] Subscribing to annotation events')
     eventUnsubscribeRef.current = annotationCapability.onAnnotationEvent?.(handleAnnotationEvent)
 
     return () => {
       if (eventUnsubscribeRef.current) {
-        console.log('[EmbedPDF Annotations] Unsubscribing from annotation events')
         eventUnsubscribeRef.current()
         eventUnsubscribeRef.current = null
       }
@@ -248,78 +196,42 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
    * @param {string} text - The selected text
    */
   const createHighlight = useCallback((pageIndex, selectionData, text = '') => {
-    console.log('[EmbedPDF Annotations] createHighlight called:', { pageIndex, selectionData, text })
-
-    if (!annotationScope) {
-      console.error('[EmbedPDF Annotations] No annotationScope available')
-      return null
-    }
+    if (!annotationScope) return null
 
     try {
       // Extract segmentRects from selection data
-      // selectionData is an array with objects containing { pageIndex, rect, segmentRects }
       const rawRects = selectionData.flatMap(item => item.segmentRects || [])
-      console.log('[EmbedPDF Annotations] Raw segmentRects:', JSON.stringify(rawRects, null, 2))
-
-      if (rawRects.length === 0) {
-        console.warn('[EmbedPDF Annotations] No segmentRects found in selection data')
-        return null
-      }
+      if (rawRects.length === 0) return null
 
       // Ensure rects are in correct format: { origin: { x, y }, size: { width, height } }
-      // Selection plugin should already provide them in this format, but validate
       const segmentRects = rawRects.map(rect => {
-        // If already in correct format, return as-is
-        if (rect.origin && rect.size) {
-          return rect
-        }
-        // If in { x, y, width, height } format, convert
+        if (rect.origin && rect.size) return rect
         if ('x' in rect && 'y' in rect && 'width' in rect && 'height' in rect) {
-          return {
-            origin: { x: rect.x, y: rect.y },
-            size: { width: rect.width, height: rect.height }
-          }
+          return { origin: { x: rect.x, y: rect.y }, size: { width: rect.width, height: rect.height } }
         }
-        // If in { x1, y1, x2, y2 } format, convert
         if ('x1' in rect && 'y1' in rect && 'x2' in rect && 'y2' in rect) {
-          return {
-            origin: { x: rect.x1, y: rect.y1 },
-            size: { width: rect.x2 - rect.x1, height: rect.y2 - rect.y1 }
-          }
+          return { origin: { x: rect.x1, y: rect.y1 }, size: { width: rect.x2 - rect.x1, height: rect.y2 - rect.y1 } }
         }
-        console.warn('[EmbedPDF Annotations] Unknown rect format:', rect)
         return rect
       })
 
-      console.log('[EmbedPDF Annotations] Converted segmentRects:', JSON.stringify(segmentRects, null, 2))
-
-      // Get the bounding rect from selection data - EmbedPDF requires this
-      // Use the first selection item's rect, or compute from segmentRects
+      // Get or compute bounding rect
       let boundingRect = selectionData[0]?.rect
       if (!boundingRect && segmentRects.length > 0) {
-        // Compute bounding rect from segmentRects
         const minX = Math.min(...segmentRects.map(r => r.origin.x))
         const minY = Math.min(...segmentRects.map(r => r.origin.y))
         const maxX = Math.max(...segmentRects.map(r => r.origin.x + r.size.width))
         const maxY = Math.max(...segmentRects.map(r => r.origin.y + r.size.height))
-        boundingRect = {
-          origin: { x: minX, y: minY },
-          size: { width: maxX - minX, height: maxY - minY }
-        }
+        boundingRect = { origin: { x: minX, y: minY }, size: { width: maxX - minX, height: maxY - minY } }
       }
 
-      console.log('[EmbedPDF Annotations] Bounding rect:', JSON.stringify(boundingRect, null, 2))
-
-      // Generate unique ID for the annotation
       const annotationId = `ann_${nanoid(10)}`
       const now = new Date().toISOString()
 
-      // Create highlight annotation with correct EmbedPDF format
-      // type: 9 is PdfAnnotationSubtype.HIGHLIGHT
-      // EmbedPDF requires both rect (bounding box) and segmentRects (individual line rects)
+      // Create in EmbedPDF for visual rendering
       const embedAnnotation = {
         id: annotationId,
-        type: 9, // HIGHLIGHT enum value
+        type: 9, // HIGHLIGHT
         pageIndex,
         rect: boundingRect,
         segmentRects,
@@ -327,14 +239,9 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
         opacity: 0.35,
         contents: typeof text === 'string' ? text : ''
       }
-
-      console.log('[EmbedPDF Annotations] Creating annotation:', JSON.stringify(embedAnnotation, null, 2))
-
-      // Create annotation in EmbedPDF for visual rendering
       annotationScope.createAnnotation?.(pageIndex, embedAnnotation)
-      console.log('[EmbedPDF Annotations] createAnnotation called on EmbedPDF')
 
-      // Also directly save to our store and storage (don't rely on events)
+      // Save to store and storage
       const scholarAnnotation = {
         id: annotationId,
         type: 'highlight',
@@ -344,16 +251,12 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
         position: {
           page: pageIndex,
           rects: segmentRects.map(r => ({
-            x1: r.origin.x,
-            y1: r.origin.y,
-            x2: r.origin.x + r.size.width,
-            y2: r.origin.y + r.size.height
+            x1: r.origin.x, y1: r.origin.y,
+            x2: r.origin.x + r.size.width, y2: r.origin.y + r.size.height
           })),
           boundingRect: boundingRect ? {
-            x1: boundingRect.origin.x,
-            y1: boundingRect.origin.y,
-            x2: boundingRect.origin.x + boundingRect.size.width,
-            y2: boundingRect.origin.y + boundingRect.size.height
+            x1: boundingRect.origin.x, y1: boundingRect.origin.y,
+            x2: boundingRect.origin.x + boundingRect.size.width, y2: boundingRect.origin.y + boundingRect.size.height
           } : null
         },
         content: { text: typeof text === 'string' ? text : '', image: null },
@@ -363,34 +266,19 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
         source: 'user'
       }
 
-      console.log('[EmbedPDF Annotations] Adding to store:', scholarAnnotation.id)
       storeAddAnnotation(scholarAnnotation)
 
-      // Persist to storage
-      console.log('[EmbedPDF Annotations] Checking storage availability:', { hasAdapter: !!adapter, docId })
       if (adapter && docId) {
-        console.log('[EmbedPDF Annotations] Saving annotation to storage...')
         AnnotationService.addAnnotation(adapter, docId, scholarAnnotation, {
-          onSaveStart: () => {
-            console.log('[EmbedPDF Annotations] Save started')
-            setSaveStatus('saving')
-          },
-          onSaveComplete: () => {
-            console.log('[EmbedPDF Annotations] Annotation saved to storage successfully')
-            setSaveStatus('saved')
-          },
-          onSaveError: (err) => {
-            console.error('[EmbedPDF Annotations] Failed to save annotation:', err)
-            setSaveStatus('error')
-          }
+          onSaveStart: () => setSaveStatus('saving'),
+          onSaveComplete: () => setSaveStatus('saved'),
+          onSaveError: () => setSaveStatus('error')
         })
-      } else {
-        console.warn('[EmbedPDF Annotations] Cannot save - missing adapter or docId')
       }
 
       return true
     } catch (error) {
-      console.error('[EmbedPDF Annotations] createAnnotation failed:', error)
+      console.error('Failed to create highlight:', error)
       return null
     }
   }, [annotationScope, highlightColor, adapter, docId, storeAddAnnotation, setSaveStatus])
@@ -499,7 +387,7 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
       return true
     } catch (error) {
-      console.error('[EmbedPDF Annotations] createUnderline failed:', error)
+      console.error('Failed to create underline:', error)
       return null
     }
   }, [annotationScope, highlightColor, adapter, docId, storeAddAnnotation, setSaveStatus])
@@ -528,52 +416,82 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
    * Update annotation comment
    */
   const updateComment = useCallback((annotationId, comment) => {
-    if (!annotationScope || !adapter || !docId) return false
+    if (!adapter || !docId) return false
 
-    // Find the annotation to get its page
     const annotation = getAnnotationById(annotationId)
     if (!annotation) return false
 
-    // Update in EmbedPDF
-    annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, annotationId, {
-      contents: comment
+    // Update in EmbedPDF if available
+    if (annotationScope) {
+      annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, annotationId, {
+        contents: comment
+      })
+    }
+
+    // Directly update store and storage
+    const patch = { comment }
+    storeUpdateAnnotation(annotationId, patch)
+    AnnotationService.updateAnnotation(adapter, docId, annotationId, patch, {
+      onSaveStart: () => setSaveStatus('saving'),
+      onSaveComplete: () => setSaveStatus('saved'),
+      onSaveError: () => setSaveStatus('error')
     })
 
-    // Update in store and storage (will be triggered by event handler)
     return true
-  }, [annotationScope, adapter, docId, getAnnotationById])
+  }, [annotationScope, adapter, docId, getAnnotationById, storeUpdateAnnotation, setSaveStatus])
 
   /**
    * Update annotation color
    */
   const updateColor = useCallback((annotationId, color) => {
-    if (!annotationScope || !adapter || !docId) return false
+    if (!adapter || !docId) return false
 
     const annotation = getAnnotationById(annotationId)
     if (!annotation) return false
 
-    // Update in EmbedPDF
-    annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, annotationId, {
-      color: { ...hexToRgbaInternal(color), a: 0.35 }
+    // Update in EmbedPDF if available - use strokeColor for text markup
+    if (annotationScope) {
+      annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, annotationId, {
+        strokeColor: color
+      })
+    }
+
+    // Directly update store and storage
+    const patch = { color }
+    storeUpdateAnnotation(annotationId, patch)
+    AnnotationService.updateAnnotation(adapter, docId, annotationId, patch, {
+      onSaveStart: () => setSaveStatus('saving'),
+      onSaveComplete: () => setSaveStatus('saved'),
+      onSaveError: () => setSaveStatus('error')
     })
 
     return true
-  }, [annotationScope, adapter, docId, getAnnotationById])
+  }, [annotationScope, adapter, docId, getAnnotationById, storeUpdateAnnotation, setSaveStatus])
 
   /**
    * Delete an annotation
    */
   const deleteAnnotation = useCallback((annotationId) => {
-    if (!annotationScope || !adapter || !docId) return false
+    if (!adapter || !docId) return false
 
     const annotation = getAnnotationById(annotationId)
     if (!annotation) return false
 
-    // Delete in EmbedPDF
-    annotationScope.deleteAnnotation?.(annotation.position?.page ?? 0, annotationId)
+    // Delete in EmbedPDF if available
+    if (annotationScope) {
+      annotationScope.deleteAnnotation?.(annotation.position?.page ?? 0, annotationId)
+    }
+
+    // Directly update store and storage
+    storeDeleteAnnotation(annotationId)
+    AnnotationService.deleteAnnotation(adapter, docId, annotationId, {
+      onSaveStart: () => setSaveStatus('saving'),
+      onSaveComplete: () => setSaveStatus('saved'),
+      onSaveError: () => setSaveStatus('error')
+    })
 
     return true
-  }, [annotationScope, adapter, docId, getAnnotationById])
+  }, [annotationScope, adapter, docId, getAnnotationById, storeDeleteAnnotation, setSaveStatus])
 
   /**
    * Select an annotation

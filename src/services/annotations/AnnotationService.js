@@ -100,13 +100,13 @@ export const AnnotationService = {
 
     annotationsCache[docId].push(annotation)
 
-    // Save immediately instead of debouncing to ensure annotations persist
+    // Save immediately to ensure annotations persist
     try {
       callbacks.onSaveStart?.()
       await this._persistAnnotations(adapter)
       callbacks.onSaveComplete?.()
     } catch (error) {
-      console.error('[AnnotationService] Failed to save annotation:', error)
+      console.error('Failed to save annotation:', error)
       callbacks.onSaveError?.(error)
     }
   },
@@ -240,12 +240,7 @@ export const AnnotationService = {
       version: '1.0',
       annotations: annotationsCache
     }
-    console.log('[AnnotationService] Persisting annotations to storage:', {
-      totalDocs: Object.keys(annotationsCache || {}).length,
-      annotations: annotationsCache
-    })
     await adapter.writeJSON('_system/annotations.json', data)
-    console.log('[AnnotationService] Annotations persisted successfully')
   },
 
   /**
