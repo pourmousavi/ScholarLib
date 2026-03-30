@@ -129,7 +129,9 @@ function EmbedPDFToolbar({
   onToggleSidebar,
   highlightColor,
   onColorChange,
-  onExportAnnotations
+  onExportAnnotations,
+  activeTool,
+  onSetActiveTool
 }) {
   const { provides: zoom, state: zoomState } = useZoom(documentId)
   const { provides: scroll, state: scrollState } = useScroll(documentId)
@@ -204,12 +206,37 @@ function EmbedPDFToolbar({
       <div className={toolbarStyles.actions}>
         {/* Annotation tools */}
         <div className={toolbarStyles.annotationTools}>
+          {/* Pen tool */}
+          <button
+            className={`${toolbarStyles.toolBtn} ${activeTool === 'ink' ? toolbarStyles.active : ''}`}
+            onClick={() => onSetActiveTool(activeTool === 'ink' ? null : 'ink')}
+            title="Freehand pen"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+              <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+              <path d="M2 2l7.586 7.586"/>
+              <circle cx="11" cy="11" r="2"/>
+            </svg>
+          </button>
+
+          {/* Ink highlighter tool */}
+          <button
+            className={`${toolbarStyles.toolBtn} ${activeTool === 'inkHighlighter' ? toolbarStyles.active : ''}`}
+            onClick={() => onSetActiveTool(activeTool === 'inkHighlighter' ? null : 'inkHighlighter')}
+            title="Freehand highlighter"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+              <path d="M15.5 4l4 4L9 18.5V22H4v-5L14.5 6.5 18 3l1.5 1.5-4 4zm-3 8l-4-4-3 3v3h3l4-2z"/>
+            </svg>
+          </button>
+
           {/* Color picker toggle */}
           <div style={{ position: 'relative' }}>
             <button
               className={toolbarStyles.toolBtn}
               onClick={() => setShowColorPicker(!showColorPicker)}
-              title="Highlight color"
+              title="Annotation color"
               style={{
                 borderBottom: `3px solid ${highlightColor}`
               }}
@@ -309,6 +336,21 @@ function EmbedPDFContent({
   // Popover state
   const [popoverAnnotation, setPopoverAnnotation] = useState(null)
   const [popoverPosition, setPopoverPosition] = useState(null)
+
+  // Active drawing tool state (null, 'ink', 'inkHighlighter')
+  const [activeTool, setActiveTool] = useState(null)
+
+  // Handle tool change
+  const handleSetActiveTool = useCallback((tool) => {
+    setActiveTool(tool)
+    if (annotationApi) {
+      if (tool) {
+        annotationApi.setActiveTool?.(tool)
+      } else {
+        annotationApi.setActiveTool?.(null)
+      }
+    }
+  }, [annotationApi])
 
   // Handle highlight creation from text selection
   const handleHighlight = useCallback((pageIndex, selectionRects, text) => {
@@ -420,6 +462,8 @@ function EmbedPDFContent({
               highlightColor={highlightColor}
               onColorChange={setColor}
               onExportAnnotations={handleExportAnnotations}
+              activeTool={activeTool}
+              onSetActiveTool={handleSetActiveTool}
             />
             <div className={styles.viewerContent}>
               <div className={styles.container}>
