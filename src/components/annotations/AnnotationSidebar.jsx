@@ -83,7 +83,7 @@ function AnnotationSidebar({
 
   // Count by type
   const typeCounts = useMemo(() => {
-    const counts = { highlight: 0, underline: 0, area: 0, note: 0 }
+    const counts = { highlight: 0, underline: 0, area: 0, note: 0, ink: 0 }
     annotations.forEach(a => {
       if (counts[a.type] !== undefined) {
         counts[a.type]++
@@ -167,6 +167,7 @@ function AnnotationSidebar({
             <option value="underline">Underlines ({typeCounts.underline})</option>
             <option value="area">Areas ({typeCounts.area})</option>
             <option value="note">Notes ({typeCounts.note})</option>
+            <option value="ink">Ink ({typeCounts.ink})</option>
           </select>
         </div>
 
