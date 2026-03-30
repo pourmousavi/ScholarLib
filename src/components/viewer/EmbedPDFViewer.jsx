@@ -4,7 +4,7 @@ import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage, useScroll } from '@embedpdf/plugin-scroll/react'
-import { DocumentContent, DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/react'
+import { DocumentContent, DocumentManagerPluginPackage, useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import { ZoomPluginPackage, useZoom, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react'
 import { InteractionManagerPluginPackage, PagePointerProvider } from '@embedpdf/plugin-interaction-manager/react'
@@ -660,6 +660,89 @@ function EmbedPDFContent({
   )
 }
 
+// Component that handles loading the PDF document using the document manager API
+function DocumentLoader({
+  pdfData,
+  docId,
+  activeDocumentId,
+  onTotalPagesChange,
+  onToggleFullscreen,
+  isFullscreen
+}) {
+  const { provides: documentManager } = useDocumentManagerCapability()
+  const [isDocumentLoading, setIsDocumentLoading] = useState(false)
+  const [documentError, setDocumentError] = useState(null)
+  const loadedDocRef = useRef(null)
+
+  // Load document when we have pdfData and documentManager
+  useEffect(() => {
+    if (!documentManager || !pdfData) return
+
+    // Skip if we already loaded this document
+    if (loadedDocRef.current === pdfData) return
+
+    const loadDocument = async () => {
+      setIsDocumentLoading(true)
+      setDocumentError(null)
+
+      try {
+        console.log('[EmbedPDF] Loading document via openDocumentBuffer...')
+        const result = await documentManager.openDocumentBuffer({
+          buffer: pdfData,
+          name: docId || 'document.pdf',
+          autoActivate: true
+        }).toPromise()
+
+        console.log('[EmbedPDF] Document loaded:', result)
+        loadedDocRef.current = pdfData
+      } catch (err) {
+        console.error('[EmbedPDF] Failed to load document:', err)
+        setDocumentError(err.message || 'Failed to load document')
+      } finally {
+        setIsDocumentLoading(false)
+      }
+    }
+
+    loadDocument()
+  }, [documentManager, pdfData, docId])
+
+  console.log('[EmbedPDF] DocumentLoader state:', {
+    hasDocumentManager: !!documentManager,
+    hasPdfData: !!pdfData,
+    activeDocumentId,
+    isDocumentLoading,
+    documentError
+  })
+
+  if (documentError) {
+    return (
+      <div className={styles.error}>
+        <span className={styles.errorIcon}>⚠</span>
+        <span className={styles.errorText}>{documentError}</span>
+      </div>
+    )
+  }
+
+  if (!activeDocumentId || isDocumentLoading) {
+    return (
+      <div className={styles.loading}>
+        <Spinner size={24} />
+        <span className={styles.loadingText}>Loading PDF...</span>
+      </div>
+    )
+  }
+
+  return (
+    <EmbedPDFContent
+      documentId={activeDocumentId}
+      docId={docId}
+      onTotalPagesChange={onTotalPagesChange}
+      onToggleFullscreen={onToggleFullscreen}
+      isFullscreen={isFullscreen}
+    />
+  )
+}
+
 export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
   const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
   const setFullscreenOverlayVisible = useUIStore((s) => s.setFullscreenOverlayVisible)
@@ -717,18 +800,13 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
     }
   }, [extractedText, onTextExtracted])
 
-  // Create plugins with PDF data - memoized to prevent re-creation
+  // Create plugins - memoized to prevent re-creation
+  // Note: We load documents dynamically via useDocumentManagerCapability, not through initialDocuments
   const plugins = useMemo(() => {
     if (!pdfData) return []
 
     return [
-      createPluginRegistration(DocumentManagerPluginPackage, {
-        initialDocuments: [{
-          buffer: pdfData,
-          name: docId || 'document.pdf',
-          autoActivate: true
-        }],
-      }),
+      createPluginRegistration(DocumentManagerPluginPackage, {}),
       createPluginRegistration(ViewportPluginPackage),
       createPluginRegistration(ScrollPluginPackage, {
         defaultPageGap: 16,
@@ -860,27 +938,16 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
   return (
     <div className={styles.viewer} ref={viewerRef}>
       <EmbedPDF engine={engine} plugins={plugins}>
-        {({ activeDocumentId }) => {
-          console.log('[EmbedPDF] activeDocumentId:', activeDocumentId)
-          if (!activeDocumentId) {
-            return (
-              <div className={styles.loading}>
-                <Spinner size={24} />
-                <span className={styles.loadingText}>Loading PDF...</span>
-              </div>
-            )
-          }
-
-          return (
-            <EmbedPDFContent
-              documentId={activeDocumentId}
-              docId={docId}
-              onTotalPagesChange={setTotalPages}
-              onToggleFullscreen={toggleFullscreen}
-              isFullscreen={isFullscreen}
-            />
-          )
-        }}
+        {({ activeDocumentId }) => (
+          <DocumentLoader
+            pdfData={pdfData}
+            docId={docId}
+            activeDocumentId={activeDocumentId}
+            onTotalPagesChange={setTotalPages}
+            onToggleFullscreen={toggleFullscreen}
+            isFullscreen={isFullscreen}
+          />
+        )}
       </EmbedPDF>
     </div>
   )
