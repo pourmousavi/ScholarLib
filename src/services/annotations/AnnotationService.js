@@ -272,5 +272,19 @@ export const AnnotationService = {
       clearTimeout(saveTimer)
       saveTimer = null
     }
+  },
+
+  /**
+   * Clear ALL annotations from storage (destructive operation)
+   * @param {StorageAdapter} adapter - The storage adapter
+   */
+  async clearAllAnnotations(adapter) {
+    annotationsCache = {}
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+    }
+    await this._persistAnnotations(adapter)
+    console.log('All annotations cleared from storage')
   }
 }
