@@ -516,6 +516,7 @@ function EmbedPDFContent({
     updateColor,
     updateType,
     deleteAnnotation,
+    deleteAllAnnotations,
     selectAnnotation,
     clearSelection,
     setColor,
@@ -856,6 +857,7 @@ function EmbedPDFContent({
                     onUpdateComment={updateComment}
                     onUpdateColor={updateColor}
                     onDelete={deleteAnnotation}
+                    onDeleteAll={deleteAllAnnotations}
                     onNavigateToAnnotation={handleNavigateToAnnotation}
                     onClose={() => setSidebar(false)}
                   />

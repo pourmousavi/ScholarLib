@@ -25,6 +25,7 @@ function AnnotationSidebar({
   onUpdateComment,
   onUpdateColor,
   onDelete,
+  onDeleteAll,
   onNavigateToAnnotation,
   onClose,
   embedded = false // When true, hide close button and adjust styling for fullscreen overlay
@@ -132,15 +133,34 @@ function AnnotationSidebar({
             Annotations
             <span className={styles.count}>{annotations.length}</span>
           </h3>
-          <button
-            className={styles.closeButton}
-            onClick={onClose}
-            aria-label="Close sidebar"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-            </svg>
-          </button>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            {annotations.length > 0 && onDeleteAll && (
+              <button
+                className={styles.closeButton}
+                onClick={() => {
+                  if (window.confirm(`Delete all ${annotations.length} annotations?`)) {
+                    onDeleteAll()
+                  }
+                }}
+                aria-label="Delete all annotations"
+                title="Delete all annotations"
+                style={{ color: 'var(--color-danger, #e53935)' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                </svg>
+              </button>
+            )}
+            <button
+              className={styles.closeButton}
+              onClick={onClose}
+              aria-label="Close sidebar"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 

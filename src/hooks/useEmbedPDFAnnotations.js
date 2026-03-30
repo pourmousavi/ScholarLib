@@ -105,6 +105,78 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
     setIsInitialized(true)
   }, [annotationScope, docId, isInitialized, isLoaded])
 
+  // Import native PDF markup annotations (highlights, underlines, etc.) that
+  // EmbedPDF loaded from the file but aren't tracked in ScholarLib yet.
+  // Only imports user-facing annotation types, not links/widgets/popups/etc.
+  const hasImportedNativeRef = useRef(false)
+
+  // EmbedPDF annotation subtypes that correspond to user-facing markup
+  const MARKUP_SUBTYPES = useRef(new Set([
+    9,   // HIGHLIGHT
+    10,  // UNDERLINE
+    11,  // SQUIGGLY
+    12,  // STRIKEOUT
+    4,   // SQUARE
+    5,   // CIRCLE
+    2,   // FREETEXT
+    15,  // INK
+    1,   // TEXT (sticky note)
+  ])).current
+
+  useEffect(() => {
+    if (!annotationScope || !isInitialized || !isLoaded || !adapter || !docId) return
+    if (hasImportedNativeRef.current) return
+
+    // Small delay to ensure EmbedPDF has finished loading native annotations
+    const timer = setTimeout(() => {
+      try {
+        const state = annotationScope.getState?.()
+        if (!state || !state.byUid) return
+
+        const knownAnnotations = AnnotationService.getAnnotationsForDoc(docId)
+        const knownIds = new Set(knownAnnotations.map(a => a.id))
+
+        // Find markup annotations in EmbedPDF that aren't in ScholarLib
+        const nativeAnnotations = []
+        for (const [uid, tracked] of Object.entries(state.byUid)) {
+          if (knownIds.has(uid) || createdAnnotationIds.current.has(uid)) continue
+
+          const obj = tracked.object || tracked
+          // Only import user-facing markup types, skip links/widgets/popups/stamps
+          if (!MARKUP_SUBTYPES.has(obj.type)) continue
+
+          const converted = fromEmbedPDF(obj)
+          converted.id = uid
+          converted.source = 'pdf_native'
+          nativeAnnotations.push(converted)
+        }
+
+        if (nativeAnnotations.length > 0) {
+          console.log(`[Annotations] Importing ${nativeAnnotations.length} native PDF markup annotation(s) into ScholarLib`)
+          for (const ann of nativeAnnotations) {
+            createdAnnotationIds.current.add(ann.id)
+            storeAddAnnotation(ann)
+          }
+          AnnotationService.importAnnotations(adapter, docId, nativeAnnotations, {
+            onSaveStart: () => setSaveStatus('saving'),
+            onSaveComplete: () => setSaveStatus('saved'),
+            onSaveError: () => setSaveStatus('error')
+          })
+        }
+      } catch (error) {
+        console.error('Failed to import native PDF annotations:', error)
+      }
+      hasImportedNativeRef.current = true
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [annotationScope, isInitialized, isLoaded, adapter, docId, storeAddAnnotation, setSaveStatus, MARKUP_SUBTYPES])
+
+  // Reset native import flag when document changes
+  useEffect(() => {
+    hasImportedNativeRef.current = false
+  }, [docId])
+
   // Subscribe to EmbedPDF annotation events (using capability for global events)
   useEffect(() => {
     if (!annotationCapability || !adapter || !docId) return
@@ -608,6 +680,32 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
   }, [annotationScope, selectedAnnotationId, getAnnotationById, setSelectedAnnotation])
 
   /**
+   * Delete all annotations for the current document
+   */
+  const deleteAllAnnotations = useCallback(() => {
+    if (!adapter || !docId) return false
+
+    // Delete each annotation from EmbedPDF
+    if (annotationScope) {
+      for (const ann of currentAnnotations) {
+        annotationScope.deleteAnnotation?.(ann.position?.page ?? 0, ann.id)
+      }
+    }
+
+    // Clear from store
+    for (const ann of currentAnnotations) {
+      storeDeleteAnnotation(ann.id)
+    }
+
+    // Clear from service cache and persist
+    AnnotationService.clearDocAnnotations(docId)
+    AnnotationService.flushSave(adapter).catch(console.error)
+
+    setSaveStatus('saved')
+    return true
+  }, [annotationScope, adapter, docId, currentAnnotations, storeDeleteAnnotation, setSaveStatus])
+
+  /**
    * Get annotations for AI indexing
    */
   const getAnnotationsForAI = useCallback(() => {
@@ -644,8 +742,9 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
     updateColor,
     updateType,
 
-    // Delete method
+    // Delete methods
     deleteAnnotation,
+    deleteAllAnnotations,
 
     // Selection
     selectAnnotation,

@@ -244,6 +244,15 @@ export const AnnotationService = {
   },
 
   /**
+   * Clear all annotations for a document from cache
+   * @param {string} docId - Document ID
+   */
+  clearDocAnnotations(docId) {
+    if (!annotationsCache) return
+    delete annotationsCache[docId]
+  },
+
+  /**
    * Get annotation count for a document
    * @param {string} docId - Document ID
    * @returns {number} Number of annotations
