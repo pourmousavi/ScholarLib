@@ -65,10 +65,10 @@ export async function extractPDFAnnotations(pdfSource, onProgress) {
  * @returns {Object|null} ScholarLib annotation or null if not supported
  */
 function convertPDFAnnotation(pdfAnnotation, pageNum, viewport) {
-  const { subtype, rect, quadPoints, color, contents, title, modificationDate } = pdfAnnotation
+  const { subtype, rect, quadPoints, color, contents, title, modificationDate, inkLists, borderStyle } = pdfAnnotation
 
-  // Only process highlight, underline, squiggly, strikeout, and text annotations
-  const supportedTypes = ['Highlight', 'Underline', 'Squiggly', 'StrikeOut', 'Text', 'FreeText']
+  // Only process highlight, underline, squiggly, strikeout, text, ink, and area annotations
+  const supportedTypes = ['Highlight', 'Underline', 'Squiggly', 'StrikeOut', 'Text', 'FreeText', 'Ink', 'Square', 'Circle']
   if (!supportedTypes.includes(subtype)) {
     return null
   }
@@ -80,7 +80,10 @@ function convertPDFAnnotation(pdfAnnotation, pageNum, viewport) {
     'Squiggly': 'underline',
     'StrikeOut': 'highlight',
     'Text': 'note',
-    'FreeText': 'note'
+    'FreeText': 'note',
+    'Ink': 'ink',
+    'Square': 'area',
+    'Circle': 'area'
   }
 
   const type = typeMapping[subtype]
@@ -99,7 +102,15 @@ function convertPDFAnnotation(pdfAnnotation, pageNum, viewport) {
   // Get text content (may be empty for highlights without extracted text)
   const text = contents || ''
 
-  return {
+  // Handle ink paths for ink annotations
+  let paths = null
+  let strokeWidth = 2
+  if (subtype === 'Ink' && inkLists) {
+    paths = convertInkPaths(inkLists, viewport)
+    strokeWidth = borderStyle?.width || 2
+  }
+
+  const annotation = {
     type,
     color: hexColor,
     created_at: timestamp,
@@ -120,6 +131,14 @@ function convertPDFAnnotation(pdfAnnotation, pageNum, viewport) {
     },
     source: 'pdf_import'
   }
+
+  // Add ink-specific properties
+  if (paths) {
+    annotation.position.paths = paths
+    annotation.strokeWidth = strokeWidth
+  }
+
+  return annotation
 }
 
 /**
@@ -169,6 +188,28 @@ function convertCoordinates(rect, quadPoints, viewport) {
   }
 
   return []
+}
+
+/**
+ * Convert PDF ink paths to ScholarLib format
+ * @param {Array} inkLists - Array of ink paths from PDF.js
+ * @param {Object} viewport - Page viewport
+ * @returns {Array} Array of path arrays
+ */
+function convertInkPaths(inkLists, viewport) {
+  const pageHeight = viewport.height
+
+  return inkLists.map(inkList => {
+    const points = []
+    // inkList is a flat array [x1, y1, x2, y2, ...]
+    for (let i = 0; i < inkList.length; i += 2) {
+      points.push({
+        x: inkList[i],
+        y: pageHeight - inkList[i + 1] // Convert PDF coords to screen coords
+      })
+    }
+    return points
+  })
 }
 
 /**
