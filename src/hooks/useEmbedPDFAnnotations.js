@@ -29,6 +29,8 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
   const adapter = useStorageStore((state) => state.adapter)
   const [isInitialized, setIsInitialized] = useState(false)
   const eventUnsubscribeRef = useRef(null)
+  // Track annotations we've created directly to avoid duplicates from events
+  const createdAnnotationIds = useRef(new Set())
 
   const {
     currentAnnotations,
@@ -117,6 +119,11 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
       switch (event.type) {
         case 'create':
+          // Skip if we already created this annotation directly (avoid duplicates)
+          if (converted.annotation && createdAnnotationIds.current.has(converted.annotation.id)) {
+            createdAnnotationIds.current.delete(converted.annotation.id)
+            return
+          }
           if (converted.annotation) {
             storeAddAnnotation(converted.annotation)
             AnnotationService.addAnnotation(adapter, docId, converted.annotation, {
@@ -228,6 +235,9 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
       const annotationId = `ann_${nanoid(10)}`
       const now = new Date().toISOString()
 
+      // Track this ID to avoid duplicate from event handler
+      createdAnnotationIds.current.add(annotationId)
+
       // Create in EmbedPDF for visual rendering
       const embedAnnotation = {
         id: annotationId,
@@ -331,6 +341,9 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
       // Generate unique ID for the annotation
       const annotationId = `ann_${nanoid(10)}`
       const now = new Date().toISOString()
+
+      // Track this ID to avoid duplicate from event handler
+      createdAnnotationIds.current.add(annotationId)
 
       // type: 10 is PdfAnnotationSubtype.UNDERLINE
       const embedAnnotation = {
