@@ -99,8 +99,14 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
         // Convert to EmbedPDF format and import
         const embedAnnotations = toEmbedPDFArray(existingAnnotations)
         console.log('[EmbedPDF Annotations] Converted to EmbedPDF format:', embedAnnotations)
-        annotationScope.importAnnotations?.(embedAnnotations)
-        console.log(`[EmbedPDF Annotations] Imported ${embedAnnotations.length} annotations into EmbedPDF`)
+
+        // EmbedPDF importAnnotations expects ImportAnnotationItem[] format
+        // where each item is { annotation: T, ctx?: AnnotationCreateContext<T> }
+        const importItems = embedAnnotations.map(ann => ({ annotation: ann }))
+        console.log('[EmbedPDF Annotations] Import items:', importItems)
+
+        annotationScope.importAnnotations?.(importItems)
+        console.log(`[EmbedPDF Annotations] Imported ${importItems.length} annotations into EmbedPDF`)
       } catch (error) {
         console.error('[EmbedPDF Annotations] Failed to import annotations:', error)
       }
