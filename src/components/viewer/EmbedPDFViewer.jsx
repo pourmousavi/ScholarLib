@@ -510,6 +510,15 @@ function EmbedPDFContent({
   return (
     <DocumentContent documentId={documentId}>
       {({ isLoaded, document: pdfDoc, error: docError }) => {
+        // Debug logging
+        console.log('[EmbedPDF] DocumentContent state:', {
+          documentId,
+          isLoaded,
+          hasDoc: !!pdfDoc,
+          pageCount: pdfDoc?.pageCount,
+          error: docError?.message
+        })
+
         if (docError) {
           return (
             <div className={styles.error}>
@@ -531,6 +540,7 @@ function EmbedPDFContent({
         }
 
         const pageCount = pdfDoc?.pageCount ?? 0
+        console.log('[EmbedPDF] Page count:', pageCount)
         if (pageCount > 0) {
           setTimeout(() => onTotalPagesChange(pageCount), 0)
         }
@@ -653,7 +663,10 @@ function EmbedPDFContent({
 export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
   const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
   const setFullscreenOverlayVisible = useUIStore((s) => s.setFullscreenOverlayVisible)
-  const { engine, isLoading: engineLoading } = usePdfiumEngine()
+  const { engine, isLoading: engineLoading, error: engineError } = usePdfiumEngine({
+    // Use CDN for WASM - this is the default but we're being explicit
+    wasmUrl: 'https://cdn.jsdelivr.net/npm/@embedpdf/pdfium@2/dist/pdfium.wasm'
+  })
 
   const viewerRef = useRef(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -757,12 +770,15 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
     )
   }
 
-  if (!engine) {
+  if (!engine || engineError) {
+    console.error('[EmbedPDF] Engine error:', engineError)
     return (
       <div className={styles.viewer}>
         <div className={styles.error}>
           <span className={styles.errorIcon}>⚠</span>
-          <span className={styles.errorText}>Failed to load PDF engine</span>
+          <span className={styles.errorText}>
+            Failed to load PDF engine{engineError ? `: ${engineError.message}` : ''}
+          </span>
           <Btn onClick={() => window.location.reload()}>Reload</Btn>
         </div>
       </div>
@@ -792,10 +808,20 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
     )
   }
 
+  console.log('[EmbedPDF] Rendering main component:', {
+    hasUrl: !!url,
+    url: url?.substring(0, 100),
+    hasEngine: !!engine,
+    engineLoading,
+    engineError: engineError?.message,
+    pluginCount: plugins.length
+  })
+
   return (
     <div className={styles.viewer} ref={viewerRef}>
       <EmbedPDF engine={engine} plugins={plugins}>
         {({ activeDocumentId }) => {
+          console.log('[EmbedPDF] activeDocumentId:', activeDocumentId)
           if (!activeDocumentId) {
             return (
               <div className={styles.loading}>
