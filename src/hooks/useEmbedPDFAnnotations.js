@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { nanoid } from 'nanoid'
 import { useAnnotationStore } from '../store/annotationStore'
 import { useStorageStore } from '../store/storageStore'
 import {
@@ -292,11 +293,17 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
       console.log('[EmbedPDF Annotations] Bounding rect:', JSON.stringify(boundingRect, null, 2))
 
+      // Generate unique ID for the annotation
+      const annotationId = `ann_${nanoid(10)}`
+      const now = new Date().toISOString()
+
       // Create highlight annotation with correct EmbedPDF format
       // type: 9 is PdfAnnotationSubtype.HIGHLIGHT
       // EmbedPDF requires both rect (bounding box) and segmentRects (individual line rects)
-      const annotation = {
+      const embedAnnotation = {
+        id: annotationId,
         type: 9, // HIGHLIGHT enum value
+        pageIndex,
         rect: boundingRect,
         segmentRects,
         strokeColor: highlightColor,
@@ -304,15 +311,65 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
         contents: typeof text === 'string' ? text : ''
       }
 
-      console.log('[EmbedPDF Annotations] Creating annotation:', JSON.stringify(annotation, null, 2))
-      annotationScope.createAnnotation?.(pageIndex, annotation)
-      console.log('[EmbedPDF Annotations] createAnnotation called successfully')
+      console.log('[EmbedPDF Annotations] Creating annotation:', JSON.stringify(embedAnnotation, null, 2))
+
+      // Create annotation in EmbedPDF for visual rendering
+      annotationScope.createAnnotation?.(pageIndex, embedAnnotation)
+      console.log('[EmbedPDF Annotations] createAnnotation called on EmbedPDF')
+
+      // Also directly save to our store and storage (don't rely on events)
+      const scholarAnnotation = {
+        id: annotationId,
+        type: 'highlight',
+        color: highlightColor,
+        created_at: now,
+        updated_at: now,
+        position: {
+          page: pageIndex,
+          rects: segmentRects.map(r => ({
+            x1: r.origin.x,
+            y1: r.origin.y,
+            x2: r.origin.x + r.size.width,
+            y2: r.origin.y + r.size.height
+          })),
+          boundingRect: boundingRect ? {
+            x1: boundingRect.origin.x,
+            y1: boundingRect.origin.y,
+            x2: boundingRect.origin.x + boundingRect.size.width,
+            y2: boundingRect.origin.y + boundingRect.size.height
+          } : null
+        },
+        content: { text: typeof text === 'string' ? text : '', image: null },
+        comment: '',
+        tags: [],
+        ai_context: { include_in_embeddings: true },
+        source: 'user'
+      }
+
+      console.log('[EmbedPDF Annotations] Adding to store:', scholarAnnotation.id)
+      storeAddAnnotation(scholarAnnotation)
+
+      // Persist to storage
+      if (adapter && docId) {
+        AnnotationService.addAnnotation(adapter, docId, scholarAnnotation, {
+          onSaveStart: () => setSaveStatus('saving'),
+          onSaveComplete: () => {
+            console.log('[EmbedPDF Annotations] Annotation saved to storage')
+            setSaveStatus('saved')
+          },
+          onSaveError: (err) => {
+            console.error('[EmbedPDF Annotations] Failed to save annotation:', err)
+            setSaveStatus('error')
+          }
+        })
+      }
+
       return true
     } catch (error) {
       console.error('[EmbedPDF Annotations] createAnnotation failed:', error)
       return null
     }
-  }, [annotationScope, highlightColor])
+  }, [annotationScope, highlightColor, adapter, docId, storeAddAnnotation, setSaveStatus])
 
   /**
    * Create an underline annotation
@@ -359,9 +416,15 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
         }
       }
 
+      // Generate unique ID for the annotation
+      const annotationId = `ann_${nanoid(10)}`
+      const now = new Date().toISOString()
+
       // type: 10 is PdfAnnotationSubtype.UNDERLINE
-      const annotation = {
+      const embedAnnotation = {
+        id: annotationId,
         type: 10, // UNDERLINE enum value
+        pageIndex,
         rect: boundingRect,
         segmentRects,
         strokeColor: highlightColor,
@@ -369,13 +432,53 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
         contents: typeof text === 'string' ? text : ''
       }
 
-      annotationScope.createAnnotation?.(pageIndex, annotation)
+      annotationScope.createAnnotation?.(pageIndex, embedAnnotation)
+
+      // Also directly save to our store and storage
+      const scholarAnnotation = {
+        id: annotationId,
+        type: 'underline',
+        color: highlightColor,
+        created_at: now,
+        updated_at: now,
+        position: {
+          page: pageIndex,
+          rects: segmentRects.map(r => ({
+            x1: r.origin.x,
+            y1: r.origin.y,
+            x2: r.origin.x + r.size.width,
+            y2: r.origin.y + r.size.height
+          })),
+          boundingRect: boundingRect ? {
+            x1: boundingRect.origin.x,
+            y1: boundingRect.origin.y,
+            x2: boundingRect.origin.x + boundingRect.size.width,
+            y2: boundingRect.origin.y + boundingRect.size.height
+          } : null
+        },
+        content: { text: typeof text === 'string' ? text : '', image: null },
+        comment: '',
+        tags: [],
+        ai_context: { include_in_embeddings: true },
+        source: 'user'
+      }
+
+      storeAddAnnotation(scholarAnnotation)
+
+      if (adapter && docId) {
+        AnnotationService.addAnnotation(adapter, docId, scholarAnnotation, {
+          onSaveStart: () => setSaveStatus('saving'),
+          onSaveComplete: () => setSaveStatus('saved'),
+          onSaveError: () => setSaveStatus('error')
+        })
+      }
+
       return true
     } catch (error) {
       console.error('[EmbedPDF Annotations] createUnderline failed:', error)
       return null
     }
-  }, [annotationScope, highlightColor])
+  }, [annotationScope, highlightColor, adapter, docId, storeAddAnnotation, setSaveStatus])
 
   /**
    * Create an area/rectangle annotation
