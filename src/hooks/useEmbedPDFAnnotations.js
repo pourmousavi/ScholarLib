@@ -85,6 +85,11 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
     if (existingAnnotations.length > 0) {
       try {
+        // Track all imported annotation IDs to prevent duplicate handling from create events
+        existingAnnotations.forEach(ann => {
+          createdAnnotationIds.current.add(ann.id)
+        })
+
         // Convert to EmbedPDF format and import
         const embedAnnotations = toEmbedPDFArray(existingAnnotations)
 

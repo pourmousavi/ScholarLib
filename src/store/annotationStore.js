@@ -59,6 +59,12 @@ export const useAnnotationStore = create((set, get) => ({
     const docId = state.currentDocId
     if (!docId) return state
 
+    // Check if annotation already exists to prevent duplicates
+    const exists = state.currentAnnotations.some(a => a.id === annotation.id)
+    if (exists) {
+      return state
+    }
+
     const newAnnotations = [...state.currentAnnotations, annotation]
     return {
       currentAnnotations: newAnnotations,

@@ -168,6 +168,7 @@ function TextSelectionMenu({
       ref={menuWrapperProps?.ref}
       style={menuStyle}
       className={styles.selectionMenu}
+      data-selection-menu
       onMouseDown={(e) => e.stopPropagation()}
     >
       <button
@@ -461,6 +462,10 @@ function EmbedPDFContent({
   const { provides: zoomApi, state: zoomState } = useZoom(documentId)
   const { provides: scrollApi, state: scrollState } = useScroll(documentId)
 
+  // State for annotation click popover
+  const [clickedAnnotation, setClickedAnnotation] = useState(null)
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 })
+
   // Force a viewport refresh on mount by setting the zoom level
   // This triggers the viewport to render and respects the default zoom setting
   const hasInitialized = useRef(false)
@@ -518,24 +523,6 @@ function EmbedPDFContent({
     setSidebar
   } = useEmbedPDFAnnotations(docId, annotationScope, annotationCapability)
 
-  // Popover state
-  const [popoverAnnotation, setPopoverAnnotation] = useState(null)
-  const [popoverPosition, setPopoverPosition] = useState(null)
-
-  // Keep popover annotation in sync with store updates (e.g., when type/color changes)
-  useEffect(() => {
-    if (popoverAnnotation) {
-      const updatedAnnotation = annotations.find(a => a.id === popoverAnnotation.id)
-      if (updatedAnnotation && updatedAnnotation !== popoverAnnotation) {
-        setPopoverAnnotation(updatedAnnotation)
-      } else if (!updatedAnnotation) {
-        // Annotation was deleted
-        setPopoverAnnotation(null)
-        setPopoverPosition(null)
-      }
-    }
-  }, [annotations, popoverAnnotation])
-
   // Active drawing tool state (null, 'ink', 'inkHighlighter')
   const [activeTool, setActiveTool] = useState(null)
 
@@ -554,6 +541,89 @@ function EmbedPDFContent({
     }
   }, [annotationScope])
 
+  // Close popover when clicking outside or pressing escape
+  const handleClosePopover = useCallback(() => {
+    setClickedAnnotation(null)
+  }, [])
+
+  // Close popover on escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && clickedAnnotation) {
+        setClickedAnnotation(null)
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [clickedAnnotation])
+
+  // Close popover when document changes
+  useEffect(() => {
+    setClickedAnnotation(null)
+  }, [docId])
+
+  // Handle click on PDF page to detect annotation clicks
+  const handlePageClick = useCallback((e, pageIndex) => {
+    // Don't handle if clicking on the popover itself or selection menu
+    if (e.target.closest('[data-annotation-popover]') || e.target.closest('[data-selection-menu]')) {
+      return
+    }
+
+    // Get the page wrapper element
+    const pageWrapper = e.currentTarget
+    if (!pageWrapper) return
+
+    // Get click position relative to the page
+    const rect = pageWrapper.getBoundingClientRect()
+    const clickX = e.clientX - rect.left
+    const clickY = e.clientY - rect.top
+
+    // Get zoom level for coordinate conversion
+    const zoom = zoomState?.currentZoomLevel || 1
+
+    // Convert to PDF coordinates (unscaled)
+    const pdfX = clickX / zoom
+    const pdfY = clickY / zoom
+
+    // Check if click hits any annotation on this page
+    const pageAnnotations = annotations.filter(a => a.position?.page === pageIndex)
+
+    for (const annotation of pageAnnotations) {
+      const rects = annotation.position?.rects || []
+
+      for (const r of rects) {
+        // Check if point is inside rect
+        if (pdfX >= r.x1 && pdfX <= r.x2 && pdfY >= r.y1 && pdfY <= r.y2) {
+          // Hit! Show popover at click position
+          setClickedAnnotation(annotation)
+          selectAnnotation(annotation.id)
+          setPopoverPosition({
+            top: e.clientY + 10,
+            left: e.clientX
+          })
+          e.stopPropagation()
+          return
+        }
+      }
+
+      // Also check bounding rect
+      const br = annotation.position?.boundingRect
+      if (br && pdfX >= br.x1 && pdfX <= br.x2 && pdfY >= br.y1 && pdfY <= br.y2) {
+        setClickedAnnotation(annotation)
+        selectAnnotation(annotation.id)
+        setPopoverPosition({
+          top: e.clientY + 10,
+          left: e.clientX
+        })
+        e.stopPropagation()
+        return
+      }
+    }
+
+    // Clicked outside any annotation, close popover
+    setClickedAnnotation(null)
+  }, [annotations, zoomState, selectAnnotation])
+
   // Handle highlight creation from text selection
   const handleHighlight = useCallback((pageIndex, selectionData, text) => {
     const textStr = typeof text === 'string' ? text : ''
@@ -571,35 +641,34 @@ function EmbedPDFContent({
     }
   }, [createUnderline])
 
-  // Show popover when annotation is selected (from EmbedPDF click events)
-  useEffect(() => {
-    if (selectedAnnotationId) {
-      const annotation = annotations.find(a => a.id === selectedAnnotationId)
-      if (annotation && (!popoverAnnotation || popoverAnnotation.id !== selectedAnnotationId)) {
-        setPopoverAnnotation(annotation)
-        // Position in top-right area since we can't easily get annotation screen position from EmbedPDF
-        setPopoverPosition({ top: 80, left: window.innerWidth - 350 })
-      }
-    } else {
-      // Clear popover when deselected
-      setPopoverAnnotation(null)
-      setPopoverPosition(null)
-    }
-  }, [selectedAnnotationId, annotations])
+  // Render function for the selection menu (shown when annotation is selected)
+  const renderSelectionMenu = useCallback(({ context, position, onClose }) => {
+    // Find our stored annotation data by ID
+    const annotation = annotations.find(a => a.id === context.annotation.id)
+    if (!annotation) return null
 
-  // Handle annotation click (manual trigger)
-  const handleAnnotationClick = useCallback((annotation) => {
-    selectAnnotation(annotation.id)
-    setPopoverAnnotation(annotation)
-    setPopoverPosition({ top: 80, left: window.innerWidth - 350 })
-  }, [selectAnnotation])
-
-  // Close popover
-  const handleClosePopover = useCallback(() => {
-    setPopoverAnnotation(null)
-    setPopoverPosition(null)
-    clearSelection()
-  }, [clearSelection])
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          top: position.top + 10,
+          left: position.left,
+          zIndex: 1000
+        }}
+        data-annotation-popover
+      >
+        <AnnotationPopover
+          annotation={annotation}
+          onUpdateComment={updateComment}
+          onUpdateColor={updateColor}
+          onUpdateType={updateType}
+          onDelete={deleteAnnotation}
+          onClose={onClose}
+          position={{ top: 0, left: 0 }}
+        />
+      </div>
+    )
+  }, [annotations, updateComment, updateColor, updateType, deleteAnnotation])
 
   // Navigate to annotation (from sidebar)
   const handleNavigateToAnnotation = useCallback((annotation) => {
@@ -738,6 +807,7 @@ function EmbedPDFContent({
                               maxWidth: 'none'
                             }}
                             data-page-number={pageIndex + 1}
+                            onClick={(e) => handlePageClick(e, pageIndex)}
                           >
                             <RenderLayer
                               documentId={documentId}
@@ -765,6 +835,7 @@ function EmbedPDFContent({
                               documentId={documentId}
                               pageIndex={pageIndex}
                               resizeUI={{ size: 8, color: 'var(--color-primary)' }}
+                              selectionMenu={renderSelectionMenu}
                             />
                           </div>
                         </PagePointerProvider>
@@ -792,17 +863,40 @@ function EmbedPDFContent({
               )}
             </div>
 
-            {/* Annotation popover */}
-            {popoverAnnotation && popoverPosition && (
-              <AnnotationPopover
-                annotation={popoverAnnotation}
-                onUpdateComment={updateComment}
-                onUpdateColor={updateColor}
-                onUpdateType={updateType}
-                onDelete={deleteAnnotation}
-                onClose={handleClosePopover}
-                position={popoverPosition}
-              />
+            {/* Annotation popover for clicked annotation */}
+            {clickedAnnotation && (
+              <div
+                style={{
+                  position: 'fixed',
+                  top: popoverPosition.top,
+                  left: popoverPosition.left,
+                  zIndex: 1001
+                }}
+                data-annotation-popover
+              >
+                <AnnotationPopover
+                  annotation={clickedAnnotation}
+                  onUpdateComment={(id, comment) => {
+                    updateComment(id, comment)
+                    // Update clickedAnnotation to reflect the change
+                    setClickedAnnotation(prev => prev ? { ...prev, comment } : null)
+                  }}
+                  onUpdateColor={(id, color) => {
+                    updateColor(id, color)
+                    setClickedAnnotation(prev => prev ? { ...prev, color } : null)
+                  }}
+                  onUpdateType={(id, type) => {
+                    updateType(id, type)
+                    setClickedAnnotation(prev => prev ? { ...prev, type } : null)
+                  }}
+                  onDelete={(id) => {
+                    deleteAnnotation(id)
+                    setClickedAnnotation(null)
+                  }}
+                  onClose={handleClosePopover}
+                  position={{ top: 0, left: 0 }}
+                />
+              </div>
             )}
           </>
         )
