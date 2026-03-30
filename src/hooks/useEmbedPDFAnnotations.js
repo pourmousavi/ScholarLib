@@ -30,6 +30,8 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
   const eventUnsubscribeRef = useRef(null)
   // Track annotations we've created directly to avoid duplicates from events
   const createdAnnotationIds = useRef(new Set())
+  // Track annotations being recreated for type change (skip delete events for these)
+  const typeChangeIds = useRef(new Set())
 
   const {
     currentAnnotations,
@@ -156,6 +158,11 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
         case 'delete':
           if (event.annotationId) {
+            // Skip store/storage delete if this is part of a type change (delete+recreate)
+            if (typeChangeIds.current.has(event.annotationId)) {
+              typeChangeIds.current.delete(event.annotationId)
+              return
+            }
             storeDeleteAnnotation(event.annotationId)
             AnnotationService.deleteAnnotation(adapter, docId, event.annotationId, {
               onSaveStart: () => setSaveStatus('saving'),
@@ -645,7 +652,10 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
     if (annotationScope && annotation.position?.page !== undefined) {
       const pageIndex = annotation.position.page
 
-      // Delete the old annotation
+      // Mark as type change so the event handler skips the store delete
+      typeChangeIds.current.add(annotationId)
+
+      // Delete the old annotation from EmbedPDF (visual only, store is preserved)
       annotationScope.deleteAnnotation?.(pageIndex, annotationId)
 
       // Track to prevent duplicate from event handler

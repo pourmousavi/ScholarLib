@@ -56,6 +56,15 @@
   max-width: 680px;
 }
 
+/* Text selection highlight for EmbedPDF viewer — makes dragged selection visible */
+.pageWrapper ::selection {
+  background: rgba(0, 120, 215, 0.35) !important;
+}
+
+.pageWrapper ::-moz-selection {
+  background: rgba(0, 120, 215, 0.35) !important;
+}
+
 .page {
   display: block;
   border-radius: var(--radius-sm);
@@ -69,7 +78,6 @@
   right: 0;
   bottom: 0;
   overflow: hidden;
-  opacity: 0.25;
   line-height: 1.0;
   z-index: 1;
 }
