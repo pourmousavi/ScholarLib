@@ -60,11 +60,13 @@ export async function extractPDFAnnotations(pdfSource, onProgress) {
 /**
  * Convert PDF.js annotation to ScholarLib format
  * @param {Object} pdfAnnotation - PDF.js annotation object
- * @param {number} pageNum - Page number (1-indexed)
+ * @param {number} pageNum - Page number (1-indexed from PDF.js)
  * @param {Object} viewport - Page viewport for coordinate conversion
  * @returns {Object|null} ScholarLib annotation or null if not supported
  */
 function convertPDFAnnotation(pdfAnnotation, pageNum, viewport) {
+  // Convert to 0-indexed page for EmbedPDF compatibility
+  const pageIndex = pageNum - 1
   const { subtype, rect, quadPoints, color, contents, title, modificationDate, inkLists, borderStyle } = pdfAnnotation
 
   // Only process highlight, underline, squiggly, strikeout, text, ink, and area annotations
@@ -116,7 +118,7 @@ function convertPDFAnnotation(pdfAnnotation, pageNum, viewport) {
     created_at: timestamp,
     updated_at: timestamp,
     position: {
-      page: pageNum,
+      page: pageIndex, // 0-indexed for EmbedPDF compatibility
       rects,
       boundingRect: calculateBoundingRect(rects)
     },
@@ -310,19 +312,21 @@ export async function extractHighlightedText(pdfSource, annotations) {
 
     const pdf = await pdfjsLib.getDocument(data).promise
 
-    // Group annotations by page
+    // Group annotations by page (0-indexed)
     const byPage = {}
     for (const ann of annotations) {
-      const page = ann.position?.page
-      if (page) {
-        if (!byPage[page]) byPage[page] = []
-        byPage[page].push(ann)
+      const pageIndex = ann.position?.page
+      if (pageIndex !== undefined && pageIndex !== null) {
+        if (!byPage[pageIndex]) byPage[pageIndex] = []
+        byPage[pageIndex].push(ann)
       }
     }
 
     // Process each page with annotations
-    for (const [pageNum, pageAnnotations] of Object.entries(byPage)) {
-      const page = await pdf.getPage(parseInt(pageNum))
+    for (const [pageIndexStr, pageAnnotations] of Object.entries(byPage)) {
+      const pageIndex = parseInt(pageIndexStr)
+      // PDF.js getPage is 1-indexed, our page indices are 0-indexed
+      const page = await pdf.getPage(pageIndex + 1)
       const textContent = await page.getTextContent()
       const viewport = page.getViewport({ scale: 1 })
 
