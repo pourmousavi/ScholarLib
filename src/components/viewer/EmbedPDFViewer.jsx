@@ -12,7 +12,8 @@ import { TilingPluginPackage } from '@embedpdf/plugin-tiling/react'
 import {
   AnnotationPluginPackage,
   AnnotationLayer,
-  useAnnotation
+  useAnnotation,
+  useAnnotationCapability
 } from '@embedpdf/plugin-annotation/react'
 import {
   SelectionPluginPackage,
@@ -465,16 +466,21 @@ function EmbedPDFContent({
   isFullscreen,
   defaultZoom
 }) {
-  const { provides: annotationApi } = useAnnotation(documentId)
+  // useAnnotation returns a scope for the document (for createAnnotation, etc.)
+  const { provides: annotationScope } = useAnnotation(documentId)
+  // useAnnotationCapability returns the capability (for onAnnotationEvent)
+  const { provides: annotationCapability } = useAnnotationCapability()
   const { provides: exportApi } = useExport(documentId)
   const { provides: zoomApi, state: zoomState } = useZoom(documentId)
   const { provides: scrollApi, state: scrollState } = useScroll(documentId)
 
-  // Debug: log annotation API
+  // Debug: log annotation APIs
   useEffect(() => {
-    console.log('[EmbedPDF Content] annotationApi:', annotationApi)
-    console.log('[EmbedPDF Content] annotationApi methods:', annotationApi ? Object.keys(annotationApi) : 'null')
-  }, [annotationApi])
+    console.log('[EmbedPDF Content] annotationScope:', annotationScope)
+    console.log('[EmbedPDF Content] annotationScope methods:', annotationScope ? Object.keys(annotationScope) : 'null')
+    console.log('[EmbedPDF Content] annotationCapability:', annotationCapability)
+    console.log('[EmbedPDF Content] annotationCapability methods:', annotationCapability ? Object.keys(annotationCapability) : 'null')
+  }, [annotationScope, annotationCapability])
 
   // Force a viewport refresh on mount by setting the zoom level
   // This triggers the viewport to render and respects the default zoom setting
@@ -536,7 +542,7 @@ function EmbedPDFContent({
     setColor,
     toggleSidebar,
     setSidebar
-  } = useEmbedPDFAnnotations(docId, annotationApi)
+  } = useEmbedPDFAnnotations(docId, annotationScope, annotationCapability)
 
   // Popover state
   const [popoverAnnotation, setPopoverAnnotation] = useState(null)
@@ -551,14 +557,14 @@ function EmbedPDFContent({
   // Handle tool change
   const handleSetActiveTool = useCallback((tool) => {
     setActiveTool(tool)
-    if (annotationApi) {
+    if (annotationScope) {
       if (tool) {
-        annotationApi.setActiveTool?.(tool)
+        annotationScope.setActiveTool?.(tool)
       } else {
-        annotationApi.setActiveTool?.(null)
+        annotationScope.setActiveTool?.(null)
       }
     }
-  }, [annotationApi])
+  }, [annotationScope])
 
   // Handle highlight creation from text selection
   const handleHighlight = useCallback((pageIndex, selectionData, text) => {

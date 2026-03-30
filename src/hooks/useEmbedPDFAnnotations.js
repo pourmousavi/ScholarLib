@@ -20,10 +20,11 @@ import {
 /**
  * Hook for managing annotations in EmbedPDF viewer
  * @param {string} docId - Document ID
- * @param {Object} annotationApi - EmbedPDF annotation API from useAnnotation hook
+ * @param {Object} annotationScope - EmbedPDF annotation scope from useAnnotation hook (for createAnnotation, etc.)
+ * @param {Object} annotationCapability - EmbedPDF annotation capability from useAnnotationCapability hook (for onAnnotationEvent)
  * @returns {Object} Annotation state and methods
  */
-export function useEmbedPDFAnnotations(docId, annotationApi) {
+export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapability) {
   const adapter = useStorageStore((state) => state.adapter)
   const [isInitialized, setIsInitialized] = useState(false)
   const eventUnsubscribeRef = useRef(null)
@@ -75,19 +76,18 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
 
   // Import existing annotations into EmbedPDF when API is ready
   useEffect(() => {
-    if (!annotationApi || !docId || isInitialized || !isLoaded) return
+    if (!annotationScope || !docId || isInitialized || !isLoaded) return
 
     // Debug: Log available annotation API methods
-    console.log('[EmbedPDF Annotations] annotationApi available methods:',
-      annotationApi ? Object.keys(annotationApi) : 'null')
-    console.log('[EmbedPDF Annotations] annotationApi:', annotationApi)
+    console.log('[EmbedPDF Annotations] annotationScope available methods:',
+      annotationScope ? Object.keys(annotationScope) : 'null')
 
     const existingAnnotations = AnnotationService.getAnnotationsForDoc(docId)
     if (existingAnnotations.length > 0) {
       try {
         // Convert to EmbedPDF format and import
         const embedAnnotations = toEmbedPDFArray(existingAnnotations)
-        annotationApi.importAnnotations?.(embedAnnotations)
+        annotationScope.importAnnotations?.(embedAnnotations)
         console.log(`Imported ${embedAnnotations.length} annotations into EmbedPDF`)
       } catch (error) {
         console.error('Failed to import annotations into EmbedPDF:', error)
@@ -95,11 +95,11 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
     }
 
     setIsInitialized(true)
-  }, [annotationApi, docId, isInitialized, isLoaded])
+  }, [annotationScope, docId, isInitialized, isLoaded])
 
-  // Subscribe to EmbedPDF annotation events
+  // Subscribe to EmbedPDF annotation events (using capability for global events)
   useEffect(() => {
-    if (!annotationApi || !adapter || !docId) return
+    if (!annotationCapability || !adapter || !docId) return
 
     // Unsubscribe from previous if any
     if (eventUnsubscribeRef.current) {
@@ -192,17 +192,19 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
       }
     }
 
-    // Subscribe to events
-    eventUnsubscribeRef.current = annotationApi.onAnnotationEvent?.(handleAnnotationEvent)
+    // Subscribe to events using the capability (which has onAnnotationEvent)
+    console.log('[EmbedPDF Annotations] Subscribing to annotation events')
+    eventUnsubscribeRef.current = annotationCapability.onAnnotationEvent?.(handleAnnotationEvent)
 
     return () => {
       if (eventUnsubscribeRef.current) {
+        console.log('[EmbedPDF Annotations] Unsubscribing from annotation events')
         eventUnsubscribeRef.current()
         eventUnsubscribeRef.current = null
       }
     }
   }, [
-    annotationApi,
+    annotationCapability,
     adapter,
     docId,
     storeAddAnnotation,
@@ -230,8 +232,8 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
   const createHighlight = useCallback((pageIndex, selectionData, text = '') => {
     console.log('[EmbedPDF Annotations] createHighlight called:', { pageIndex, selectionData, text })
 
-    if (!annotationApi) {
-      console.error('[EmbedPDF Annotations] No annotationApi available')
+    if (!annotationScope) {
+      console.error('[EmbedPDF Annotations] No annotationScope available')
       return null
     }
 
@@ -303,14 +305,14 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
       }
 
       console.log('[EmbedPDF Annotations] Creating annotation:', JSON.stringify(annotation, null, 2))
-      annotationApi.createAnnotation?.(pageIndex, annotation)
+      annotationScope.createAnnotation?.(pageIndex, annotation)
       console.log('[EmbedPDF Annotations] createAnnotation called successfully')
       return true
     } catch (error) {
       console.error('[EmbedPDF Annotations] createAnnotation failed:', error)
       return null
     }
-  }, [annotationApi, highlightColor])
+  }, [annotationScope, highlightColor])
 
   /**
    * Create an underline annotation
@@ -319,7 +321,7 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
    * @param {string} text - The selected text
    */
   const createUnderline = useCallback((pageIndex, selectionData, text = '') => {
-    if (!annotationApi) return null
+    if (!annotationScope) return null
 
     try {
       const rawRects = selectionData.flatMap(item => item.segmentRects || [])
@@ -367,21 +369,21 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
         contents: typeof text === 'string' ? text : ''
       }
 
-      annotationApi.createAnnotation?.(pageIndex, annotation)
+      annotationScope.createAnnotation?.(pageIndex, annotation)
       return true
     } catch (error) {
       console.error('[EmbedPDF Annotations] createUnderline failed:', error)
       return null
     }
-  }, [annotationApi, highlightColor])
+  }, [annotationScope, highlightColor])
 
   /**
    * Create an area/rectangle annotation
    */
   const createAreaAnnotation = useCallback((pageIndex, rect, imageData = null) => {
-    if (!annotationApi) return null
+    if (!annotationScope) return null
 
-    annotationApi.createAnnotation?.(pageIndex, {
+    annotationScope.createAnnotation?.(pageIndex, {
       type: 'square',
       rect,
       color: { ...hexToRgbaInternal(highlightColor), a: 0.35 },
@@ -393,84 +395,84 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
         source: 'user'
       }
     })
-  }, [annotationApi, highlightColor])
+  }, [annotationScope, highlightColor])
 
   /**
    * Update annotation comment
    */
   const updateComment = useCallback((annotationId, comment) => {
-    if (!annotationApi || !adapter || !docId) return false
+    if (!annotationScope || !adapter || !docId) return false
 
     // Find the annotation to get its page
     const annotation = getAnnotationById(annotationId)
     if (!annotation) return false
 
     // Update in EmbedPDF
-    annotationApi.updateAnnotation?.(annotation.position?.page ?? 0, annotationId, {
+    annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, annotationId, {
       contents: comment
     })
 
     // Update in store and storage (will be triggered by event handler)
     return true
-  }, [annotationApi, adapter, docId, getAnnotationById])
+  }, [annotationScope, adapter, docId, getAnnotationById])
 
   /**
    * Update annotation color
    */
   const updateColor = useCallback((annotationId, color) => {
-    if (!annotationApi || !adapter || !docId) return false
+    if (!annotationScope || !adapter || !docId) return false
 
     const annotation = getAnnotationById(annotationId)
     if (!annotation) return false
 
     // Update in EmbedPDF
-    annotationApi.updateAnnotation?.(annotation.position?.page ?? 0, annotationId, {
+    annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, annotationId, {
       color: { ...hexToRgbaInternal(color), a: 0.35 }
     })
 
     return true
-  }, [annotationApi, adapter, docId, getAnnotationById])
+  }, [annotationScope, adapter, docId, getAnnotationById])
 
   /**
    * Delete an annotation
    */
   const deleteAnnotation = useCallback((annotationId) => {
-    if (!annotationApi || !adapter || !docId) return false
+    if (!annotationScope || !adapter || !docId) return false
 
     const annotation = getAnnotationById(annotationId)
     if (!annotation) return false
 
     // Delete in EmbedPDF
-    annotationApi.deleteAnnotation?.(annotation.position?.page ?? 0, annotationId)
+    annotationScope.deleteAnnotation?.(annotation.position?.page ?? 0, annotationId)
 
     return true
-  }, [annotationApi, adapter, docId, getAnnotationById])
+  }, [annotationScope, adapter, docId, getAnnotationById])
 
   /**
    * Select an annotation
    */
   const selectAnnotation = useCallback((annotationId) => {
-    if (!annotationApi) return
+    if (!annotationScope) return
 
     const annotation = getAnnotationById(annotationId)
     if (annotation) {
-      annotationApi.selectAnnotation?.(annotation.position?.page ?? 0, annotationId)
+      annotationScope.selectAnnotation?.(annotation.position?.page ?? 0, annotationId)
     }
     setSelectedAnnotation(annotationId)
-  }, [annotationApi, getAnnotationById, setSelectedAnnotation])
+  }, [annotationScope, getAnnotationById, setSelectedAnnotation])
 
   /**
    * Clear selection
    */
   const clearSelection = useCallback(() => {
-    if (annotationApi && selectedAnnotationId) {
+    if (annotationScope && selectedAnnotationId) {
       const annotation = getAnnotationById(selectedAnnotationId)
       if (annotation) {
-        annotationApi.deselectAnnotation?.(annotation.position?.page ?? 0, selectedAnnotationId)
+        annotationScope.deselectAnnotation?.(annotation.position?.page ?? 0, selectedAnnotationId)
       }
     }
     setSelectedAnnotation(null)
-  }, [annotationApi, selectedAnnotationId, getAnnotationById, setSelectedAnnotation])
+  }, [annotationScope, selectedAnnotationId, getAnnotationById, setSelectedAnnotation])
 
   /**
    * Get annotations for AI indexing
