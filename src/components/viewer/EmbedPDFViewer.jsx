@@ -710,16 +710,23 @@ function EmbedPDFContent({
                             <SelectionLayer
                               documentId={documentId}
                               pageIndex={pageIndex}
-                              selectionMenu={(props) => (
-                                <TextSelectionMenu
-                                  {...props}
-                                  documentId={documentId}
-                                  pageIndex={pageIndex}
-                                  onHighlight={handleHighlight}
-                                  onUnderline={handleUnderline}
-                                  highlightColor={highlightColor}
-                                />
-                              )}
+                              enabled={true}
+                              onSelectionChange={(selection) => {
+                                console.log('[EmbedPDF] SelectionLayer onSelectionChange:', selection)
+                              }}
+                              selectionMenu={(props) => {
+                                console.log('[EmbedPDF] SelectionLayer selectionMenu called with props:', props)
+                                return (
+                                  <TextSelectionMenu
+                                    {...props}
+                                    documentId={documentId}
+                                    pageIndex={pageIndex}
+                                    onHighlight={handleHighlight}
+                                    onUnderline={handleUnderline}
+                                    highlightColor={highlightColor}
+                                  />
+                                )
+                              }}
                             />
                             <AnnotationLayer
                               documentId={documentId}
