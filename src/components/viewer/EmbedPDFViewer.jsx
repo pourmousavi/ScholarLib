@@ -231,6 +231,31 @@ function EmbedPDFToolbar({
             </svg>
           </button>
 
+          {/* Area/Rectangle selection tool */}
+          <button
+            className={`${toolbarStyles.toolBtn} ${activeTool === 'square' ? toolbarStyles.active : ''}`}
+            onClick={() => onSetActiveTool(activeTool === 'square' ? null : 'square')}
+            title="Select area (for figures/tables)"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 2"/>
+              <path d="M9 3v18M15 3v18M3 9h18M3 15h18" strokeOpacity="0.3"/>
+            </svg>
+          </button>
+
+          {/* Note/Free text tool */}
+          <button
+            className={`${toolbarStyles.toolBtn} ${activeTool === 'freetext' ? toolbarStyles.active : ''}`}
+            onClick={() => onSetActiveTool(activeTool === 'freetext' ? null : 'freetext')}
+            title="Add text note"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+              <line x1="9" y1="9" x2="15" y2="9"/>
+              <line x1="9" y1="13" x2="13" y2="13"/>
+            </svg>
+          </button>
+
           {/* Color picker toggle */}
           <div style={{ position: 'relative' }}>
             <button
