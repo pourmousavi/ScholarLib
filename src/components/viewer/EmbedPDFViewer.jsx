@@ -74,7 +74,7 @@ function TextSelectionMenu({
       const docSelection = selectionCapability.forDocument(documentId)
 
       const formatted = docSelection.getFormattedSelection()
-      console.log('[EmbedPDF TextSelectionMenu] formatted selection:', formatted)
+      console.log('[EmbedPDF TextSelectionMenu] formatted selection:', JSON.stringify(formatted, null, 2))
 
       // getSelectedText returns a Task/Promise-like object, try to resolve it
       let text = ''
@@ -88,6 +88,10 @@ function TextSelectionMenu({
         } else {
           text = textResult || ''
         }
+        // Join array if needed
+        if (Array.isArray(text)) {
+          text = text.join(' ')
+        }
       } catch (textErr) {
         console.warn('[EmbedPDF] Could not get selected text:', textErr)
       }
@@ -95,12 +99,11 @@ function TextSelectionMenu({
 
       if (formatted && formatted.length > 0) {
         onHighlight(pageIndex, formatted, text)
+        // Clear selection after creating highlight
+        docSelection.clear?.()
       } else {
         console.warn('[EmbedPDF TextSelectionMenu] No formatted selection')
       }
-
-      // Clear selection
-      docSelection.clearSelection?.()
     } catch (e) {
       console.error('[EmbedPDF] Highlight creation failed:', e)
     }
@@ -123,15 +126,18 @@ function TextSelectionMenu({
         } else {
           text = textResult || ''
         }
+        if (Array.isArray(text)) {
+          text = text.join(' ')
+        }
       } catch (textErr) {
         console.warn('[EmbedPDF] Could not get selected text:', textErr)
       }
 
       if (formatted && formatted.length > 0) {
         onUnderline(pageIndex, formatted, text)
+        // Clear selection after creating underline
+        docSelection.clear?.()
       }
-
-      docSelection.clearSelection?.()
     } catch (e) {
       console.error('[EmbedPDF] Underline creation failed:', e)
     }

@@ -217,13 +217,40 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
     try {
       // Extract segmentRects from selection data
       // selectionData is an array with objects containing { pageIndex, rect, segmentRects }
-      const segmentRects = selectionData.flatMap(item => item.segmentRects || [])
-      console.log('[EmbedPDF Annotations] Extracted segmentRects:', segmentRects)
+      const rawRects = selectionData.flatMap(item => item.segmentRects || [])
+      console.log('[EmbedPDF Annotations] Raw segmentRects:', JSON.stringify(rawRects, null, 2))
 
-      if (segmentRects.length === 0) {
+      if (rawRects.length === 0) {
         console.warn('[EmbedPDF Annotations] No segmentRects found in selection data')
         return null
       }
+
+      // Ensure rects are in correct format: { origin: { x, y }, size: { width, height } }
+      // Selection plugin should already provide them in this format, but validate
+      const segmentRects = rawRects.map(rect => {
+        // If already in correct format, return as-is
+        if (rect.origin && rect.size) {
+          return rect
+        }
+        // If in { x, y, width, height } format, convert
+        if ('x' in rect && 'y' in rect && 'width' in rect && 'height' in rect) {
+          return {
+            origin: { x: rect.x, y: rect.y },
+            size: { width: rect.width, height: rect.height }
+          }
+        }
+        // If in { x1, y1, x2, y2 } format, convert
+        if ('x1' in rect && 'y1' in rect && 'x2' in rect && 'y2' in rect) {
+          return {
+            origin: { x: rect.x1, y: rect.y1 },
+            size: { width: rect.x2 - rect.x1, height: rect.y2 - rect.y1 }
+          }
+        }
+        console.warn('[EmbedPDF Annotations] Unknown rect format:', rect)
+        return rect
+      })
+
+      console.log('[EmbedPDF Annotations] Converted segmentRects:', JSON.stringify(segmentRects, null, 2))
 
       // Create highlight annotation with correct EmbedPDF format
       // type: 9 is PdfAnnotationSubtype.HIGHLIGHT
@@ -235,10 +262,10 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
         contents: typeof text === 'string' ? text : ''
       }
 
-      console.log('[EmbedPDF Annotations] Creating annotation:', annotation)
-      const result = annotationApi.createAnnotation?.(pageIndex, annotation)
-      console.log('[EmbedPDF Annotations] createAnnotation result:', result)
-      return result
+      console.log('[EmbedPDF Annotations] Creating annotation:', JSON.stringify(annotation, null, 2))
+      annotationApi.createAnnotation?.(pageIndex, annotation)
+      console.log('[EmbedPDF Annotations] createAnnotation called successfully')
+      return true
     } catch (error) {
       console.error('[EmbedPDF Annotations] createAnnotation failed:', error)
       return null
@@ -255,8 +282,26 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
     if (!annotationApi) return null
 
     try {
-      const segmentRects = selectionData.flatMap(item => item.segmentRects || [])
-      if (segmentRects.length === 0) return null
+      const rawRects = selectionData.flatMap(item => item.segmentRects || [])
+      if (rawRects.length === 0) return null
+
+      // Ensure rects are in correct format: { origin: { x, y }, size: { width, height } }
+      const segmentRects = rawRects.map(rect => {
+        if (rect.origin && rect.size) return rect
+        if ('x' in rect && 'y' in rect && 'width' in rect && 'height' in rect) {
+          return {
+            origin: { x: rect.x, y: rect.y },
+            size: { width: rect.width, height: rect.height }
+          }
+        }
+        if ('x1' in rect && 'y1' in rect && 'x2' in rect && 'y2' in rect) {
+          return {
+            origin: { x: rect.x1, y: rect.y1 },
+            size: { width: rect.x2 - rect.x1, height: rect.y2 - rect.y1 }
+          }
+        }
+        return rect
+      })
 
       // type: 10 is PdfAnnotationSubtype.UNDERLINE
       const annotation = {
@@ -267,7 +312,8 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
         contents: typeof text === 'string' ? text : ''
       }
 
-      return annotationApi.createAnnotation?.(pageIndex, annotation)
+      annotationApi.createAnnotation?.(pageIndex, annotation)
+      return true
     } catch (error) {
       console.error('[EmbedPDF Annotations] createUnderline failed:', error)
       return null
