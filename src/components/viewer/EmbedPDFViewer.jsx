@@ -367,34 +367,38 @@ function EmbedPDFContent({
   const { provides: zoomApi } = useZoom(documentId)
   const { provides: scrollApi } = useScroll(documentId)
 
-  // Force a viewport refresh on mount to ensure the document renders
-  // This is needed because EmbedPDF sometimes doesn't render until interaction
+  // Force a viewport refresh on mount by triggering a zoom cycle
+  // This is needed because EmbedPDF sometimes doesn't render until zoom interaction
   const hasInitialized = useRef(false)
   useEffect(() => {
-    if (hasInitialized.current) return
+    if (hasInitialized.current || !zoomApi) return
 
-    // Use a small delay to ensure EmbedPDF has fully processed
+    // Use a delay to ensure EmbedPDF has fully processed the document
     const timer = setTimeout(() => {
-      console.log('[EmbedPDF] Triggering initial viewport refresh')
+      console.log('[EmbedPDF] Triggering zoom cycle to force render')
 
-      // Method 1: Trigger window resize event to force viewport recalculation
-      window.dispatchEvent(new Event('resize'))
-
-      // Method 2: Scroll to first page to ensure viewport is positioned correctly
-      if (scrollApi) {
-        try {
-          console.log('[EmbedPDF] Scrolling to first page')
-          scrollApi.scrollToPage?.(0)
-        } catch (e) {
-          console.log('[EmbedPDF] Scroll to page not available:', e)
+      try {
+        // Trigger a zoom out then zoom in to force viewport refresh
+        // This mimics what happens when the user clicks the zoom button
+        if (typeof zoomApi.zoomOut === 'function') {
+          zoomApi.zoomOut()
+          // Immediately zoom back in to restore original zoom level
+          setTimeout(() => {
+            if (typeof zoomApi.zoomIn === 'function') {
+              zoomApi.zoomIn()
+              console.log('[EmbedPDF] Zoom cycle complete')
+            }
+          }, 50)
         }
+      } catch (e) {
+        console.log('[EmbedPDF] Zoom cycle failed:', e)
       }
 
       hasInitialized.current = true
-    }, 150)
+    }, 200)
 
     return () => clearTimeout(timer)
-  }, [scrollApi, documentId])
+  }, [zoomApi, documentId])
 
   // Reset initialization flag when document changes
   useEffect(() => {
