@@ -216,39 +216,55 @@
   max-width: 300px;
 }
 
-/* Selection menu for EmbedPDF */
+/* Selection menu for EmbedPDF - Adobe Acrobat style floating toolbar */
 .selectionMenu {
   display: flex;
-  gap: 4px;
-  padding: 6px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  z-index: 100;
+  gap: 2px;
+  padding: 4px 6px;
+  background: #1a1a1a;
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  z-index: 1000;
+  animation: selectionMenuFadeIn 0.15s ease-out;
+}
+
+@keyframes selectionMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .selectionMenuBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: none;
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface);
-  color: var(--text-primary);
+  border-radius: 4px;
+  background: transparent;
+  color: #ffffff;
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  transition: background 0.1s;
 }
 
 .selectionMenuBtn:hover {
-  background: var(--bg-hover);
-  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .selectionMenuBtn:active {
-  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.selectionMenuBtn svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* Color picker popover */

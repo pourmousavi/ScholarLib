@@ -48,7 +48,7 @@ function ColorPicker({ currentColor, onColorChange, colors }) {
   )
 }
 
-// Text selection menu that appears on text selection
+// Text selection menu that appears on text selection - positioned like Adobe Acrobat
 function TextSelectionMenu({
   documentId,
   pageIndex,
@@ -62,110 +62,104 @@ function TextSelectionMenu({
 }) {
   const { provides: selectionCapability } = useSelectionCapability()
 
-  const handleHighlight = useCallback(async () => {
-    console.log('[EmbedPDF TextSelectionMenu] handleHighlight called')
-
-    if (!selectionCapability) {
-      console.warn('[EmbedPDF TextSelectionMenu] No selectionCapability')
-      return
-    }
-
+  // Helper to get selected text
+  const getSelectedText = useCallback(async () => {
+    if (!selectionCapability) return ''
     try {
       const docSelection = selectionCapability.forDocument(documentId)
-
-      const formatted = docSelection.getFormattedSelection()
-      console.log('[EmbedPDF TextSelectionMenu] formatted selection:', JSON.stringify(formatted, null, 2))
-
-      // getSelectedText returns a Task/Promise-like object, try to resolve it
+      const textResult = docSelection.getSelectedText()
       let text = ''
-      try {
-        const textResult = docSelection.getSelectedText()
-        // Check if it's a promise or task
-        if (textResult && typeof textResult.toPromise === 'function') {
-          text = await textResult.toPromise()
-        } else if (textResult && typeof textResult.then === 'function') {
-          text = await textResult
-        } else {
-          text = textResult || ''
-        }
-        // Join array if needed
-        if (Array.isArray(text)) {
-          text = text.join(' ')
-        }
-      } catch (textErr) {
-        console.warn('[EmbedPDF] Could not get selected text:', textErr)
+      if (textResult && typeof textResult.toPromise === 'function') {
+        text = await textResult.toPromise()
+      } else if (textResult && typeof textResult.then === 'function') {
+        text = await textResult
+      } else {
+        text = textResult || ''
       }
-      console.log('[EmbedPDF TextSelectionMenu] selected text:', text)
+      return Array.isArray(text) ? text.join(' ') : text
+    } catch (err) {
+      console.warn('[EmbedPDF] Could not get selected text:', err)
+      return ''
+    }
+  }, [selectionCapability, documentId])
+
+  const handleHighlight = useCallback(async () => {
+    if (!selectionCapability) return
+    try {
+      const docSelection = selectionCapability.forDocument(documentId)
+      const formatted = docSelection.getFormattedSelection()
+      const text = await getSelectedText()
 
       if (formatted && formatted.length > 0) {
         onHighlight(pageIndex, formatted, text)
-        // Clear selection after creating highlight
         docSelection.clear?.()
-      } else {
-        console.warn('[EmbedPDF TextSelectionMenu] No formatted selection')
       }
     } catch (e) {
       console.error('[EmbedPDF] Highlight creation failed:', e)
     }
-  }, [selectionCapability, documentId, pageIndex, onHighlight])
+  }, [selectionCapability, documentId, pageIndex, onHighlight, getSelectedText])
 
   const handleUnderline = useCallback(async () => {
     if (!selectionCapability) return
-
     try {
       const docSelection = selectionCapability.forDocument(documentId)
       const formatted = docSelection.getFormattedSelection()
-
-      let text = ''
-      try {
-        const textResult = docSelection.getSelectedText()
-        if (textResult && typeof textResult.toPromise === 'function') {
-          text = await textResult.toPromise()
-        } else if (textResult && typeof textResult.then === 'function') {
-          text = await textResult
-        } else {
-          text = textResult || ''
-        }
-        if (Array.isArray(text)) {
-          text = text.join(' ')
-        }
-      } catch (textErr) {
-        console.warn('[EmbedPDF] Could not get selected text:', textErr)
-      }
+      const text = await getSelectedText()
 
       if (formatted && formatted.length > 0) {
         onUnderline(pageIndex, formatted, text)
-        // Clear selection after creating underline
         docSelection.clear?.()
       }
     } catch (e) {
       console.error('[EmbedPDF] Underline creation failed:', e)
     }
-  }, [selectionCapability, documentId, pageIndex, onUnderline])
+  }, [selectionCapability, documentId, pageIndex, onUnderline, getSelectedText])
+
+  const handleCopy = useCallback(async () => {
+    if (!selectionCapability) return
+    try {
+      const docSelection = selectionCapability.forDocument(documentId)
+      // Use built-in copyToClipboard if available
+      if (docSelection.copyToClipboard) {
+        docSelection.copyToClipboard()
+      } else {
+        // Fallback: get text and copy manually
+        const text = await getSelectedText()
+        if (text) {
+          await navigator.clipboard.writeText(text)
+        }
+      }
+      docSelection.clear?.()
+    } catch (e) {
+      console.error('[EmbedPDF] Copy failed:', e)
+    }
+  }, [selectionCapability, documentId, getSelectedText])
 
   // Don't render if not selected or no rect
   if (!selected || !rect) {
     return null
   }
 
-  // Merge wrapper styles with our overrides for proper display
+  // Position the menu as a small floating toolbar ABOVE the selection
+  // rect contains { origin: { x, y }, size: { width, height } }
+  const rectX = rect.origin?.x ?? rect.x ?? 0
+  const rectY = rect.origin?.y ?? rect.y ?? 0
+  const rectWidth = rect.size?.width ?? rect.width ?? 100
+  const rectHeight = rect.size?.height ?? rect.height ?? 20
+
+  // Center the menu above the selection
+  const menuWidth = 100 // approximate menu width
   const menuStyle = {
-    ...menuWrapperProps?.style,
-    pointerEvents: 'auto', // Ensure clicks work
+    position: 'absolute',
+    left: Math.max(0, rectX + (rectWidth / 2) - (menuWidth / 2)),
+    top: rectY - 44, // 36px menu height + 8px gap
+    pointerEvents: 'auto',
+    zIndex: 1000,
   }
 
-  const handleHighlightClick = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    console.log('[EmbedPDF] Highlight button clicked')
-    handleHighlight()
-  }
-
-  const handleUnderlineClick = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    console.log('[EmbedPDF] Underline button clicked')
-    handleUnderline()
+  // If menu would go above the page, position it below the selection instead
+  if (menuStyle.top < 0) {
+    menuStyle.top = rectY + rectHeight + 8
   }
 
   return (
@@ -176,7 +170,7 @@ function TextSelectionMenu({
       onMouseDown={(e) => e.stopPropagation()}
     >
       <button
-        onClick={handleHighlightClick}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleHighlight() }}
         onMouseDown={(e) => e.stopPropagation()}
         className={styles.selectionMenuBtn}
         style={{ backgroundColor: highlightColor }}
@@ -187,7 +181,7 @@ function TextSelectionMenu({
         </svg>
       </button>
       <button
-        onClick={handleUnderlineClick}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleUnderline() }}
         onMouseDown={(e) => e.stopPropagation()}
         className={styles.selectionMenuBtn}
         title="Underline"
@@ -195,6 +189,17 @@ function TextSelectionMenu({
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
           <path d="M6 3v7a6 6 0 0 0 12 0V3"/>
           <line x1="4" y1="21" x2="20" y2="21"/>
+        </svg>
+      </button>
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleCopy() }}
+        onMouseDown={(e) => e.stopPropagation()}
+        className={styles.selectionMenuBtn}
+        title="Copy"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
         </svg>
       </button>
     </div>
@@ -751,23 +756,20 @@ function EmbedPDFContent({
                             <SelectionLayer
                               documentId={documentId}
                               pageIndex={pageIndex}
-                              enabled={true}
-                              onSelectionChange={(selection) => {
-                                console.log('[EmbedPDF] SelectionLayer onSelectionChange:', selection)
+                              textStyle={{
+                                // Blue selection highlight like Adobe Acrobat
+                                background: 'rgba(0, 120, 215, 0.35)'
                               }}
-                              selectionMenu={(props) => {
-                                console.log('[EmbedPDF] SelectionLayer selectionMenu called with props:', props)
-                                return (
-                                  <TextSelectionMenu
-                                    {...props}
-                                    documentId={documentId}
-                                    pageIndex={pageIndex}
-                                    onHighlight={handleHighlight}
-                                    onUnderline={handleUnderline}
-                                    highlightColor={highlightColor}
-                                  />
-                                )
-                              }}
+                              selectionMenu={(props) => (
+                                <TextSelectionMenu
+                                  {...props}
+                                  documentId={documentId}
+                                  pageIndex={pageIndex}
+                                  onHighlight={handleHighlight}
+                                  onUnderline={handleUnderline}
+                                  highlightColor={highlightColor}
+                                />
+                              )}
                             />
                             <AnnotationLayer
                               documentId={documentId}

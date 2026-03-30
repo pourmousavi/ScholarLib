@@ -82,3 +82,40 @@ input, textarea, button { font-family: inherit; }
 [data-theme="light"]::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.45);
 }
+
+/* ===== EmbedPDF Selection Layer Styles ===== */
+/* These styles make text selection work like Adobe Acrobat Reader */
+
+/* Text cursor when hovering over selectable text */
+[data-embedpdf-selection-layer],
+[class*="selection-layer"],
+[class*="SelectionLayer"] {
+  cursor: text !important;
+}
+
+/* Blue selection highlight - standard browser selection styling */
+[data-embedpdf-selection-layer] ::selection,
+[class*="selection-layer"] ::selection,
+[class*="SelectionLayer"] ::selection {
+  background: rgba(0, 120, 215, 0.35) !important;
+}
+
+/* EmbedPDF internal selection rectangles */
+[data-embedpdf-selection],
+[class*="selection-rect"],
+[class*="selectionRect"] {
+  background: rgba(0, 120, 215, 0.25) !important;
+  border: none !important;
+  mix-blend-mode: multiply;
+}
+
+/* Ensure page content shows text cursor for text areas */
+[data-page-number] {
+  cursor: text;
+}
+
+/* Override any default cursors on the viewport during selection */
+[class*="viewport"] [class*="text"],
+[class*="Viewport"] [class*="text"] {
+  cursor: text !important;
+}
