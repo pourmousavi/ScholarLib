@@ -723,7 +723,11 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
 
     return [
       createPluginRegistration(DocumentManagerPluginPackage, {
-        initialDocuments: [{ data: pdfData }],
+        initialDocuments: [{
+          buffer: pdfData,
+          name: docId || 'document.pdf',
+          autoActivate: true
+        }],
       }),
       createPluginRegistration(ViewportPluginPackage),
       createPluginRegistration(ScrollPluginPackage, {
@@ -745,7 +749,7 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
       }),
       createPluginRegistration(ExportPluginPackage),
     ]
-  }, [pdfData, pdfDefaultZoom])
+  }, [pdfData, pdfDefaultZoom, docId])
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
