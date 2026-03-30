@@ -123,7 +123,7 @@ function TextSelectionMenu({
 // Inner toolbar with annotation tools
 function EmbedPDFToolbar({
   documentId,
-  totalPages,
+  totalPagesProp,
   onToggleFullscreen,
   isFullscreen,
   annotationCount,
@@ -145,7 +145,23 @@ function EmbedPDFToolbar({
     ? Math.round(zoomState.currentZoomLevel * 100)
     : 100
 
+  // Get current page from scroll state (1-indexed)
   const currentPage = scrollState?.currentPage ?? 1
+  // Get total pages from scroll state, fallback to prop
+  const totalPages = scrollState?.totalPages || scrollState?.pageCount || scrollState?.numPages || totalPagesProp || 0
+
+  // Debug: log scroll and zoom state to find correct property names
+  useEffect(() => {
+    if (scrollState) {
+      console.log('[EmbedPDF Toolbar] scrollState:', JSON.stringify(scrollState, null, 2))
+    }
+    if (zoomState) {
+      console.log('[EmbedPDF Toolbar] zoomState:', JSON.stringify(zoomState, null, 2))
+    }
+    if (zoom) {
+      console.log('[EmbedPDF Toolbar] zoom API methods:', Object.keys(zoom))
+    }
+  }, [scrollState, zoomState, zoom])
 
   const handleZoomIn = useCallback(() => {
     zoom?.zoomIn()
@@ -360,45 +376,54 @@ function EmbedPDFContent({
   totalPages,
   onTotalPagesChange,
   onToggleFullscreen,
-  isFullscreen
+  isFullscreen,
+  defaultZoom
 }) {
   const { provides: annotationApi } = useAnnotation(documentId)
   const { provides: exportApi } = useExport(documentId)
-  const { provides: zoomApi } = useZoom(documentId)
-  const { provides: scrollApi } = useScroll(documentId)
+  const { provides: zoomApi, state: zoomState } = useZoom(documentId)
+  const { provides: scrollApi, state: scrollState } = useScroll(documentId)
 
-  // Force a viewport refresh on mount by triggering a zoom cycle
-  // This is needed because EmbedPDF sometimes doesn't render until zoom interaction
+  // Force a viewport refresh on mount by setting the zoom level
+  // This triggers the viewport to render and respects the default zoom setting
   const hasInitialized = useRef(false)
   useEffect(() => {
     if (hasInitialized.current || !zoomApi) return
 
     // Use a delay to ensure EmbedPDF has fully processed the document
     const timer = setTimeout(() => {
-      console.log('[EmbedPDF] Triggering zoom cycle to force render')
+      console.log('[EmbedPDF] Initializing viewport with default zoom:', defaultZoom)
 
       try {
-        // Trigger a zoom out then zoom in to force viewport refresh
-        // This mimics what happens when the user clicks the zoom button
-        if (typeof zoomApi.zoomOut === 'function') {
-          zoomApi.zoomOut()
-          // Immediately zoom back in to restore original zoom level
-          setTimeout(() => {
-            if (typeof zoomApi.zoomIn === 'function') {
-              zoomApi.zoomIn()
-              console.log('[EmbedPDF] Zoom cycle complete')
-            }
-          }, 50)
+        // Try to set zoom level directly first
+        const targetZoom = defaultZoom / 100
+        if (typeof zoomApi.setZoomLevel === 'function') {
+          zoomApi.setZoomLevel(targetZoom)
+          console.log('[EmbedPDF] Set zoom level to:', targetZoom)
+        } else if (typeof zoomApi.zoomTo === 'function') {
+          zoomApi.zoomTo(targetZoom)
+          console.log('[EmbedPDF] Zoomed to:', targetZoom)
+        } else {
+          // Fallback: trigger a zoom cycle to force render
+          console.log('[EmbedPDF] No direct zoom set method, using zoom cycle')
+          if (typeof zoomApi.zoomOut === 'function') {
+            zoomApi.zoomOut()
+            setTimeout(() => {
+              if (typeof zoomApi.zoomIn === 'function') {
+                zoomApi.zoomIn()
+              }
+            }, 50)
+          }
         }
       } catch (e) {
-        console.log('[EmbedPDF] Zoom cycle failed:', e)
+        console.log('[EmbedPDF] Zoom initialization failed:', e)
       }
 
       hasInitialized.current = true
     }, 200)
 
     return () => clearTimeout(timer)
-  }, [zoomApi, documentId])
+  }, [zoomApi, documentId, defaultZoom])
 
   // Reset initialization flag when document changes
   useEffect(() => {
@@ -588,7 +613,7 @@ function EmbedPDFContent({
           <>
             <EmbedPDFToolbar
               documentId={documentId}
-              totalPages={pageCount}
+              totalPagesProp={pageCount}
               onToggleFullscreen={onToggleFullscreen}
               isFullscreen={isFullscreen}
               annotationCount={annotationCount}
@@ -709,7 +734,8 @@ function DocumentLoader({
   activeDocumentId,
   onTotalPagesChange,
   onToggleFullscreen,
-  isFullscreen
+  isFullscreen,
+  defaultZoom
 }) {
   const { provides: documentManager } = useDocumentManagerCapability()
   const [isDocumentLoading, setIsDocumentLoading] = useState(false)
@@ -801,6 +827,7 @@ function DocumentLoader({
       onTotalPagesChange={onTotalPagesChange}
       onToggleFullscreen={onToggleFullscreen}
       isFullscreen={isFullscreen}
+      defaultZoom={defaultZoom}
     />
   )
 }
@@ -1008,6 +1035,7 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
             onTotalPagesChange={setTotalPages}
             onToggleFullscreen={toggleFullscreen}
             isFullscreen={isFullscreen}
+            defaultZoom={pdfDefaultZoom}
           />
         )}
       </EmbedPDF>
