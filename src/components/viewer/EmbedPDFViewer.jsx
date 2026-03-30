@@ -571,13 +571,27 @@ function EmbedPDFContent({
     }
   }, [createUnderline])
 
-  // Handle annotation click
+  // Show popover when annotation is selected (from EmbedPDF click events)
+  useEffect(() => {
+    if (selectedAnnotationId) {
+      const annotation = annotations.find(a => a.id === selectedAnnotationId)
+      if (annotation && (!popoverAnnotation || popoverAnnotation.id !== selectedAnnotationId)) {
+        setPopoverAnnotation(annotation)
+        // Position in top-right area since we can't easily get annotation screen position from EmbedPDF
+        setPopoverPosition({ top: 80, left: window.innerWidth - 350 })
+      }
+    } else {
+      // Clear popover when deselected
+      setPopoverAnnotation(null)
+      setPopoverPosition(null)
+    }
+  }, [selectedAnnotationId, annotations])
+
+  // Handle annotation click (manual trigger)
   const handleAnnotationClick = useCallback((annotation) => {
     selectAnnotation(annotation.id)
-    // Position popover - would need ref to get actual position
     setPopoverAnnotation(annotation)
-    // TODO: Calculate position based on annotation bounds
-    setPopoverPosition({ top: 100, left: 100 })
+    setPopoverPosition({ top: 80, left: window.innerWidth - 350 })
   }, [selectAnnotation])
 
   // Close popover
