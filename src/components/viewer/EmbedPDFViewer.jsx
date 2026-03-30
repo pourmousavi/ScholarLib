@@ -115,11 +115,19 @@ function TextSelectionMenu({
     return null
   }
 
-  // Use menuWrapperProps for positioning (provided by EmbedPDF)
+  // Calculate position from rect
+  const menuStyle = {
+    position: 'absolute',
+    left: rect.left + rect.width / 2,
+    top: rect.top,
+    transform: 'translate(-50%, -100%) translateY(-8px)',
+    zIndex: 1000
+  }
+
   return (
     <div
-      {...menuWrapperProps}
       className={styles.selectionMenu}
+      style={menuStyle}
     >
       <button
         onClick={handleHighlight}
