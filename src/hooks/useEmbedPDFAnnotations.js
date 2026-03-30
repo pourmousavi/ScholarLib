@@ -77,6 +77,11 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
   useEffect(() => {
     if (!annotationApi || !docId || isInitialized || !isLoaded) return
 
+    // Debug: Log available annotation API methods
+    console.log('[EmbedPDF Annotations] annotationApi available methods:',
+      annotationApi ? Object.keys(annotationApi) : 'null')
+    console.log('[EmbedPDF Annotations] annotationApi:', annotationApi)
+
     const existingAnnotations = AnnotationService.getAnnotationsForDoc(docId)
     if (existingAnnotations.length > 0) {
       try {
@@ -199,20 +204,32 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
    * Create a highlight annotation at the current selection
    */
   const createHighlight = useCallback((pageIndex, quadPoints, text = '') => {
-    if (!annotationApi) return null
+    console.log('[EmbedPDF Annotations] createHighlight called:', { pageIndex, quadPoints, text })
+    console.log('[EmbedPDF Annotations] annotationApi:', annotationApi)
+    console.log('[EmbedPDF Annotations] annotationApi methods:', annotationApi ? Object.keys(annotationApi) : 'null')
 
-    annotationApi.createAnnotation?.(pageIndex, {
-      type: 'highlight',
-      quadPoints,
-      color: { ...hexToRgbaInternal(highlightColor), a: 0.35 },
-      contents: '',
-      _scholarlib: {
-        content: { text, image: null },
-        tags: [],
-        ai_context: { include_in_embeddings: true },
-        source: 'user'
-      }
-    })
+    if (!annotationApi) {
+      console.error('[EmbedPDF Annotations] No annotationApi available')
+      return null
+    }
+
+    try {
+      const result = annotationApi.createAnnotation?.(pageIndex, {
+        type: 'highlight',
+        quadPoints,
+        color: { ...hexToRgbaInternal(highlightColor), a: 0.35 },
+        contents: '',
+        _scholarlib: {
+          content: { text, image: null },
+          tags: [],
+          ai_context: { include_in_embeddings: true },
+          source: 'user'
+        }
+      })
+      console.log('[EmbedPDF Annotations] createAnnotation result:', result)
+    } catch (error) {
+      console.error('[EmbedPDF Annotations] createAnnotation failed:', error)
+    }
   }, [annotationApi, highlightColor])
 
   /**
