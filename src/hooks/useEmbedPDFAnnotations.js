@@ -252,10 +252,29 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
 
       console.log('[EmbedPDF Annotations] Converted segmentRects:', JSON.stringify(segmentRects, null, 2))
 
+      // Get the bounding rect from selection data - EmbedPDF requires this
+      // Use the first selection item's rect, or compute from segmentRects
+      let boundingRect = selectionData[0]?.rect
+      if (!boundingRect && segmentRects.length > 0) {
+        // Compute bounding rect from segmentRects
+        const minX = Math.min(...segmentRects.map(r => r.origin.x))
+        const minY = Math.min(...segmentRects.map(r => r.origin.y))
+        const maxX = Math.max(...segmentRects.map(r => r.origin.x + r.size.width))
+        const maxY = Math.max(...segmentRects.map(r => r.origin.y + r.size.height))
+        boundingRect = {
+          origin: { x: minX, y: minY },
+          size: { width: maxX - minX, height: maxY - minY }
+        }
+      }
+
+      console.log('[EmbedPDF Annotations] Bounding rect:', JSON.stringify(boundingRect, null, 2))
+
       // Create highlight annotation with correct EmbedPDF format
       // type: 9 is PdfAnnotationSubtype.HIGHLIGHT
+      // EmbedPDF requires both rect (bounding box) and segmentRects (individual line rects)
       const annotation = {
         type: 9, // HIGHLIGHT enum value
+        rect: boundingRect,
         segmentRects,
         strokeColor: highlightColor,
         opacity: 0.35,
@@ -303,9 +322,24 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
         return rect
       })
 
+      // Get the bounding rect from selection data - EmbedPDF requires this
+      let boundingRect = selectionData[0]?.rect
+      if (!boundingRect && segmentRects.length > 0) {
+        // Compute bounding rect from segmentRects
+        const minX = Math.min(...segmentRects.map(r => r.origin.x))
+        const minY = Math.min(...segmentRects.map(r => r.origin.y))
+        const maxX = Math.max(...segmentRects.map(r => r.origin.x + r.size.width))
+        const maxY = Math.max(...segmentRects.map(r => r.origin.y + r.size.height))
+        boundingRect = {
+          origin: { x: minX, y: minY },
+          size: { width: maxX - minX, height: maxY - minY }
+        }
+      }
+
       // type: 10 is PdfAnnotationSubtype.UNDERLINE
       const annotation = {
         type: 10, // UNDERLINE enum value
+        rect: boundingRect,
         segmentRects,
         strokeColor: highlightColor,
         opacity: 1,
