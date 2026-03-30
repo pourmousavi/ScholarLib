@@ -28,7 +28,7 @@ function AnnotationCard({
 
   const { type, color, content, position, created_at } = annotation
   const highlightedText = content?.text || ''
-  const page = position?.page || 1
+  const page = (position?.page ?? 0) + 1
 
   const formattedDate = created_at
     ? new Date(created_at).toLocaleDateString(undefined, {
@@ -168,8 +168,8 @@ function AnnotationCard({
         )}
       </div>
 
-      {/* Highlighted text */}
-      {highlightedText && (
+      {/* Highlighted text (not shown for notes — their text is the comment) */}
+      {highlightedText && type !== 'note' && (
         <div className={styles.highlightedText}>
           {highlightedText.length > 120
             ? highlightedText.substring(0, 120) + '...'

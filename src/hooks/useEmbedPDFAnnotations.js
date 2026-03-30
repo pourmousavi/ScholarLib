@@ -415,6 +415,87 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
   }, [annotationScope, highlightColor, adapter, docId, storeAddAnnotation, setSaveStatus])
 
   /**
+   * Create a text note annotation at a specific position on the page
+   * @param {number} pageIndex - The page index (0-based)
+   * @param {number} x - X coordinate in PDF space
+   * @param {number} y - Y coordinate in PDF space
+   * @param {string} comment - The note text
+   * @param {string} color - Hex color for the note
+   * @returns {boolean} Success status
+   */
+  const createTextNote = useCallback((pageIndex, x, y, comment, color) => {
+    if (!annotationScope) return null
+
+    try {
+      const annotationId = `ann_${nanoid(10)}`
+      const now = new Date().toISOString()
+      const noteColor = color || highlightColor
+
+      // Track to prevent duplicate from event handler
+      createdAnnotationIds.current.add(annotationId)
+
+      // Create a small rect for the note pin (24x24 in PDF units)
+      const noteSize = 24
+      const boundingRect = {
+        origin: { x, y },
+        size: { width: noteSize, height: noteSize }
+      }
+
+      // Create in EmbedPDF for visual rendering
+      const embedAnnotation = {
+        id: annotationId,
+        type: 2, // FREETEXT
+        pageIndex,
+        rect: boundingRect,
+        strokeColor: noteColor,
+        opacity: 1,
+        contents: comment
+      }
+      annotationScope.createAnnotation?.(pageIndex, embedAnnotation)
+
+      // Save to ScholarLib store and storage
+      const scholarAnnotation = {
+        id: annotationId,
+        type: 'note',
+        color: noteColor,
+        created_at: now,
+        updated_at: now,
+        position: {
+          page: pageIndex,
+          rects: [{
+            x1: x, y1: y,
+            x2: x + noteSize, y2: y + noteSize
+          }],
+          boundingRect: {
+            x1: x, y1: y,
+            x2: x + noteSize, y2: y + noteSize
+          }
+        },
+        content: { text: comment, image: null },
+        comment,
+        tags: [],
+        ai_context: { include_in_embeddings: true },
+        source: 'user'
+      }
+
+      storeAddAnnotation(scholarAnnotation)
+
+      if (adapter && docId) {
+        AnnotationService.addAnnotation(adapter, docId, scholarAnnotation, {
+          onSaveStart: () => setSaveStatus('saving'),
+          onSaveComplete: () => setSaveStatus('saved'),
+          onSaveError: () => setSaveStatus('error')
+        })
+      }
+
+      return annotationId
+    } catch (error) {
+      console.error('Failed to create text note:', error)
+      return null
+    }
+  }, [annotationScope, highlightColor, adapter, docId, storeAddAnnotation, setSaveStatus])
+
+  /**
    * Create an area/rectangle annotation
    */
   const createAreaAnnotation = useCallback((pageIndex, rect, imageData = null) => {
@@ -435,6 +516,53 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
   }, [annotationScope, highlightColor])
 
   /**
+   * Update annotation position (used for dragging note pins)
+   * @param {string} annotationId - The annotation ID
+   * @param {number} newX - New X coordinate in PDF space
+   * @param {number} newY - New Y coordinate in PDF space
+   * @returns {boolean} Success status
+   */
+  const updatePosition = useCallback((annotationId, newX, newY) => {
+    if (!adapter || !docId) return false
+
+    const annotation = getAnnotationById(annotationId)
+    if (!annotation) return false
+
+    const noteSize = 24
+    const newPosition = {
+      ...annotation.position,
+      rects: [{
+        x1: newX, y1: newY,
+        x2: newX + noteSize, y2: newY + noteSize
+      }],
+      boundingRect: {
+        x1: newX, y1: newY,
+        x2: newX + noteSize, y2: newY + noteSize
+      }
+    }
+
+    // Update in EmbedPDF if available
+    if (annotationScope) {
+      annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, annotationId, {
+        rect: {
+          origin: { x: newX, y: newY },
+          size: { width: noteSize, height: noteSize }
+        }
+      })
+    }
+
+    const patch = { position: newPosition }
+    storeUpdateAnnotation(annotationId, patch)
+    AnnotationService.updateAnnotation(adapter, docId, annotationId, patch, {
+      onSaveStart: () => setSaveStatus('saving'),
+      onSaveComplete: () => setSaveStatus('saved'),
+      onSaveError: () => setSaveStatus('error')
+    })
+
+    return true
+  }, [annotationScope, adapter, docId, getAnnotationById, storeUpdateAnnotation, setSaveStatus])
+
+  /**
    * Update annotation comment
    */
   const updateComment = useCallback((annotationId, comment) => {
@@ -450,8 +578,11 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
       })
     }
 
-    // Directly update store and storage
-    const patch = { comment }
+    // For note-type annotations, keep content.text in sync with comment
+    const patch = annotation.type === 'note'
+      ? { comment, content: { ...annotation.content, text: comment } }
+      : { comment }
+
     storeUpdateAnnotation(annotationId, patch)
     AnnotationService.updateAnnotation(adapter, docId, annotationId, patch, {
       onSaveStart: () => setSaveStatus('saving'),
@@ -667,12 +798,14 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
     // Creation methods
     createHighlight,
     createUnderline,
+    createTextNote,
     createAreaAnnotation,
 
     // Update methods
     updateComment,
     updateColor,
     updateType,
+    updatePosition,
 
     // Delete methods
     deleteAnnotation,

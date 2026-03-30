@@ -28,7 +28,7 @@ import { useEmbedPDFAnnotations } from '../../hooks/useEmbedPDFAnnotations'
 import { useEmbedPDFTextExtraction } from '../../hooks/useEmbedPDFLoader'
 import { ANNOTATION_COLORS, DEFAULT_HIGHLIGHT_COLOR } from '../../services/annotations'
 import { Spinner, Btn } from '../ui'
-import { AnnotationSidebar, AnnotationPopover } from '../annotations'
+import { AnnotationSidebar, AnnotationPopover, TextNoteDialog } from '../annotations'
 import styles from './PDFViewer.module.css'
 import toolbarStyles from './PDFToolbar.module.css'
 
@@ -346,8 +346,6 @@ function EmbedPDFToolbar({
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
               <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-              <line x1="9" y1="9" x2="15" y2="9"/>
-              <line x1="9" y1="13" x2="13" y2="13"/>
             </svg>
           </button>
 
@@ -512,9 +510,11 @@ function EmbedPDFContent({
     annotationCount,
     createHighlight,
     createUnderline,
+    createTextNote,
     updateComment,
     updateColor,
     updateType,
+    updatePosition,
     deleteAnnotation,
     deleteAllAnnotations,
     selectAnnotation,
@@ -524,17 +524,22 @@ function EmbedPDFContent({
     setSidebar
   } = useEmbedPDFAnnotations(docId, annotationScope, annotationCapability)
 
-  // Active drawing tool state (null, 'ink', 'inkHighlighter')
+  // Active drawing tool state (null, 'ink', 'inkHighlighter', 'freetext')
   const [activeTool, setActiveTool] = useState(null)
+
+  // Text note creation state - holds { pageIndex, pdfX, pdfY, screenTop, screenLeft }
+  const [noteCreation, setNoteCreation] = useState(null)
 
   // PDF export state
   const [isExportingPDF, setIsExportingPDF] = useState(false)
 
-  // Handle tool change
+  // Handle tool change - 'freetext' is handled locally (not passed to EmbedPDF)
   const handleSetActiveTool = useCallback((tool) => {
     setActiveTool(tool)
+    setNoteCreation(null) // Clear any pending note creation
     if (annotationScope) {
-      if (tool) {
+      if (tool && tool !== 'freetext') {
+        // Pass drawing tools to EmbedPDF, but handle freetext ourselves
         annotationScope.setActiveTool?.(tool)
       } else {
         annotationScope.setActiveTool?.(null)
@@ -547,25 +552,32 @@ function EmbedPDFContent({
     setClickedAnnotation(null)
   }, [])
 
-  // Close popover on escape key
+  // Close popover/dialog on escape key
   useEffect(() => {
     const handleEscape = (e) => {
-      if (e.key === 'Escape' && clickedAnnotation) {
-        setClickedAnnotation(null)
+      if (e.key === 'Escape') {
+        if (noteCreation) {
+          setNoteCreation(null)
+        } else if (clickedAnnotation) {
+          setClickedAnnotation(null)
+        } else if (activeTool === 'freetext') {
+          // Deactivate note placement mode
+          handleSetActiveTool(null)
+        }
       }
     }
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
-  }, [clickedAnnotation])
+  }, [clickedAnnotation, noteCreation, activeTool, handleSetActiveTool])
 
   // Close popover when document changes
   useEffect(() => {
     setClickedAnnotation(null)
   }, [docId])
 
-  // Handle click on PDF page to detect annotation clicks
+  // Handle click on PDF page to detect annotation clicks or place text notes
   const handlePageClick = useCallback((e, pageIndex) => {
-    // Don't handle if clicking on the popover itself or selection menu
+    // Don't handle if clicking on the popover itself, selection menu, or note dialog
     if (e.target.closest('[data-annotation-popover]') || e.target.closest('[data-selection-menu]')) {
       return
     }
@@ -585,6 +597,20 @@ function EmbedPDFContent({
     // Convert to PDF coordinates (unscaled)
     const pdfX = clickX / zoom
     const pdfY = clickY / zoom
+
+    // If in text note placement mode, open the note dialog
+    if (activeTool === 'freetext') {
+      setNoteCreation({
+        pageIndex,
+        pdfX,
+        pdfY,
+        screenTop: e.clientY + 12,
+        screenLeft: e.clientX - 16
+      })
+      setClickedAnnotation(null)
+      e.stopPropagation()
+      return
+    }
 
     // Check if click hits any annotation on this page
     const pageAnnotations = annotations.filter(a => a.position?.page === pageIndex)
@@ -623,7 +649,7 @@ function EmbedPDFContent({
 
     // Clicked outside any annotation, close popover
     setClickedAnnotation(null)
-  }, [annotations, zoomState, selectAnnotation])
+  }, [annotations, zoomState, selectAnnotation, activeTool])
 
   // Handle highlight creation from text selection
   const handleHighlight = useCallback((pageIndex, selectionData, text) => {
@@ -641,6 +667,88 @@ function EmbedPDFContent({
       createUnderline(pageIndex, selectionData, textStr)
     }
   }, [createUnderline])
+
+  // Handle text note creation from dialog
+  const handleNoteCreate = useCallback(({ text, color }) => {
+    if (!noteCreation) return
+    const { pageIndex, pdfX, pdfY } = noteCreation
+    createTextNote(pageIndex, pdfX, pdfY, text, color)
+    setNoteCreation(null)
+    // Keep the tool active so user can place multiple notes
+  }, [noteCreation, createTextNote])
+
+  // Handle text note cancel
+  const handleNoteCancel = useCallback(() => {
+    setNoteCreation(null)
+  }, [])
+
+  // Note pin drag handlers
+  const handleNotePinMouseDown = useCallback((e, note) => {
+    e.stopPropagation()
+    e.preventDefault()
+
+    const zoom = zoomState?.currentZoomLevel || 1
+    const pageWrapper = e.target.closest('[data-page-number]')
+    if (!pageWrapper) return
+
+    const pageRect = pageWrapper.getBoundingClientRect()
+    const startScreenX = e.clientX
+    const startScreenY = e.clientY
+    const startPdfX = note.position.boundingRect?.x1 ?? 0
+    const startPdfY = note.position.boundingRect?.y1 ?? 0
+
+    // Track if we actually dragged (vs just clicked)
+    let hasMoved = false
+    const pinEl = e.currentTarget
+
+    const handleMouseMove = (moveE) => {
+      const dx = moveE.clientX - startScreenX
+      const dy = moveE.clientY - startScreenY
+
+      if (!hasMoved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return
+      hasMoved = true
+
+      // Update pin position visually during drag
+      const newScreenX = (startPdfX * zoom) + dx
+      const newScreenY = (startPdfY * zoom) + dy
+      pinEl.style.left = `${newScreenX}px`
+      pinEl.style.top = `${newScreenY}px`
+      pinEl.style.opacity = '0.8'
+      pinEl.style.zIndex = '20'
+    }
+
+    const handleMouseUp = (upE) => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+
+      pinEl.style.opacity = ''
+      pinEl.style.zIndex = ''
+
+      if (hasMoved) {
+        const dx = upE.clientX - startScreenX
+        const dy = upE.clientY - startScreenY
+        const newPdfX = startPdfX + (dx / zoom)
+        const newPdfY = startPdfY + (dy / zoom)
+
+        // Clamp to page bounds (approximate)
+        const clampedX = Math.max(0, newPdfX)
+        const clampedY = Math.max(0, newPdfY)
+
+        updatePosition(note.id, clampedX, clampedY)
+      } else {
+        // It was a click, not a drag - show popover
+        setClickedAnnotation(note)
+        selectAnnotation(note.id)
+        setPopoverPosition({
+          top: upE.clientY + 10,
+          left: upE.clientX
+        })
+      }
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [zoomState, updatePosition, selectAnnotation])
 
   // Render function for the selection menu (shown when annotation is selected)
   const renderSelectionMenu = useCallback(({ context, position, onClose }) => {
@@ -778,6 +886,11 @@ function EmbedPDFContent({
             />
             <div className={styles.viewerContent}>
               <div className={styles.embedpdfContainer}>
+                {activeTool === 'freetext' && !noteCreation && (
+                  <div className={styles.notePlacementHint}>
+                    Click anywhere on the page to place a note &middot; Press Esc to cancel
+                  </div>
+                )}
                 <div className={styles.embedpdfViewport}>
                   <ZoomGestureWrapper
                     documentId={documentId}
@@ -801,7 +914,7 @@ function EmbedPDFContent({
                           pageIndex={pageIndex}
                         >
                           <div
-                            className={styles.pageWrapper}
+                            className={`${styles.pageWrapper} ${activeTool === 'freetext' ? styles.notePlacementMode : ''}`}
                             style={{
                               width,
                               height,
@@ -838,6 +951,31 @@ function EmbedPDFContent({
                               resizeUI={{ size: 8, color: 'var(--color-primary)' }}
                               selectionMenu={renderSelectionMenu}
                             />
+                            {/* Note pin markers for text notes on this page */}
+                            {annotations
+                              .filter(a => a.type === 'note' && a.position?.page === pageIndex)
+                              .map(note => {
+                                const zoom = zoomState?.currentZoomLevel || 1
+                                const x = (note.position.boundingRect?.x1 ?? 0) * zoom
+                                const y = (note.position.boundingRect?.y1 ?? 0) * zoom
+                                return (
+                                  <div
+                                    key={note.id}
+                                    className={styles.notePin}
+                                    style={{
+                                      left: `${x}px`,
+                                      top: `${y}px`,
+                                      backgroundColor: note.color
+                                    }}
+                                    title={note.comment || 'Text note'}
+                                    onMouseDown={(e) => handleNotePinMouseDown(e, note)}
+                                  >
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
+                                      <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                                    </svg>
+                                  </div>
+                                )
+                              })}
                           </div>
                         </PagePointerProvider>
                       )}
@@ -864,6 +1002,16 @@ function EmbedPDFContent({
                 </div>
               )}
             </div>
+
+            {/* Text note creation dialog */}
+            {noteCreation && (
+              <TextNoteDialog
+                position={{ top: noteCreation.screenTop, left: noteCreation.screenLeft }}
+                initialColor={highlightColor}
+                onSave={handleNoteCreate}
+                onCancel={handleNoteCancel}
+              />
+            )}
 
             {/* Annotation popover for clicked annotation */}
             {clickedAnnotation && (

@@ -223,8 +223,8 @@ function AnnotationPopover({
         </div>
       </div>
 
-      {/* Highlighted text preview */}
-      {highlightedText && (
+      {/* Highlighted text preview (not shown for notes — their text is the comment) */}
+      {highlightedText && type !== 'note' && (
         <div className={styles.highlightedText} style={{ borderLeftColor: color }}>
           {highlightedText.length > 200
             ? highlightedText.substring(0, 200) + '...'
