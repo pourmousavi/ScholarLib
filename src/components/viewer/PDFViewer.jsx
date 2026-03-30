@@ -42,6 +42,7 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
     createAreaAnnotation,
     updateComment,
     updateColor,
+    updateType,
     deleteAnnotation,
     selectAnnotation,
     clearSelection,
@@ -68,6 +69,20 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
   // Popover state
   const [popoverAnnotation, setPopoverAnnotation] = useState(null)
   const [popoverPosition, setPopoverPosition] = useState(null)
+
+  // Keep popover annotation in sync with store updates (e.g., when type/color changes)
+  useEffect(() => {
+    if (popoverAnnotation) {
+      const updatedAnnotation = annotations.find(a => a.id === popoverAnnotation.id)
+      if (updatedAnnotation && updatedAnnotation !== popoverAnnotation) {
+        setPopoverAnnotation(updatedAnnotation)
+      } else if (!updatedAnnotation) {
+        // Annotation was deleted
+        setPopoverAnnotation(null)
+        setPopoverPosition(null)
+      }
+    }
+  }, [annotations, popoverAnnotation])
 
   // Handle text selection from pages
   const handleTextSelection = useCallback((selection) => {
@@ -449,6 +464,7 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
               annotation={popoverAnnotation}
               onUpdateComment={updateComment}
               onUpdateColor={updateColor}
+              onUpdateType={updateType}
               onDelete={deleteAnnotation}
               onClose={handleClosePopover}
               position={popoverPosition}

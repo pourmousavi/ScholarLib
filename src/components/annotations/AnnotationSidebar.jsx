@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState, useEffect, useRef } from 'react'
 import { ANNOTATION_COLORS } from '../../services/annotations'
 import AnnotationCard from './AnnotationCard'
 import styles from './AnnotationSidebar.module.css'
@@ -33,6 +33,10 @@ function AnnotationSidebar({
   const [filterColor, setFilterColor] = useState(null)
   const [sortBy, setSortBy] = useState('page') // 'page' | 'date' | 'color'
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Refs for scrolling to selected annotation
+  const listRef = useRef(null)
+  const cardRefsMap = useRef(new Map())
 
   // Filter and sort annotations
   const filteredAnnotations = useMemo(() => {
@@ -105,6 +109,19 @@ function AnnotationSidebar({
     onSelectAnnotation?.(annotation.id)
     onNavigateToAnnotation?.(annotation)
   }, [onSelectAnnotation, onNavigateToAnnotation])
+
+  // Scroll to selected annotation when selection changes from outside (e.g., clicking in PDF)
+  useEffect(() => {
+    if (selectedAnnotationId && listRef.current) {
+      const cardElement = cardRefsMap.current.get(selectedAnnotationId)
+      if (cardElement) {
+        cardElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest'
+        })
+      }
+    }
+  }, [selectedAnnotationId])
 
   return (
     <div className={`${styles.sidebar} ${embedded ? styles.embedded : ''}`}>
@@ -212,7 +229,7 @@ function AnnotationSidebar({
       </div>
 
       {/* Annotations list */}
-      <div className={styles.list}>
+      <div className={styles.list} ref={listRef}>
         {filteredAnnotations.length === 0 ? (
           <div className={styles.empty}>
             {annotations.length === 0 ? (
@@ -236,15 +253,25 @@ function AnnotationSidebar({
           </div>
         ) : (
           filteredAnnotations.map((annotation) => (
-            <AnnotationCard
+            <div
               key={annotation.id}
-              annotation={annotation}
-              isSelected={annotation.id === selectedAnnotationId}
-              onClick={() => handleAnnotationClick(annotation)}
-              onUpdateComment={onUpdateComment}
-              onUpdateColor={onUpdateColor}
-              onDelete={onDelete}
-            />
+              ref={(el) => {
+                if (el) {
+                  cardRefsMap.current.set(annotation.id, el)
+                } else {
+                  cardRefsMap.current.delete(annotation.id)
+                }
+              }}
+            >
+              <AnnotationCard
+                annotation={annotation}
+                isSelected={annotation.id === selectedAnnotationId}
+                onClick={() => handleAnnotationClick(annotation)}
+                onUpdateComment={onUpdateComment}
+                onUpdateColor={onUpdateColor}
+                onDelete={onDelete}
+              />
+            </div>
           ))
         )}
       </div>

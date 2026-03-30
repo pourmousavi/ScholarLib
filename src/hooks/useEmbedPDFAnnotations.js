@@ -482,6 +482,76 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
   }, [annotationScope, adapter, docId, getAnnotationById, storeUpdateAnnotation, setSaveStatus])
 
   /**
+   * Update annotation type (highlight <-> underline)
+   * For EmbedPDF, this requires deleting and recreating the annotation
+   */
+  const updateType = useCallback((annotationId, newType) => {
+    if (!adapter || !docId) return false
+
+    const annotation = getAnnotationById(annotationId)
+    if (!annotation) return false
+
+    // Only allow changing between highlight and underline
+    const allowedTypes = ['highlight', 'underline']
+    if (!allowedTypes.includes(newType) || !allowedTypes.includes(annotation.type)) {
+      return false
+    }
+
+    // Map type to EmbedPDF type number
+    const typeMap = { highlight: 9, underline: 10 }
+    const embedType = typeMap[newType]
+
+    // Update in EmbedPDF by deleting and recreating
+    if (annotationScope && annotation.position?.page !== undefined) {
+      const pageIndex = annotation.position.page
+
+      // Delete the old annotation
+      annotationScope.deleteAnnotation?.(pageIndex, annotationId)
+
+      // Track to prevent duplicate from event handler
+      createdAnnotationIds.current.add(annotationId)
+
+      // Recreate with new type
+      const segmentRects = annotation.position.rects?.map(r => ({
+        origin: { x: r.x1, y: r.y1 },
+        size: { width: r.x2 - r.x1, height: r.y2 - r.y1 }
+      })) || []
+
+      const boundingRect = annotation.position.boundingRect ? {
+        origin: { x: annotation.position.boundingRect.x1, y: annotation.position.boundingRect.y1 },
+        size: {
+          width: annotation.position.boundingRect.x2 - annotation.position.boundingRect.x1,
+          height: annotation.position.boundingRect.y2 - annotation.position.boundingRect.y1
+        }
+      } : null
+
+      const embedAnnotation = {
+        id: annotationId,
+        type: embedType,
+        pageIndex,
+        rect: boundingRect,
+        segmentRects,
+        strokeColor: annotation.color,
+        opacity: newType === 'highlight' ? 0.35 : 1,
+        contents: annotation.content?.text || ''
+      }
+
+      annotationScope.createAnnotation?.(pageIndex, embedAnnotation)
+    }
+
+    // Update store and storage
+    const patch = { type: newType }
+    storeUpdateAnnotation(annotationId, patch)
+    AnnotationService.updateAnnotation(adapter, docId, annotationId, patch, {
+      onSaveStart: () => setSaveStatus('saving'),
+      onSaveComplete: () => setSaveStatus('saved'),
+      onSaveError: () => setSaveStatus('error')
+    })
+
+    return true
+  }, [annotationScope, adapter, docId, getAnnotationById, storeUpdateAnnotation, setSaveStatus])
+
+  /**
    * Delete an annotation
    */
   const deleteAnnotation = useCallback((annotationId) => {
@@ -567,6 +637,7 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
     // Update methods
     updateComment,
     updateColor,
+    updateType,
 
     // Delete method
     deleteAnnotation,

@@ -2,14 +2,18 @@ import { memo, useCallback, useRef, useEffect, useState } from 'react'
 import { ANNOTATION_COLORS } from '../../services/annotations'
 import styles from './AnnotationPopover.module.css'
 
+// Available annotation types that can be changed between
+const CHANGEABLE_TYPES = ['highlight', 'underline']
+
 /**
  * AnnotationPopover - Popover for viewing/editing an annotation
  *
- * Shows annotation details and allows editing comment, color, or deleting.
+ * Shows annotation details and allows editing comment, color, type, or deleting.
  *
  * @param {Object} annotation - The annotation object
  * @param {function} onUpdateComment - Called when comment is updated
  * @param {function} onUpdateColor - Called when color is changed
+ * @param {function} onUpdateType - Called when type is changed
  * @param {function} onDelete - Called when delete is clicked
  * @param {function} onClose - Called to dismiss popover
  * @param {Object} position - Position { top, left } for popover
@@ -18,6 +22,7 @@ function AnnotationPopover({
   annotation,
   onUpdateComment,
   onUpdateColor,
+  onUpdateType,
   onDelete,
   onClose,
   position
@@ -26,6 +31,7 @@ function AnnotationPopover({
   const textareaRef = useRef(null)
   const [comment, setComment] = useState(annotation?.comment || '')
   const [showColorPicker, setShowColorPicker] = useState(false)
+  const [showTypePicker, setShowTypePicker] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
 
   // Focus textarea when entering edit mode
@@ -79,6 +85,11 @@ function AnnotationPopover({
     onUpdateColor?.(annotation.id, color)
     setShowColorPicker(false)
   }, [annotation, onUpdateColor])
+
+  const handleTypeSelect = useCallback((newType) => {
+    onUpdateType?.(annotation.id, newType)
+    setShowTypePicker(false)
+  }, [annotation, onUpdateType])
 
   const handleDelete = useCallback(() => {
     if (window.confirm('Delete this annotation?')) {
@@ -146,7 +157,48 @@ function AnnotationPopover({
           )}
         </div>
 
-        <span className={styles.type}>{type}</span>
+        <div className={styles.typeSection}>
+          {CHANGEABLE_TYPES.includes(type) ? (
+            <>
+              <button
+                className={styles.typeButton}
+                onClick={() => setShowTypePicker(!showTypePicker)}
+                aria-label="Change type"
+                aria-expanded={showTypePicker}
+              >
+                <span className={styles.type}>{type}</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M7 10l5 5 5-5z"/>
+                </svg>
+              </button>
+
+              {showTypePicker && (
+                <div className={styles.typePicker}>
+                  {CHANGEABLE_TYPES.map((t) => (
+                    <button
+                      key={t}
+                      className={`${styles.typeOption} ${t === type ? styles.selected : ''}`}
+                      onClick={() => handleTypeSelect(t)}
+                    >
+                      {t === 'highlight' ? (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M15.54 3.5l4.95 4.95-9.9 9.9H5.64v-4.95l9.9-9.9zm1.41-1.41l-1.41 1.41-4.95-4.95 1.41-1.41 4.95 4.95zm-12.03 17.41h12v2h-12v-2z"/>
+                        </svg>
+                      ) : (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 17c3.31 0 6-2.69 6-6V3h-2.5v8c0 1.93-1.57 3.5-3.5 3.5S8.5 12.93 8.5 11V3H6v8c0 3.31 2.69 6 6 6zm-7 2v2h14v-2H5z"/>
+                        </svg>
+                      )}
+                      <span>{t}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <span className={styles.type}>{type}</span>
+          )}
+        </div>
         <span className={styles.date}>{formattedDate}</span>
 
         <div className={styles.actions}>

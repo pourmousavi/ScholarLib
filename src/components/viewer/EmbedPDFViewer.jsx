@@ -509,6 +509,7 @@ function EmbedPDFContent({
     createUnderline,
     updateComment,
     updateColor,
+    updateType,
     deleteAnnotation,
     selectAnnotation,
     clearSelection,
@@ -520,6 +521,20 @@ function EmbedPDFContent({
   // Popover state
   const [popoverAnnotation, setPopoverAnnotation] = useState(null)
   const [popoverPosition, setPopoverPosition] = useState(null)
+
+  // Keep popover annotation in sync with store updates (e.g., when type/color changes)
+  useEffect(() => {
+    if (popoverAnnotation) {
+      const updatedAnnotation = annotations.find(a => a.id === popoverAnnotation.id)
+      if (updatedAnnotation && updatedAnnotation !== popoverAnnotation) {
+        setPopoverAnnotation(updatedAnnotation)
+      } else if (!updatedAnnotation) {
+        // Annotation was deleted
+        setPopoverAnnotation(null)
+        setPopoverPosition(null)
+      }
+    }
+  }, [annotations, popoverAnnotation])
 
   // Active drawing tool state (null, 'ink', 'inkHighlighter')
   const [activeTool, setActiveTool] = useState(null)
@@ -769,6 +784,7 @@ function EmbedPDFContent({
                 annotation={popoverAnnotation}
                 onUpdateComment={updateComment}
                 onUpdateColor={updateColor}
+                onUpdateType={updateType}
                 onDelete={deleteAnnotation}
                 onClose={handleClosePopover}
                 position={popoverPosition}

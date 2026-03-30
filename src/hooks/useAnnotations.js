@@ -239,6 +239,23 @@ export function useAnnotations(docId) {
   }, [adapter, docId, storeUpdateAnnotation, setSaveStatus])
 
   /**
+   * Update annotation type (highlight, underline, etc.)
+   */
+  const updateType = useCallback((annotationId, type) => {
+    if (!adapter || !docId) return false
+
+    storeUpdateAnnotation(annotationId, { type })
+
+    AnnotationService.updateAnnotation(adapter, docId, annotationId, { type }, {
+      onSaveStart: () => setSaveStatus('saving'),
+      onSaveComplete: () => setSaveStatus('saved'),
+      onSaveError: () => setSaveStatus('error')
+    })
+
+    return true
+  }, [adapter, docId, storeUpdateAnnotation, setSaveStatus])
+
+  /**
    * Update annotation tags
    */
   const updateTags = useCallback((annotationId, tags) => {
@@ -347,6 +364,7 @@ export function useAnnotations(docId) {
     // Update methods
     updateComment,
     updateColor,
+    updateType,
     updateTags,
     toggleAIContext,
 
