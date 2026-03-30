@@ -116,24 +116,36 @@ function TextSelectionMenu({
     return null
   }
 
-  // Position the menu above or below selection based on placement hint
-  // rect.size.height is the height of the selection area
-  const top = placement?.suggestTop ? -48 : (rect.size?.height || 0) + 8
-
-  // Merge our positioning with the menuWrapperProps styles
-  const mergedStyle = {
+  // Merge wrapper styles with our overrides for proper display
+  const menuStyle = {
     ...menuWrapperProps?.style,
-    top
+    pointerEvents: 'auto', // Ensure clicks work
+  }
+
+  const handleHighlightClick = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    console.log('[EmbedPDF] Highlight button clicked')
+    handleHighlight()
+  }
+
+  const handleUnderlineClick = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    console.log('[EmbedPDF] Underline button clicked')
+    handleUnderline()
   }
 
   return (
     <div
       ref={menuWrapperProps?.ref}
+      style={menuStyle}
       className={styles.selectionMenu}
-      style={mergedStyle}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       <button
-        onClick={handleHighlight}
+        onClick={handleHighlightClick}
+        onMouseDown={(e) => e.stopPropagation()}
         className={styles.selectionMenuBtn}
         style={{ backgroundColor: highlightColor }}
         title="Highlight"
@@ -143,7 +155,8 @@ function TextSelectionMenu({
         </svg>
       </button>
       <button
-        onClick={handleUnderline}
+        onClick={handleUnderlineClick}
+        onMouseDown={(e) => e.stopPropagation()}
         className={styles.selectionMenuBtn}
         title="Underline"
       >
