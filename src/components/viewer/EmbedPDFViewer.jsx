@@ -54,6 +54,7 @@ function TextSelectionMenu({
   pageIndex,
   menuWrapperProps,
   rect,
+  placement,
   selected,
   onHighlight,
   onUnderline,
@@ -115,19 +116,15 @@ function TextSelectionMenu({
     return null
   }
 
-  // Calculate position from rect
-  const menuStyle = {
-    position: 'absolute',
-    left: rect.left + rect.width / 2,
-    top: rect.top,
-    transform: 'translate(-50%, -100%) translateY(-8px)',
-    zIndex: 1000
-  }
+  // Position the menu above or below selection based on placement hint
+  // rect.size.height is the height of the selection area
+  const top = placement?.suggestTop ? -48 : (rect.size?.height || 0) + 8
 
   return (
     <div
+      {...menuWrapperProps}
       className={styles.selectionMenu}
-      style={menuStyle}
+      style={{ top }}
     >
       <button
         onClick={handleHighlight}
