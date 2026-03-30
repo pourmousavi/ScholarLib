@@ -3,7 +3,7 @@ import { useUIStore } from '../../store/uiStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { LibraryService } from '../../services/library/LibraryService'
-import PDFViewer from '../viewer/PDFViewer'
+import ViewerSwitch from '../viewer/ViewerSwitch'
 import SplitViewPanel from './SplitViewPanel'
 import { NotesPanel } from '../notes'
 import { ChatPanel } from '../ai'
@@ -199,7 +199,7 @@ export default function MainPanel({ isMobile = false }) {
         ) : (
           <>
             {activePanel === 'pdf' && (
-              <PDFViewer
+              <ViewerSwitch
                 url={pdfUrl}
                 docId={selectedDocId}
                 onTextExtracted={handleTextExtracted}

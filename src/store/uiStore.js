@@ -70,7 +70,13 @@ const getInitialSplitViewSettings = () => {
   }
 }
 
+// Get initial PDF viewer setting
+const getInitialPdfViewer = () => {
+  return localStorage.getItem('sv_pdf_viewer') || 'pdfjs' // 'pdfjs' or 'embedpdf'
+}
+
 const initialSplitView = getInitialSplitViewSettings()
+const initialPdfViewer = getInitialPdfViewer()
 
 export const useUIStore = create((set) => ({
   activePanel: 'pdf',
@@ -99,6 +105,9 @@ export const useUIStore = create((set) => ({
   splitViewDefaultEnabled: initialSplitView.splitViewDefaultEnabled,
   fullscreenOverlayVisible: false,
   fullscreenOverlayWidth: initialSplitView.fullscreenOverlayWidth,
+
+  // PDF viewer selection (pdfjs or embedpdf)
+  pdfViewer: initialPdfViewer,
 
   setActivePanel: (panel) => set({ activePanel: panel }),
   setShowModal: (modal) => set({ showModal: modal }),
@@ -192,5 +201,11 @@ export const useUIStore = create((set) => ({
     const clampedWidth = Math.max(250, Math.min(500, width))
     localStorage.setItem('sv_fullscreen_overlay_width', clampedWidth.toString())
     set({ fullscreenOverlayWidth: clampedWidth })
+  },
+
+  // PDF viewer setter
+  setPdfViewer: (viewer) => {
+    localStorage.setItem('sv_pdf_viewer', viewer)
+    set({ pdfViewer: viewer })
   }
 }))

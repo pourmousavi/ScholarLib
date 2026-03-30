@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useUIStore } from '../../store/uiStore'
-import PDFViewer from '../viewer/PDFViewer'
+import ViewerSwitch from '../viewer/ViewerSwitch'
 import { NotesPanel } from '../notes'
 import { ChatPanel } from '../ai'
 import styles from './SplitViewPanel.module.css'
@@ -90,7 +90,7 @@ export default function SplitViewPanel({ pdfUrl, docId, onTextExtracted, pdfErro
     >
       {/* PDF Section */}
       <div className={styles.pdfSection} style={pdfStyle}>
-        <PDFViewer
+        <ViewerSwitch
           url={pdfUrl}
           docId={docId}
           onTextExtracted={onTextExtracted}

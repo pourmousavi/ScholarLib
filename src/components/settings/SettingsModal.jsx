@@ -149,6 +149,8 @@ export default function SettingsModal({ onClose }) {
   const setSplitViewRatio = useUIStore((s) => s.setSplitViewRatio)
   const fullscreenOverlayWidth = useUIStore((s) => s.fullscreenOverlayWidth)
   const setFullscreenOverlayWidth = useUIStore((s) => s.setFullscreenOverlayWidth)
+  const pdfViewer = useUIStore((s) => s.pdfViewer)
+  const setPdfViewer = useUIStore((s) => s.setPdfViewer)
 
   const { showToast } = useToast()
 
@@ -1579,6 +1581,23 @@ export default function SettingsModal({ onClose }) {
           <option value={125}>125%</option>
           <option value={150}>150%</option>
         </select>
+      </div>
+
+      <div className={styles.field}>
+        <label>PDF Viewer Engine</label>
+        <select
+          value={pdfViewer}
+          onChange={(e) => {
+            setPdfViewer(e.target.value)
+            updateGlobalSetting('appearance.pdf_viewer', e.target.value)
+          }}
+        >
+          <option value="pdfjs">PDF.js (Classic)</option>
+          <option value="embedpdf">EmbedPDF (Experimental)</option>
+        </select>
+        <span className={styles.fieldHint}>
+          EmbedPDF uses Chrome's PDFium engine for better text selection and annotation precision. Experimental feature.
+        </span>
       </div>
 
       <h3 className={styles.sectionTitle} style={{ marginTop: 24 }}>Split View</h3>
