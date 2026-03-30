@@ -60,18 +60,33 @@ function TextSelectionMenu({
   const { provides: selectionCapability } = useSelectionCapability()
 
   const handleHighlight = useCallback(async () => {
-    if (!selectionCapability) return
+    console.log('[EmbedPDF TextSelectionMenu] handleHighlight called')
+    console.log('[EmbedPDF TextSelectionMenu] selectionCapability:', selectionCapability)
+
+    if (!selectionCapability) {
+      console.warn('[EmbedPDF TextSelectionMenu] No selectionCapability')
+      return
+    }
 
     try {
-      const formatted = selectionCapability.forDocument(documentId).getFormattedSelection()
-      const text = await selectionCapability.forDocument(documentId).getSelectedText()
+      const docSelection = selectionCapability.forDocument(documentId)
+      console.log('[EmbedPDF TextSelectionMenu] docSelection:', docSelection)
+      console.log('[EmbedPDF TextSelectionMenu] docSelection methods:', docSelection ? Object.keys(docSelection) : 'null')
+
+      const formatted = docSelection.getFormattedSelection()
+      console.log('[EmbedPDF TextSelectionMenu] formatted selection:', formatted)
+
+      const text = await docSelection.getSelectedText()
+      console.log('[EmbedPDF TextSelectionMenu] selected text:', text)
 
       if (formatted && formatted.length > 0) {
         onHighlight(pageIndex, formatted, text)
+      } else {
+        console.warn('[EmbedPDF TextSelectionMenu] No formatted selection')
       }
 
       // Clear selection
-      selectionCapability.forDocument(documentId).clearSelection?.()
+      docSelection.clearSelection?.()
     } catch (e) {
       console.error('[EmbedPDF] Highlight creation failed:', e)
     }
@@ -489,6 +504,9 @@ function EmbedPDFContent({
 
   // Handle highlight creation from text selection
   const handleHighlight = useCallback((pageIndex, selectionRects, text) => {
+    console.log('[EmbedPDF] handleHighlight called:', { pageIndex, selectionRects, text })
+    console.log('[EmbedPDF] selectionRects structure:', JSON.stringify(selectionRects, null, 2))
+
     // Convert selection rects to quadPoints
     // selectionRects from EmbedPDF contain bounds per page
     const quadPoints = selectionRects.flatMap(rect => {
@@ -496,8 +514,17 @@ function EmbedPDFContent({
       return rect.highlightRects || []
     })
 
+    console.log('[EmbedPDF] Extracted quadPoints:', quadPoints)
+
     if (quadPoints.length > 0) {
       createHighlight(pageIndex, quadPoints, text || '')
+    } else {
+      console.warn('[EmbedPDF] No quadPoints extracted from selection')
+      // Try using selectionRects directly if they have the right structure
+      if (selectionRects && selectionRects.length > 0) {
+        console.log('[EmbedPDF] Trying selectionRects directly')
+        createHighlight(pageIndex, selectionRects, text || '')
+      }
     }
   }, [createHighlight])
 
