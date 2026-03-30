@@ -120,11 +120,17 @@ function TextSelectionMenu({
   // rect.size.height is the height of the selection area
   const top = placement?.suggestTop ? -48 : (rect.size?.height || 0) + 8
 
+  // Merge our positioning with the menuWrapperProps styles
+  const mergedStyle = {
+    ...menuWrapperProps?.style,
+    top
+  }
+
   return (
     <div
-      {...menuWrapperProps}
+      ref={menuWrapperProps?.ref}
       className={styles.selectionMenu}
-      style={{ top }}
+      style={mergedStyle}
     >
       <button
         onClick={handleHighlight}
