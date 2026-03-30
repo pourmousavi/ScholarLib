@@ -88,18 +88,27 @@ export const AnnotationService = {
   },
 
   /**
-   * Add an annotation for a document (with debounced auto-save)
+   * Add an annotation for a document (saves immediately)
    * @param {StorageAdapter} adapter - The storage adapter
    * @param {string} docId - Document ID
    * @param {Object} annotation - The annotation object
    * @param {Object} callbacks - onSaveStart, onSaveComplete, onSaveError
    */
-  addAnnotation(adapter, docId, annotation, callbacks = {}) {
+  async addAnnotation(adapter, docId, annotation, callbacks = {}) {
     if (!annotationsCache) annotationsCache = {}
     if (!annotationsCache[docId]) annotationsCache[docId] = []
 
     annotationsCache[docId].push(annotation)
-    this._scheduleAutoSave(adapter, callbacks)
+
+    // Save immediately instead of debouncing to ensure annotations persist
+    try {
+      callbacks.onSaveStart?.()
+      await this._persistAnnotations(adapter)
+      callbacks.onSaveComplete?.()
+    } catch (error) {
+      console.error('[AnnotationService] Failed to save annotation:', error)
+      callbacks.onSaveError?.(error)
+    }
   },
 
   /**
@@ -231,7 +240,12 @@ export const AnnotationService = {
       version: '1.0',
       annotations: annotationsCache
     }
+    console.log('[AnnotationService] Persisting annotations to storage:', {
+      totalDocs: Object.keys(annotationsCache || {}).length,
+      annotations: annotationsCache
+    })
     await adapter.writeJSON('_system/annotations.json', data)
+    console.log('[AnnotationService] Annotations persisted successfully')
   },
 
   /**

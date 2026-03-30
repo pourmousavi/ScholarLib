@@ -55,12 +55,15 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
   useEffect(() => {
     if (!adapter || isLoaded) return
 
+    console.log('[EmbedPDF Annotations] Loading annotations from storage...')
+
     const loadAnnotations = async () => {
       try {
         const annotations = await AnnotationService.loadAnnotations(adapter)
+        console.log('[EmbedPDF Annotations] Loaded annotations:', annotations)
         setAnnotationsCache(annotations)
       } catch (error) {
-        console.error('Failed to load annotations:', error)
+        console.error('[EmbedPDF Annotations] Failed to load annotations:', error)
       }
     }
 
@@ -77,21 +80,29 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
   // Import existing annotations into EmbedPDF when API is ready
   useEffect(() => {
+    console.log('[EmbedPDF Annotations] Import effect check:', {
+      hasScope: !!annotationScope,
+      docId,
+      isInitialized,
+      isLoaded
+    })
+
     if (!annotationScope || !docId || isInitialized || !isLoaded) return
 
-    // Debug: Log available annotation API methods
-    console.log('[EmbedPDF Annotations] annotationScope available methods:',
-      annotationScope ? Object.keys(annotationScope) : 'null')
+    console.log('[EmbedPDF Annotations] Importing annotations for doc:', docId)
 
     const existingAnnotations = AnnotationService.getAnnotationsForDoc(docId)
+    console.log('[EmbedPDF Annotations] Found existing annotations:', existingAnnotations.length)
+
     if (existingAnnotations.length > 0) {
       try {
         // Convert to EmbedPDF format and import
         const embedAnnotations = toEmbedPDFArray(existingAnnotations)
+        console.log('[EmbedPDF Annotations] Converted to EmbedPDF format:', embedAnnotations)
         annotationScope.importAnnotations?.(embedAnnotations)
-        console.log(`Imported ${embedAnnotations.length} annotations into EmbedPDF`)
+        console.log(`[EmbedPDF Annotations] Imported ${embedAnnotations.length} annotations into EmbedPDF`)
       } catch (error) {
-        console.error('Failed to import annotations into EmbedPDF:', error)
+        console.error('[EmbedPDF Annotations] Failed to import annotations:', error)
       }
     }
 
@@ -350,11 +361,16 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
       storeAddAnnotation(scholarAnnotation)
 
       // Persist to storage
+      console.log('[EmbedPDF Annotations] Checking storage availability:', { hasAdapter: !!adapter, docId })
       if (adapter && docId) {
+        console.log('[EmbedPDF Annotations] Saving annotation to storage...')
         AnnotationService.addAnnotation(adapter, docId, scholarAnnotation, {
-          onSaveStart: () => setSaveStatus('saving'),
+          onSaveStart: () => {
+            console.log('[EmbedPDF Annotations] Save started')
+            setSaveStatus('saving')
+          },
           onSaveComplete: () => {
-            console.log('[EmbedPDF Annotations] Annotation saved to storage')
+            console.log('[EmbedPDF Annotations] Annotation saved to storage successfully')
             setSaveStatus('saved')
           },
           onSaveError: (err) => {
@@ -362,6 +378,8 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
             setSaveStatus('error')
           }
         })
+      } else {
+        console.warn('[EmbedPDF Annotations] Cannot save - missing adapter or docId')
       }
 
       return true
