@@ -392,20 +392,17 @@ function EmbedPDFContent({
 
     // Use a delay to ensure EmbedPDF has fully processed the document
     const timer = setTimeout(() => {
-      console.log('[EmbedPDF] Initializing viewport with default zoom:', defaultZoom)
+      const targetZoom = defaultZoom / 100
+      console.log('[EmbedPDF] Initializing viewport with default zoom:', targetZoom)
 
       try {
-        // Try to set zoom level directly first
-        const targetZoom = defaultZoom / 100
-        if (typeof zoomApi.setZoomLevel === 'function') {
-          zoomApi.setZoomLevel(targetZoom)
-          console.log('[EmbedPDF] Set zoom level to:', targetZoom)
-        } else if (typeof zoomApi.zoomTo === 'function') {
-          zoomApi.zoomTo(targetZoom)
-          console.log('[EmbedPDF] Zoomed to:', targetZoom)
+        // Use requestZoom to set the zoom level (this is the correct EmbedPDF API)
+        if (typeof zoomApi.requestZoom === 'function') {
+          zoomApi.requestZoom(targetZoom)
+          console.log('[EmbedPDF] requestZoom called with:', targetZoom)
         } else {
           // Fallback: trigger a zoom cycle to force render
-          console.log('[EmbedPDF] No direct zoom set method, using zoom cycle')
+          console.log('[EmbedPDF] requestZoom not available, using zoom cycle')
           if (typeof zoomApi.zoomOut === 'function') {
             zoomApi.zoomOut()
             setTimeout(() => {
