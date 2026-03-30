@@ -397,6 +397,12 @@ function EmbedPDFContent({
   const { provides: zoomApi, state: zoomState } = useZoom(documentId)
   const { provides: scrollApi, state: scrollState } = useScroll(documentId)
 
+  // Debug: log annotation API
+  useEffect(() => {
+    console.log('[EmbedPDF Content] annotationApi:', annotationApi)
+    console.log('[EmbedPDF Content] annotationApi methods:', annotationApi ? Object.keys(annotationApi) : 'null')
+  }, [annotationApi])
+
   // Force a viewport refresh on mount by setting the zoom level
   // This triggers the viewport to render and respects the default zoom setting
   const hasInitialized = useRef(false)
