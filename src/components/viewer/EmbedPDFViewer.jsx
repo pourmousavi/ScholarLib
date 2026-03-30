@@ -62,29 +62,42 @@ function TextSelectionMenu({
   const handleHighlight = useCallback(async () => {
     if (!selectionCapability) return
 
-    const formatted = selectionCapability.forDocument(documentId).getFormattedSelection()
-    const text = await selectionCapability.forDocument(documentId).getSelectedText()
+    try {
+      const formatted = selectionCapability.forDocument(documentId).getFormattedSelection()
+      const text = await selectionCapability.forDocument(documentId).getSelectedText()
 
-    if (formatted && formatted.length > 0) {
-      onHighlight(pageIndex, formatted, text)
+      if (formatted && formatted.length > 0) {
+        onHighlight(pageIndex, formatted, text)
+      }
+
+      // Clear selection
+      selectionCapability.forDocument(documentId).clearSelection?.()
+    } catch (e) {
+      console.error('[EmbedPDF] Highlight creation failed:', e)
     }
-
-    // Clear selection
-    selectionCapability.forDocument(documentId).clearSelection?.()
   }, [selectionCapability, documentId, pageIndex, onHighlight])
 
   const handleUnderline = useCallback(async () => {
     if (!selectionCapability) return
 
-    const formatted = selectionCapability.forDocument(documentId).getFormattedSelection()
-    const text = await selectionCapability.forDocument(documentId).getSelectedText()
+    try {
+      const formatted = selectionCapability.forDocument(documentId).getFormattedSelection()
+      const text = await selectionCapability.forDocument(documentId).getSelectedText()
 
-    if (formatted && formatted.length > 0) {
-      onUnderline(pageIndex, formatted, text)
+      if (formatted && formatted.length > 0) {
+        onUnderline(pageIndex, formatted, text)
+      }
+
+      selectionCapability.forDocument(documentId).clearSelection?.()
+    } catch (e) {
+      console.error('[EmbedPDF] Underline creation failed:', e)
     }
-
-    selectionCapability.forDocument(documentId).clearSelection?.()
   }, [selectionCapability, documentId, pageIndex, onUnderline])
+
+  // Don't render if position is not provided
+  if (!position || typeof position.top === 'undefined') {
+    return null
+  }
 
   return (
     <div
