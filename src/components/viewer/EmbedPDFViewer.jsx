@@ -23,6 +23,7 @@ import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
 
 import { useUIStore } from '../../store/uiStore'
 import { useEmbedPDFAnnotations } from '../../hooks/useEmbedPDFAnnotations'
+import { useEmbedPDFTextExtraction } from '../../hooks/useEmbedPDFLoader'
 import { ANNOTATION_COLORS, DEFAULT_HIGHLIGHT_COLOR } from '../../services/annotations'
 import { Spinner, Btn } from '../ui'
 import { AnnotationSidebar, AnnotationPopover } from '../annotations'
@@ -596,6 +597,18 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [totalPages, setTotalPages] = useState(0)
   const [error, setError] = useState(null)
+
+  // Extract text for AI indexing using PDF.js fallback
+  const { extractedText, isExtracting } = useEmbedPDFTextExtraction(url, {
+    enabled: !!url && !!onTextExtracted
+  })
+
+  // Call onTextExtracted when text is available
+  useEffect(() => {
+    if (extractedText && onTextExtracted) {
+      onTextExtracted(extractedText)
+    }
+  }, [extractedText, onTextExtracted])
 
   // Create plugins with document URL - memoized to prevent re-creation
   const plugins = useMemo(() => {
