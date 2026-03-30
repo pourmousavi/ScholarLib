@@ -672,6 +672,38 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [totalPages, setTotalPages] = useState(0)
   const [error, setError] = useState(null)
+  const [pdfData, setPdfData] = useState(null)
+  const [isLoadingPdf, setIsLoadingPdf] = useState(false)
+
+  // Fetch PDF as ArrayBuffer to avoid CORS issues with EmbedPDF
+  useEffect(() => {
+    if (!url) {
+      setPdfData(null)
+      return
+    }
+
+    const fetchPdf = async () => {
+      setIsLoadingPdf(true)
+      setError(null)
+      try {
+        console.log('[EmbedPDF] Fetching PDF from URL:', url.substring(0, 80))
+        const response = await fetch(url)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`)
+        }
+        const arrayBuffer = await response.arrayBuffer()
+        console.log('[EmbedPDF] PDF fetched, size:', arrayBuffer.byteLength)
+        setPdfData(arrayBuffer)
+      } catch (err) {
+        console.error('[EmbedPDF] Failed to fetch PDF:', err)
+        setError(err.message || 'Failed to load PDF')
+      } finally {
+        setIsLoadingPdf(false)
+      }
+    }
+
+    fetchPdf()
+  }, [url])
 
   // Extract text for AI indexing using PDF.js fallback
   const { extractedText, isExtracting } = useEmbedPDFTextExtraction(url, {
@@ -685,13 +717,13 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
     }
   }, [extractedText, onTextExtracted])
 
-  // Create plugins with document URL - memoized to prevent re-creation
+  // Create plugins with PDF data - memoized to prevent re-creation
   const plugins = useMemo(() => {
-    if (!url) return []
+    if (!pdfData) return []
 
     return [
       createPluginRegistration(DocumentManagerPluginPackage, {
-        initialDocuments: [{ url }],
+        initialDocuments: [{ data: pdfData }],
       }),
       createPluginRegistration(ViewportPluginPackage),
       createPluginRegistration(ScrollPluginPackage, {
@@ -713,7 +745,7 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
       }),
       createPluginRegistration(ExportPluginPackage),
     ]
-  }, [url, pdfDefaultZoom])
+  }, [pdfData, pdfDefaultZoom])
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -759,12 +791,14 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
     )
   }
 
-  if (engineLoading) {
+  if (engineLoading || isLoadingPdf) {
     return (
       <div className={styles.viewer}>
         <div className={styles.loading}>
           <Spinner size={32} />
-          <span className={styles.loadingText}>Loading PDF engine...</span>
+          <span className={styles.loadingText}>
+            {engineLoading ? 'Loading PDF engine...' : 'Loading PDF...'}
+          </span>
         </div>
       </div>
     )
@@ -810,9 +844,11 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
 
   console.log('[EmbedPDF] Rendering main component:', {
     hasUrl: !!url,
-    url: url?.substring(0, 100),
+    hasPdfData: !!pdfData,
+    pdfDataSize: pdfData?.byteLength,
     hasEngine: !!engine,
     engineLoading,
+    isLoadingPdf,
     engineError: engineError?.message,
     pluginCount: plugins.length
   })
