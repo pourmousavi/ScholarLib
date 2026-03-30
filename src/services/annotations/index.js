@@ -10,3 +10,14 @@ export {
   exportToJSON,
   getAnnotationStats
 } from './AnnotationExporter'
+
+export {
+  AnnotationAdapter,
+  toEmbedPDF,
+  fromEmbedPDF,
+  toEmbedPDFArray,
+  fromEmbedPDFArray,
+  fromEmbedPDFEvent,
+  hexToRgba,
+  rgbaToHex
+} from './AnnotationAdapter'
