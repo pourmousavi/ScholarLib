@@ -6,24 +6,134 @@ import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react
 import { Scroller, ScrollPluginPackage, useScroll } from '@embedpdf/plugin-scroll/react'
 import { DocumentContent, DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
-import { ZoomPluginPackage, ZoomMode, useZoom, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react'
+import { ZoomPluginPackage, useZoom, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react'
 import { InteractionManagerPluginPackage, PagePointerProvider } from '@embedpdf/plugin-interaction-manager/react'
 import { TilingPluginPackage } from '@embedpdf/plugin-tiling/react'
+import {
+  AnnotationPluginPackage,
+  AnnotationLayer,
+  useAnnotation
+} from '@embedpdf/plugin-annotation/react'
+import {
+  SelectionPluginPackage,
+  SelectionLayer,
+  useSelectionCapability
+} from '@embedpdf/plugin-selection/react'
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
 
 import { useUIStore } from '../../store/uiStore'
+import { useEmbedPDFAnnotations } from '../../hooks/useEmbedPDFAnnotations'
+import { ANNOTATION_COLORS, DEFAULT_HIGHLIGHT_COLOR } from '../../services/annotations'
 import { Spinner, Btn } from '../ui'
+import { AnnotationSidebar, AnnotationPopover } from '../annotations'
 import styles from './PDFViewer.module.css'
 import toolbarStyles from './PDFToolbar.module.css'
 
-// Inner toolbar that has access to EmbedPDF context
+// Color picker component for annotation toolbar
+function ColorPicker({ currentColor, onColorChange, colors }) {
+  return (
+    <div className={toolbarStyles.colorPicker}>
+      {Object.entries(colors).map(([name, hex]) => (
+        <button
+          key={name}
+          className={`${toolbarStyles.colorSwatch} ${currentColor === hex ? toolbarStyles.active : ''}`}
+          style={{ backgroundColor: hex }}
+          onClick={() => onColorChange(hex)}
+          title={name}
+        />
+      ))}
+    </div>
+  )
+}
+
+// Text selection menu that appears on text selection
+function TextSelectionMenu({
+  documentId,
+  pageIndex,
+  position,
+  onHighlight,
+  onUnderline,
+  highlightColor
+}) {
+  const { provides: selectionCapability } = useSelectionCapability()
+
+  const handleHighlight = useCallback(async () => {
+    if (!selectionCapability) return
+
+    const formatted = selectionCapability.forDocument(documentId).getFormattedSelection()
+    const text = await selectionCapability.forDocument(documentId).getSelectedText()
+
+    if (formatted && formatted.length > 0) {
+      onHighlight(pageIndex, formatted, text)
+    }
+
+    // Clear selection
+    selectionCapability.forDocument(documentId).clearSelection?.()
+  }, [selectionCapability, documentId, pageIndex, onHighlight])
+
+  const handleUnderline = useCallback(async () => {
+    if (!selectionCapability) return
+
+    const formatted = selectionCapability.forDocument(documentId).getFormattedSelection()
+    const text = await selectionCapability.forDocument(documentId).getSelectedText()
+
+    if (formatted && formatted.length > 0) {
+      onUnderline(pageIndex, formatted, text)
+    }
+
+    selectionCapability.forDocument(documentId).clearSelection?.()
+  }, [selectionCapability, documentId, pageIndex, onUnderline])
+
+  return (
+    <div
+      className={styles.selectionMenu}
+      style={{
+        position: 'absolute',
+        top: position.top,
+        left: position.left,
+        transform: position.below ? 'translateY(8px)' : 'translateY(-100%) translateY(-8px)'
+      }}
+    >
+      <button
+        onClick={handleHighlight}
+        className={styles.selectionMenuBtn}
+        style={{ backgroundColor: highlightColor }}
+        title="Highlight"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+          <path d="M15.54 3.5l4.95 4.95-9.9 9.9H5.64v-4.95l9.9-9.9z"/>
+        </svg>
+      </button>
+      <button
+        onClick={handleUnderline}
+        className={styles.selectionMenuBtn}
+        title="Underline"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+          <path d="M6 3v7a6 6 0 0 0 12 0V3"/>
+          <line x1="4" y1="21" x2="20" y2="21"/>
+        </svg>
+      </button>
+    </div>
+  )
+}
+
+// Inner toolbar with annotation tools
 function EmbedPDFToolbar({
   documentId,
   totalPages,
   onToggleFullscreen,
-  isFullscreen
+  isFullscreen,
+  annotationCount,
+  showAnnotationSidebar,
+  onToggleSidebar,
+  highlightColor,
+  onColorChange,
+  onExportAnnotations
 }) {
   const { provides: zoom, state: zoomState } = useZoom(documentId)
   const { provides: scroll, state: scrollState } = useScroll(documentId)
+  const [showColorPicker, setShowColorPicker] = useState(false)
 
   const currentZoom = zoomState?.currentZoomLevel
     ? Math.round(zoomState.currentZoomLevel * 100)
@@ -92,6 +202,69 @@ function EmbedPDFToolbar({
       </div>
 
       <div className={toolbarStyles.actions}>
+        {/* Annotation tools */}
+        <div className={toolbarStyles.annotationTools}>
+          {/* Color picker toggle */}
+          <div style={{ position: 'relative' }}>
+            <button
+              className={toolbarStyles.toolBtn}
+              onClick={() => setShowColorPicker(!showColorPicker)}
+              title="Highlight color"
+              style={{
+                borderBottom: `3px solid ${highlightColor}`
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M12 3a9 9 0 100 18 1.5 1.5 0 001.5-1.5c0-.4-.15-.75-.4-1.02-.25-.28-.4-.63-.4-1.02a1.5 1.5 0 011.5-1.5h1.75a5 5 0 005-5c0-4.42-4.03-8-9-8z"/>
+              </svg>
+            </button>
+            {showColorPicker && (
+              <div
+                className={styles.colorPickerPopover}
+                onMouseLeave={() => setShowColorPicker(false)}
+              >
+                <ColorPicker
+                  currentColor={highlightColor}
+                  onColorChange={(color) => {
+                    onColorChange(color)
+                    setShowColorPicker(false)
+                  }}
+                  colors={ANNOTATION_COLORS}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Annotations sidebar toggle */}
+          <button
+            className={`${toolbarStyles.annotationBtn} ${showAnnotationSidebar ? toolbarStyles.active : ''}`}
+            onClick={onToggleSidebar}
+            title="Toggle annotations sidebar"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+              <path d="M15.54 3.5l4.95 4.95-9.9 9.9H5.64v-4.95l9.9-9.9zm1.41-1.41l-1.41 1.41-4.95-4.95 1.41-1.41 4.95 4.95zm-12.03 17.41h12v2h-12v-2z"/>
+            </svg>
+            {annotationCount > 0 && (
+              <span className={toolbarStyles.annotationCount}>{annotationCount}</span>
+            )}
+          </button>
+
+          {/* Export annotations */}
+          {annotationCount > 0 && (
+            <button
+              className={toolbarStyles.toolBtn}
+              onClick={onExportAnnotations}
+              title="Export annotations"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </button>
+          )}
+        </div>
+
         <button
           className={toolbarStyles.fullscreenBtn}
           onClick={onToggleFullscreen}
@@ -107,10 +280,105 @@ function EmbedPDFToolbar({
 // Content wrapper that handles document loading and rendering
 function EmbedPDFContent({
   documentId,
+  docId,
   onTotalPagesChange,
   onToggleFullscreen,
   isFullscreen
 }) {
+  const { provides: annotationApi } = useAnnotation(documentId)
+
+  // Use annotation management hook
+  const {
+    annotations,
+    selectedAnnotationId,
+    highlightColor,
+    showAnnotationSidebar,
+    annotationCount,
+    createHighlight,
+    createUnderline,
+    updateComment,
+    updateColor,
+    deleteAnnotation,
+    selectAnnotation,
+    clearSelection,
+    setColor,
+    toggleSidebar,
+    setSidebar
+  } = useEmbedPDFAnnotations(docId, annotationApi)
+
+  // Popover state
+  const [popoverAnnotation, setPopoverAnnotation] = useState(null)
+  const [popoverPosition, setPopoverPosition] = useState(null)
+
+  // Handle highlight creation from text selection
+  const handleHighlight = useCallback((pageIndex, selectionRects, text) => {
+    // Convert selection rects to quadPoints
+    // selectionRects from EmbedPDF contain bounds per page
+    const quadPoints = selectionRects.flatMap(rect => {
+      // Each rect has highlightRects array
+      return rect.highlightRects || []
+    })
+
+    if (quadPoints.length > 0) {
+      createHighlight(pageIndex, quadPoints, text || '')
+    }
+  }, [createHighlight])
+
+  // Handle underline creation
+  const handleUnderline = useCallback((pageIndex, selectionRects, text) => {
+    const quadPoints = selectionRects.flatMap(rect => {
+      return rect.highlightRects || []
+    })
+
+    if (quadPoints.length > 0) {
+      createUnderline(pageIndex, quadPoints, text || '')
+    }
+  }, [createUnderline])
+
+  // Handle annotation click
+  const handleAnnotationClick = useCallback((annotation) => {
+    selectAnnotation(annotation.id)
+    // Position popover - would need ref to get actual position
+    setPopoverAnnotation(annotation)
+    // TODO: Calculate position based on annotation bounds
+    setPopoverPosition({ top: 100, left: 100 })
+  }, [selectAnnotation])
+
+  // Close popover
+  const handleClosePopover = useCallback(() => {
+    setPopoverAnnotation(null)
+    setPopoverPosition(null)
+    clearSelection()
+  }, [clearSelection])
+
+  // Navigate to annotation (from sidebar)
+  const handleNavigateToAnnotation = useCallback((annotation) => {
+    const pageNum = annotation.position?.page
+    // TODO: Scroll to page using EmbedPDF scroll API
+    selectAnnotation(annotation.id)
+  }, [selectAnnotation])
+
+  // Export annotations
+  const handleExportAnnotations = useCallback(() => {
+    // Use existing export functionality - import at top of file
+    import('../../services/annotations/AnnotationExporter').then(({ exportToMarkdown }) => {
+      const markdown = exportToMarkdown(annotations, {
+        documentTitle: docId,
+        includeImages: false
+      })
+
+      const blob = new Blob([markdown], { type: 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `annotations-${docId || 'document'}.md`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    })
+  }, [annotations, docId])
+
   return (
     <DocumentContent documentId={documentId}>
       {({ isLoaded, document: pdfDoc, error: docError }) => {
@@ -134,10 +402,8 @@ function EmbedPDFContent({
           )
         }
 
-        // Update total pages when document loads
         const pageCount = pdfDoc?.pageCount ?? 0
         if (pageCount > 0) {
-          // Use timeout to avoid setState during render
           setTimeout(() => onTotalPagesChange(pageCount), 0)
         }
 
@@ -148,6 +414,12 @@ function EmbedPDFContent({
               totalPages={pageCount}
               onToggleFullscreen={onToggleFullscreen}
               isFullscreen={isFullscreen}
+              annotationCount={annotationCount}
+              showAnnotationSidebar={showAnnotationSidebar}
+              onToggleSidebar={toggleSidebar}
+              highlightColor={highlightColor}
+              onColorChange={setColor}
+              onExportAnnotations={handleExportAnnotations}
             />
             <div className={styles.viewerContent}>
               <div className={styles.container}>
@@ -184,6 +456,25 @@ function EmbedPDFContent({
                               documentId={documentId}
                               pageIndex={pageIndex}
                             />
+                            <SelectionLayer
+                              documentId={documentId}
+                              pageIndex={pageIndex}
+                              selectionMenu={(props) => (
+                                <TextSelectionMenu
+                                  {...props}
+                                  documentId={documentId}
+                                  pageIndex={pageIndex}
+                                  onHighlight={handleHighlight}
+                                  onUnderline={handleUnderline}
+                                  highlightColor={highlightColor}
+                                />
+                              )}
+                            />
+                            <AnnotationLayer
+                              documentId={documentId}
+                              pageIndex={pageIndex}
+                              resizeUI={{ size: 8, color: 'var(--color-primary)' }}
+                            />
                           </div>
                         </PagePointerProvider>
                       )}
@@ -191,7 +482,35 @@ function EmbedPDFContent({
                   </Viewport>
                 </ZoomGestureWrapper>
               </div>
+
+              {/* Annotation sidebar */}
+              {showAnnotationSidebar && (
+                <div className={styles.annotationSidebar}>
+                  <AnnotationSidebar
+                    annotations={annotations}
+                    selectedAnnotationId={selectedAnnotationId}
+                    onSelectAnnotation={selectAnnotation}
+                    onUpdateComment={updateComment}
+                    onUpdateColor={updateColor}
+                    onDelete={deleteAnnotation}
+                    onNavigateToAnnotation={handleNavigateToAnnotation}
+                    onClose={() => setSidebar(false)}
+                  />
+                </div>
+              )}
             </div>
+
+            {/* Annotation popover */}
+            {popoverAnnotation && popoverPosition && (
+              <AnnotationPopover
+                annotation={popoverAnnotation}
+                onUpdateComment={updateComment}
+                onUpdateColor={updateColor}
+                onDelete={deleteAnnotation}
+                onClose={handleClosePopover}
+                position={popoverPosition}
+              />
+            )}
           </>
         )
       }}
@@ -228,6 +547,12 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
         defaultZoomLevel: pdfDefaultZoom / 100,
         minZoomLevel: 0.5,
         maxZoomLevel: 2.0,
+      }),
+      createPluginRegistration(SelectionPluginPackage),
+      createPluginRegistration(HistoryPluginPackage),
+      createPluginRegistration(AnnotationPluginPackage, {
+        autoCommit: false, // We handle persistence externally
+        selectAfterCreate: true
       }),
     ]
   }, [url, pdfDefaultZoom])
@@ -338,6 +663,7 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
           return (
             <EmbedPDFContent
               documentId={activeDocumentId}
+              docId={docId}
               onTotalPagesChange={setTotalPages}
               onToggleFullscreen={toggleFullscreen}
               isFullscreen={isFullscreen}

@@ -192,6 +192,32 @@
   color: var(--accent);
 }
 
+/* Color picker */
+.colorPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 140px;
+}
+
+.colorSwatch {
+  width: 24px;
+  height: 24px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.colorSwatch:hover {
+  transform: scale(1.1);
+}
+
+.colorSwatch.active {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 2px var(--bg-surface);
+}
+
 /* Mobile responsive adjustments */
 @media (max-width: 639px) {
   .toolbar {
