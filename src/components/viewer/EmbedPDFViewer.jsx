@@ -52,7 +52,9 @@ function ColorPicker({ currentColor, onColorChange, colors }) {
 function TextSelectionMenu({
   documentId,
   pageIndex,
-  position,
+  menuWrapperProps,
+  rect,
+  selected,
   onHighlight,
   onUnderline,
   highlightColor
@@ -61,7 +63,6 @@ function TextSelectionMenu({
 
   const handleHighlight = useCallback(async () => {
     console.log('[EmbedPDF TextSelectionMenu] handleHighlight called')
-    console.log('[EmbedPDF TextSelectionMenu] selectionCapability:', selectionCapability)
 
     if (!selectionCapability) {
       console.warn('[EmbedPDF TextSelectionMenu] No selectionCapability')
@@ -70,7 +71,6 @@ function TextSelectionMenu({
 
     try {
       const docSelection = selectionCapability.forDocument(documentId)
-      console.log('[EmbedPDF TextSelectionMenu] docSelection:', docSelection)
       console.log('[EmbedPDF TextSelectionMenu] docSelection methods:', docSelection ? Object.keys(docSelection) : 'null')
 
       const formatted = docSelection.getFormattedSelection()
@@ -96,33 +96,30 @@ function TextSelectionMenu({
     if (!selectionCapability) return
 
     try {
-      const formatted = selectionCapability.forDocument(documentId).getFormattedSelection()
-      const text = await selectionCapability.forDocument(documentId).getSelectedText()
+      const docSelection = selectionCapability.forDocument(documentId)
+      const formatted = docSelection.getFormattedSelection()
+      const text = await docSelection.getSelectedText()
 
       if (formatted && formatted.length > 0) {
         onUnderline(pageIndex, formatted, text)
       }
 
-      selectionCapability.forDocument(documentId).clearSelection?.()
+      docSelection.clearSelection?.()
     } catch (e) {
       console.error('[EmbedPDF] Underline creation failed:', e)
     }
   }, [selectionCapability, documentId, pageIndex, onUnderline])
 
-  // Don't render if position is not provided
-  if (!position || typeof position.top === 'undefined') {
+  // Don't render if not selected or no rect
+  if (!selected || !rect) {
     return null
   }
 
+  // Use menuWrapperProps for positioning (provided by EmbedPDF)
   return (
     <div
+      {...menuWrapperProps}
       className={styles.selectionMenu}
-      style={{
-        position: 'absolute',
-        top: position.top,
-        left: position.left,
-        transform: position.below ? 'translateY(8px)' : 'translateY(-100%) translateY(-8px)'
-      }}
     >
       <button
         onClick={handleHighlight}
