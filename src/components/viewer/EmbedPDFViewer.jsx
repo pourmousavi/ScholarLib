@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react'
-import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
+import { Scroller, ScrollPluginPackage, useScroll } from '@embedpdf/plugin-scroll/react'
 import { DocumentContent, DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import { ZoomPluginPackage, ZoomMode, useZoom, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/react'
@@ -12,43 +12,205 @@ import { TilingPluginPackage } from '@embedpdf/plugin-tiling/react'
 
 import { useUIStore } from '../../store/uiStore'
 import { Spinner, Btn } from '../ui'
-import PDFToolbar from './PDFToolbar'
 import styles from './PDFViewer.module.css'
+import toolbarStyles from './PDFToolbar.module.css'
 
-// Zoom toolbar component for EmbedPDF
-function EmbedPDFZoomToolbar({ documentId, onZoomChange }) {
-  const { provides: zoom, state } = useZoom(documentId)
+// Inner toolbar that has access to EmbedPDF context
+function EmbedPDFToolbar({
+  documentId,
+  totalPages,
+  onToggleFullscreen,
+  isFullscreen
+}) {
+  const { provides: zoom, state: zoomState } = useZoom(documentId)
+  const { provides: scroll, state: scrollState } = useScroll(documentId)
 
-  useEffect(() => {
-    if (state?.currentZoomLevel && onZoomChange) {
-      onZoomChange(Math.round(state.currentZoomLevel * 100))
-    }
-  }, [state?.currentZoomLevel, onZoomChange])
+  const currentZoom = zoomState?.currentZoomLevel
+    ? Math.round(zoomState.currentZoomLevel * 100)
+    : 100
 
-  if (!zoom) return null
+  const currentPage = scrollState?.currentPage ?? 1
 
-  return {
-    zoom: state?.currentZoomLevel ? Math.round(state.currentZoomLevel * 100) : 100,
-    zoomIn: () => zoom.zoomIn(),
-    zoomOut: () => zoom.zoomOut(),
-    resetZoom: () => zoom.requestZoom(ZoomMode.FitPage)
-  }
+  const handleZoomIn = useCallback(() => {
+    zoom?.zoomIn()
+  }, [zoom])
+
+  const handleZoomOut = useCallback(() => {
+    zoom?.zoomOut()
+  }, [zoom])
+
+  const handlePrevPage = useCallback(() => {
+    scroll?.scrollToPreviousPage()
+  }, [scroll])
+
+  const handleNextPage = useCallback(() => {
+    scroll?.scrollToNextPage()
+  }, [scroll])
+
+  return (
+    <div className={toolbarStyles.toolbar}>
+      <div className={toolbarStyles.navigation}>
+        <button
+          className={toolbarStyles.navBtn}
+          onClick={handlePrevPage}
+          disabled={currentPage <= 1}
+          title="Previous page"
+        >
+          ◂
+        </button>
+        <button
+          className={toolbarStyles.navBtn}
+          onClick={handleNextPage}
+          disabled={currentPage >= totalPages}
+          title="Next page"
+        >
+          ▸
+        </button>
+        <span className={toolbarStyles.pageInfo}>
+          Page {currentPage} / {totalPages}
+        </span>
+      </div>
+
+      <div className={toolbarStyles.zoom}>
+        <button
+          className={toolbarStyles.zoomBtn}
+          onClick={handleZoomOut}
+          disabled={currentZoom <= 50}
+          title="Zoom out"
+        >
+          −
+        </button>
+        <span className={toolbarStyles.zoomLevel}>{currentZoom}%</span>
+        <button
+          className={toolbarStyles.zoomBtn}
+          onClick={handleZoomIn}
+          disabled={currentZoom >= 200}
+          title="Zoom in"
+        >
+          +
+        </button>
+      </div>
+
+      <div className={toolbarStyles.actions}>
+        <button
+          className={toolbarStyles.fullscreenBtn}
+          onClick={onToggleFullscreen}
+          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        >
+          {isFullscreen ? '⤓' : '⤢'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Content wrapper that handles document loading and rendering
+function EmbedPDFContent({
+  documentId,
+  onTotalPagesChange,
+  onToggleFullscreen,
+  isFullscreen
+}) {
+  return (
+    <DocumentContent documentId={documentId}>
+      {({ isLoaded, document: pdfDoc, error: docError }) => {
+        if (docError) {
+          return (
+            <div className={styles.error}>
+              <span className={styles.errorIcon}>⚠</span>
+              <span className={styles.errorText}>
+                {docError.message || 'Failed to load PDF'}
+              </span>
+            </div>
+          )
+        }
+
+        if (!isLoaded) {
+          return (
+            <div className={styles.loading}>
+              <Spinner size={24} />
+              <span className={styles.loadingText}>Loading PDF...</span>
+            </div>
+          )
+        }
+
+        // Update total pages when document loads
+        const pageCount = pdfDoc?.pageCount ?? 0
+        if (pageCount > 0) {
+          // Use timeout to avoid setState during render
+          setTimeout(() => onTotalPagesChange(pageCount), 0)
+        }
+
+        return (
+          <>
+            <EmbedPDFToolbar
+              documentId={documentId}
+              totalPages={pageCount}
+              onToggleFullscreen={onToggleFullscreen}
+              isFullscreen={isFullscreen}
+            />
+            <div className={styles.viewerContent}>
+              <div className={styles.container}>
+                <ZoomGestureWrapper
+                  documentId={documentId}
+                  enablePinch
+                  enableWheel
+                >
+                  <Viewport
+                    documentId={documentId}
+                    style={{
+                      backgroundColor: 'var(--bg-surface)',
+                      height: '100%',
+                      width: '100%'
+                    }}
+                  >
+                    <Scroller
+                      documentId={documentId}
+                      renderPage={({ width, height, pageIndex }) => (
+                        <PagePointerProvider
+                          documentId={documentId}
+                          pageIndex={pageIndex}
+                        >
+                          <div
+                            className={styles.pageWrapper}
+                            style={{
+                              width,
+                              height,
+                              maxWidth: 'none'
+                            }}
+                            data-page-number={pageIndex + 1}
+                          >
+                            <RenderLayer
+                              documentId={documentId}
+                              pageIndex={pageIndex}
+                            />
+                          </div>
+                        </PagePointerProvider>
+                      )}
+                    />
+                  </Viewport>
+                </ZoomGestureWrapper>
+              </div>
+            </div>
+          </>
+        )
+      }}
+    </DocumentContent>
+  )
 }
 
 export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
   const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
+  const setFullscreenOverlayVisible = useUIStore((s) => s.setFullscreenOverlayVisible)
   const { engine, isLoading: engineLoading } = usePdfiumEngine()
 
   const viewerRef = useRef(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
-  const [zoom, setZoom] = useState(pdfDefaultZoom)
   const [error, setError] = useState(null)
-  const [documentLoaded, setDocumentLoaded] = useState(false)
 
-  // Create plugins with document URL
-  const plugins = useCallback(() => {
+  // Create plugins with document URL - memoized to prevent re-creation
+  const plugins = useMemo(() => {
     if (!url) return []
 
     return [
@@ -56,55 +218,47 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
         initialDocuments: [{ url }],
       }),
       createPluginRegistration(ViewportPluginPackage),
-      createPluginRegistration(ScrollPluginPackage),
+      createPluginRegistration(ScrollPluginPackage, {
+        defaultPageGap: 16,
+      }),
       createPluginRegistration(RenderPluginPackage),
       createPluginRegistration(InteractionManagerPluginPackage),
       createPluginRegistration(TilingPluginPackage),
       createPluginRegistration(ZoomPluginPackage, {
         defaultZoomLevel: pdfDefaultZoom / 100,
+        minZoomLevel: 0.5,
+        maxZoomLevel: 2.0,
       }),
     ]
   }, [url, pdfDefaultZoom])
-
-  const handleZoomIn = useCallback(() => {
-    setZoom(z => Math.min(z + 25, 200))
-  }, [])
-
-  const handleZoomOut = useCallback(() => {
-    setZoom(z => Math.max(z - 25, 50))
-  }, [])
-
-  const handlePrevPage = useCallback(() => {
-    setCurrentPage(p => Math.max(1, p - 1))
-  }, [])
-
-  const handleNextPage = useCallback(() => {
-    setCurrentPage(p => Math.min(totalPages, p + 1))
-  }, [totalPages])
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       viewerRef.current?.requestFullscreen()
       setIsFullscreen(true)
+      setFullscreenOverlayVisible(true)
     } else {
       document.exitFullscreen()
       setIsFullscreen(false)
+      setFullscreenOverlayVisible(false)
     }
-  }, [])
+  }, [setFullscreenOverlayVisible])
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
+      const isNowFullscreen = !!document.fullscreenElement
+      setIsFullscreen(isNowFullscreen)
+      if (!isNowFullscreen) {
+        setFullscreenOverlayVisible(false)
+      }
     }
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  }, [])
+  }, [setFullscreenOverlayVisible])
 
   // Reset state when URL changes
   useEffect(() => {
-    setCurrentPage(1)
     setTotalPages(0)
-    setDocumentLoaded(false)
     setError(null)
   }, [url])
 
@@ -151,125 +305,46 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
         <div className={styles.error}>
           <span className={styles.errorIcon}>⚠</span>
           <span className={styles.errorText}>{error}</span>
-          <Btn onClick={() => { setError(null); setDocumentLoaded(false) }}>Retry</Btn>
+          <Btn onClick={() => setError(null)}>Retry</Btn>
         </div>
       </div>
     )
   }
 
-  const pluginList = plugins()
+  if (plugins.length === 0) {
+    return (
+      <div className={styles.viewer}>
+        <div className={styles.loading}>
+          <Spinner size={24} />
+          <span className={styles.loadingText}>Initializing viewer...</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={styles.viewer} ref={viewerRef}>
-      <PDFToolbar
-        currentPage={currentPage}
-        totalPages={totalPages}
-        zoom={zoom}
-        onPrevPage={handlePrevPage}
-        onNextPage={handleNextPage}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onToggleFullscreen={toggleFullscreen}
-        isFullscreen={isFullscreen}
-        annotationCount={0}
-        onToggleAnnotations={() => {}}
-        showAnnotationSidebar={false}
-        areaSelectMode={false}
-        onToggleAreaSelect={() => {}}
-        onExportAnnotations={() => {}}
-      />
-      <div className={styles.viewerContent}>
-        <div className={styles.container}>
-          {pluginList.length > 0 && (
-            <EmbedPDF engine={engine} plugins={pluginList}>
-              {({ activeDocumentId }) => {
-                if (!activeDocumentId) {
-                  return (
-                    <div className={styles.loading}>
-                      <Spinner size={24} />
-                      <span className={styles.loadingText}>Loading PDF...</span>
-                    </div>
-                  )
-                }
+      <EmbedPDF engine={engine} plugins={plugins}>
+        {({ activeDocumentId }) => {
+          if (!activeDocumentId) {
+            return (
+              <div className={styles.loading}>
+                <Spinner size={24} />
+                <span className={styles.loadingText}>Loading PDF...</span>
+              </div>
+            )
+          }
 
-                return (
-                  <DocumentContent documentId={activeDocumentId}>
-                    {({ isLoaded, document: pdfDoc, error: docError }) => {
-                      if (docError) {
-                        return (
-                          <div className={styles.error}>
-                            <span className={styles.errorIcon}>⚠</span>
-                            <span className={styles.errorText}>
-                              {docError.message || 'Failed to load PDF'}
-                            </span>
-                          </div>
-                        )
-                      }
-
-                      if (!isLoaded) {
-                        return (
-                          <div className={styles.loading}>
-                            <Spinner size={24} />
-                            <span className={styles.loadingText}>Loading PDF...</span>
-                          </div>
-                        )
-                      }
-
-                      // Update total pages when document loads
-                      if (pdfDoc?.pageCount && pdfDoc.pageCount !== totalPages) {
-                        setTotalPages(pdfDoc.pageCount)
-                        setDocumentLoaded(true)
-                      }
-
-                      return (
-                        <ZoomGestureWrapper
-                          documentId={activeDocumentId}
-                          enablePinch
-                          enableWheel
-                        >
-                          <Viewport
-                            documentId={activeDocumentId}
-                            style={{
-                              backgroundColor: 'var(--bg-surface)',
-                              height: '100%',
-                              width: '100%'
-                            }}
-                          >
-                            <Scroller
-                              documentId={activeDocumentId}
-                              renderPage={({ width, height, pageIndex }) => (
-                                <PagePointerProvider
-                                  documentId={activeDocumentId}
-                                  pageIndex={pageIndex}
-                                >
-                                  <div
-                                    className={styles.pageWrapper}
-                                    style={{
-                                      width,
-                                      height,
-                                      maxWidth: 'none'
-                                    }}
-                                    data-page-number={pageIndex + 1}
-                                  >
-                                    <RenderLayer
-                                      documentId={activeDocumentId}
-                                      pageIndex={pageIndex}
-                                    />
-                                  </div>
-                                </PagePointerProvider>
-                              )}
-                            />
-                          </Viewport>
-                        </ZoomGestureWrapper>
-                      )
-                    }}
-                  </DocumentContent>
-                )
-              }}
-            </EmbedPDF>
-          )}
-        </div>
-      </div>
+          return (
+            <EmbedPDFContent
+              documentId={activeDocumentId}
+              onTotalPagesChange={setTotalPages}
+              onToggleFullscreen={toggleFullscreen}
+              isFullscreen={isFullscreen}
+            />
+          )
+        }}
+      </EmbedPDF>
     </div>
   )
 }
