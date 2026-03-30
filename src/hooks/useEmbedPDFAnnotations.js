@@ -107,29 +107,48 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
     }
 
     const handleAnnotationEvent = (event) => {
-      // Skip non-committed events (interim changes during editing)
-      if (event.type === 'create' && !event.committed) return
-      if (event.type === 'update' && !event.committed) return
+      console.log('[EmbedPDF Annotations] Event received:', {
+        type: event.type,
+        committed: event.committed,
+        annotationId: event.annotationId,
+        hasAnnotation: !!event.annotation
+      })
+
+      // Skip non-committed create/update events (interim changes during editing)
+      // But always process committed events for persistence
+      if ((event.type === 'create' || event.type === 'update') && !event.committed) {
+        console.log('[EmbedPDF Annotations] Skipping non-committed event')
+        return
+      }
 
       const converted = fromEmbedPDFEvent(event)
+      console.log('[EmbedPDF Annotations] Converted event:', converted)
 
       switch (event.type) {
         case 'create':
           if (converted.annotation) {
+            console.log('[EmbedPDF Annotations] Adding annotation to store:', converted.annotation.id)
             // Add to store
             storeAddAnnotation(converted.annotation)
 
             // Persist to storage
             AnnotationService.addAnnotation(adapter, docId, converted.annotation, {
               onSaveStart: () => setSaveStatus('saving'),
-              onSaveComplete: () => setSaveStatus('saved'),
-              onSaveError: () => setSaveStatus('error')
+              onSaveComplete: () => {
+                console.log('[EmbedPDF Annotations] Annotation saved successfully')
+                setSaveStatus('saved')
+              },
+              onSaveError: (err) => {
+                console.error('[EmbedPDF Annotations] Failed to save annotation:', err)
+                setSaveStatus('error')
+              }
             })
           }
           break
 
         case 'update':
           if (event.annotationId && converted.patch) {
+            console.log('[EmbedPDF Annotations] Updating annotation:', event.annotationId)
             // Update store
             storeUpdateAnnotation(event.annotationId, converted.patch)
 
@@ -144,6 +163,7 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
 
         case 'delete':
           if (event.annotationId) {
+            console.log('[EmbedPDF Annotations] Deleting annotation:', event.annotationId)
             // Remove from store
             storeDeleteAnnotation(event.annotationId)
 
@@ -167,6 +187,7 @@ export function useEmbedPDFAnnotations(docId, annotationApi) {
           break
 
         default:
+          console.log('[EmbedPDF Annotations] Unknown event type:', event.type)
           break
       }
     }

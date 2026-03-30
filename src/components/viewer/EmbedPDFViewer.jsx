@@ -1004,8 +1004,8 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
       createPluginRegistration(SelectionPluginPackage),
       createPluginRegistration(HistoryPluginPackage),
       createPluginRegistration(AnnotationPluginPackage, {
-        autoCommit: false, // We handle persistence externally
-        selectAfterCreate: true
+        autoCommit: true, // Auto-commit annotations to trigger committed events
+        selectAfterCreate: false // Don't auto-select to avoid UI issues
       }),
       createPluginRegistration(ExportPluginPackage),
     ]
