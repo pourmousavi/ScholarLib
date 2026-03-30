@@ -20,6 +20,7 @@ import {
   useSelectionCapability
 } from '@embedpdf/plugin-selection/react'
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
+import { ExportPluginPackage, useExport } from '@embedpdf/plugin-export/react'
 
 import { useUIStore } from '../../store/uiStore'
 import { useEmbedPDFAnnotations } from '../../hooks/useEmbedPDFAnnotations'
@@ -131,6 +132,8 @@ function EmbedPDFToolbar({
   highlightColor,
   onColorChange,
   onExportAnnotations,
+  onExportPDF,
+  isExportingPDF,
   activeTool,
   onSetActiveTool
 }) {
@@ -302,18 +305,38 @@ function EmbedPDFToolbar({
             )}
           </button>
 
-          {/* Export annotations */}
+          {/* Export annotations (Markdown) */}
           {annotationCount > 0 && (
             <button
               className={toolbarStyles.toolBtn}
               onClick={onExportAnnotations}
-              title="Export annotations"
+              title="Export annotations (Markdown)"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
                 <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
+            </button>
+          )}
+
+          {/* Export PDF with embedded annotations */}
+          {annotationCount > 0 && (
+            <button
+              className={toolbarStyles.toolBtn}
+              onClick={onExportPDF}
+              disabled={isExportingPDF}
+              title="Download PDF with annotations"
+            >
+              {isExportingPDF ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" className={toolbarStyles.spinning}>
+                  <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="32"/>
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                  <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6zm7-7h-4v2h4v3l4-4-4-4v3z"/>
+                </svg>
+              )}
             </button>
           )}
         </div>
@@ -339,6 +362,7 @@ function EmbedPDFContent({
   isFullscreen
 }) {
   const { provides: annotationApi } = useAnnotation(documentId)
+  const { provides: exportApi } = useExport(documentId)
 
   // Use annotation management hook
   const {
@@ -365,6 +389,9 @@ function EmbedPDFContent({
 
   // Active drawing tool state (null, 'ink', 'inkHighlighter')
   const [activeTool, setActiveTool] = useState(null)
+
+  // PDF export state
+  const [isExportingPDF, setIsExportingPDF] = useState(false)
 
   // Handle tool change
   const handleSetActiveTool = useCallback((tool) => {
@@ -426,7 +453,7 @@ function EmbedPDFContent({
     selectAnnotation(annotation.id)
   }, [selectAnnotation])
 
-  // Export annotations
+  // Export annotations as Markdown
   const handleExportAnnotations = useCallback(() => {
     // Use existing export functionality - import at top of file
     import('../../services/annotations/AnnotationExporter').then(({ exportToMarkdown }) => {
@@ -446,6 +473,39 @@ function EmbedPDFContent({
       URL.revokeObjectURL(url)
     })
   }, [annotations, docId])
+
+  // Export PDF with embedded annotations
+  const handleExportPDF = useCallback(async () => {
+    if (!exportApi) {
+      console.warn('Export API not available')
+      return
+    }
+
+    setIsExportingPDF(true)
+
+    try {
+      // Export PDF with annotations embedded
+      const pdfBlob = await exportApi.exportDocument({
+        includeAnnotations: true,
+        flattenAnnotations: false // Keep annotations editable in other viewers
+      })
+
+      // Create download link
+      const url = URL.createObjectURL(pdfBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${docId || 'document'}-annotated.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Failed to export PDF:', err)
+      // Could show a toast notification here
+    } finally {
+      setIsExportingPDF(false)
+    }
+  }, [exportApi, docId])
 
   return (
     <DocumentContent documentId={documentId}>
@@ -488,6 +548,8 @@ function EmbedPDFContent({
               highlightColor={highlightColor}
               onColorChange={setColor}
               onExportAnnotations={handleExportAnnotations}
+              onExportPDF={handleExportPDF}
+              isExportingPDF={isExportingPDF}
               activeTool={activeTool}
               onSetActiveTool={handleSetActiveTool}
             />
@@ -636,6 +698,7 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
         autoCommit: false, // We handle persistence externally
         selectAfterCreate: true
       }),
+      createPluginRegistration(ExportPluginPackage),
     ]
   }, [url, pdfDefaultZoom])
 
