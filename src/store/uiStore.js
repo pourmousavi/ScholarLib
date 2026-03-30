@@ -72,7 +72,7 @@ const getInitialSplitViewSettings = () => {
 
 // Get initial PDF viewer setting
 const getInitialPdfViewer = () => {
-  return localStorage.getItem('sv_pdf_viewer') || 'pdfjs' // 'pdfjs' or 'embedpdf'
+  return localStorage.getItem('sv_pdf_viewer') || 'embedpdf' // 'embedpdf' (default) or 'pdfjs' (legacy)
 }
 
 const initialSplitView = getInitialSplitViewSettings()

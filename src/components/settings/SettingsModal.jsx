@@ -1592,11 +1592,11 @@ export default function SettingsModal({ onClose }) {
             updateGlobalSetting('appearance.pdf_viewer', e.target.value)
           }}
         >
-          <option value="pdfjs">PDF.js (Classic)</option>
-          <option value="embedpdf">EmbedPDF (Experimental)</option>
+          <option value="embedpdf">EmbedPDF (Recommended)</option>
+          <option value="pdfjs">PDF.js (Legacy)</option>
         </select>
         <span className={styles.fieldHint}>
-          EmbedPDF uses Chrome's PDFium engine for better text selection and annotation precision. Experimental feature.
+          EmbedPDF uses Chrome's PDFium engine for better text selection, annotation precision, and ink/freehand drawing. PDF.js is available as a fallback.
         </span>
       </div>
 
