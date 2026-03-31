@@ -438,34 +438,18 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
    * @returns {boolean} Success status
    */
   const createTextNote = useCallback((pageIndex, x, y, comment, color) => {
-    if (!annotationScope) return null
+    if (!adapter || !docId) return null
 
     try {
       const annotationId = `ann_${nanoid(10)}`
       const now = new Date().toISOString()
       const noteColor = color || highlightColor
 
-      // Track to prevent duplicate from event handler
-      createdAnnotationIds.current.add(annotationId)
+      // Note: We do NOT create an EmbedPDF annotation here because ScholarLib
+      // renders its own note pin markers. Creating an EmbedPDF FREETEXT
+      // annotation causes a visible underline/box artifact beneath the pin.
 
-      // Create a small rect for the note pin (24x24 in PDF units)
       const noteSize = 24
-      const boundingRect = {
-        origin: { x, y },
-        size: { width: noteSize, height: noteSize }
-      }
-
-      // Create in EmbedPDF for visual rendering
-      const embedAnnotation = {
-        id: annotationId,
-        type: 2, // FREETEXT
-        pageIndex,
-        rect: boundingRect,
-        strokeColor: noteColor,
-        opacity: 1,
-        contents: comment
-      }
-      annotationScope.createAnnotation?.(pageIndex, embedAnnotation)
 
       // Save to ScholarLib store and storage
       const scholarAnnotation = {

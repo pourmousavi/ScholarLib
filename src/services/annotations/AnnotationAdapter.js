@@ -365,7 +365,9 @@ function calculateBoundingRect(rects) {
  */
 export function toEmbedPDFArray(annotations) {
   if (!annotations || !Array.isArray(annotations)) return []
-  return annotations.map(toEmbedPDF)
+  // Skip 'note' type — ScholarLib renders its own pin markers for notes;
+  // importing them as EmbedPDF FREETEXT creates an unwanted visual artifact.
+  return annotations.filter(a => a.type !== 'note').map(toEmbedPDF)
 }
 
 /**
