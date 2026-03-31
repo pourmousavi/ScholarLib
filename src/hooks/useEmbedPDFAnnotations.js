@@ -630,7 +630,8 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
   /**
    * Update annotation type (highlight <-> underline)
-   * For EmbedPDF, this requires deleting and recreating the annotation
+   * Deletes old EmbedPDF annotation and recreates with new type on next tick
+   * to avoid same-frame ID collision.
    */
   const updateType = useCallback((annotationId, newType) => {
     if (!adapter || !docId) return false
@@ -648,7 +649,7 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
     const typeMap = { highlight: 9, underline: 10 }
     const embedType = typeMap[newType]
 
-    // Update in EmbedPDF by deleting and recreating
+    // Delete old and recreate with new type in EmbedPDF
     if (annotationScope && annotation.position?.page !== undefined) {
       const pageIndex = annotation.position.page
 
@@ -658,10 +659,7 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
       // Delete the old annotation from EmbedPDF (visual only, store is preserved)
       annotationScope.deleteAnnotation?.(pageIndex, annotationId)
 
-      // Track to prevent duplicate from event handler
-      createdAnnotationIds.current.add(annotationId)
-
-      // Recreate with new type
+      // Build the replacement annotation
       const segmentRects = annotation.position.rects?.map(r => ({
         origin: { x: r.x1, y: r.y1 },
         size: { width: r.x2 - r.x1, height: r.y2 - r.y1 }
@@ -686,10 +684,14 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
         contents: annotation.content?.text || ''
       }
 
-      annotationScope.createAnnotation?.(pageIndex, embedAnnotation)
+      // Defer creation to next frame so EmbedPDF fully processes the delete first
+      createdAnnotationIds.current.add(annotationId)
+      requestAnimationFrame(() => {
+        annotationScope.createAnnotation?.(pageIndex, embedAnnotation)
+      })
     }
 
-    // Update store and storage
+    // Update store and storage immediately
     const patch = { type: newType }
     storeUpdateAnnotation(annotationId, patch)
     AnnotationService.updateAnnotation(adapter, docId, annotationId, patch, {

@@ -930,6 +930,9 @@ function EmbedPDFContent({
                             <SelectionLayer
                               documentId={documentId}
                               pageIndex={pageIndex}
+                              textStyle={{
+                                background: 'rgba(0, 120, 215, 0.4)'
+                              }}
                               selectionMenu={(props) => (
                                 <TextSelectionMenu
                                   {...props}
