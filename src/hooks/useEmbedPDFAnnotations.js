@@ -32,6 +32,10 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
   const createdAnnotationIds = useRef(new Set())
   // Track annotations being recreated for type change (skip delete events for these)
   const typeChangeIds = useRef(new Set())
+  // Map ScholarLib ID → EmbedPDF ID when they differ (after type change re-creation)
+  const embedIdMap = useRef(new Map())
+  // Resolve the EmbedPDF-side ID for a ScholarLib annotation ID
+  const getEmbedId = useCallback((scholarId) => embedIdMap.current.get(scholarId) || scholarId, [])
 
   const {
     currentAnnotations,
@@ -541,7 +545,8 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
     // Update in EmbedPDF if available
     if (annotationScope) {
-      annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, annotationId, {
+      const embedId = getEmbedId(annotationId)
+      annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, embedId, {
         rect: {
           origin: { x: newX, y: newY },
           size: { width: noteSize, height: noteSize }
@@ -558,7 +563,7 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
     })
 
     return true
-  }, [annotationScope, adapter, docId, getAnnotationById, storeUpdateAnnotation, setSaveStatus])
+  }, [annotationScope, adapter, docId, getAnnotationById, getEmbedId, storeUpdateAnnotation, setSaveStatus])
 
   /**
    * Update annotation comment
@@ -571,7 +576,8 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
     // Update in EmbedPDF if available
     if (annotationScope) {
-      annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, annotationId, {
+      const embedId = getEmbedId(annotationId)
+      annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, embedId, {
         contents: comment
       })
     }
@@ -602,7 +608,8 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
     // Update in EmbedPDF if available - use strokeColor for text markup
     if (annotationScope) {
-      annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, annotationId, {
+      const embedId = getEmbedId(annotationId)
+      annotationScope.updateAnnotation?.(annotation.position?.page ?? 0, embedId, {
         strokeColor: color
       })
     }
@@ -621,8 +628,9 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
   /**
    * Update annotation type (highlight <-> underline)
-   * Updates store/storage first, then rebuilds all EmbedPDF annotations
-   * to avoid history/state conflicts from same-ID delete+create.
+   * Deletes the old EmbedPDF annotation and imports a replacement with a
+   * fresh ID to avoid EmbedPDF history/state conflicts.  The mapping
+   * between ScholarLib ID and EmbedPDF ID is tracked in embedIdMap.
    */
   const updateType = useCallback((annotationId, newType) => {
     if (!adapter || !docId) return false
@@ -636,7 +644,52 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
       return false
     }
 
-    // 1. Update store and storage first
+    // Map type to EmbedPDF type number
+    const typeMap = { highlight: 9, underline: 10 }
+    const embedType = typeMap[newType]
+
+    if (annotationScope && annotation.position?.page !== undefined) {
+      const pageIndex = annotation.position.page
+      const oldEmbedId = getEmbedId(annotationId)
+
+      // Delete old visual — skip store delete via typeChangeIds
+      typeChangeIds.current.add(oldEmbedId)
+      annotationScope.deleteAnnotation?.(pageIndex, oldEmbedId)
+
+      // Build replacement with a brand-new EmbedPDF ID
+      const newEmbedId = `ann_${nanoid(10)}`
+      embedIdMap.current.set(annotationId, newEmbedId)
+
+      const segmentRects = annotation.position.rects?.map(r => ({
+        origin: { x: r.x1, y: r.y1 },
+        size: { width: r.x2 - r.x1, height: r.y2 - r.y1 }
+      })) || []
+
+      const boundingRect = annotation.position.boundingRect ? {
+        origin: { x: annotation.position.boundingRect.x1, y: annotation.position.boundingRect.y1 },
+        size: {
+          width: annotation.position.boundingRect.x2 - annotation.position.boundingRect.x1,
+          height: annotation.position.boundingRect.y2 - annotation.position.boundingRect.y1
+        }
+      } : null
+
+      // Import with the new ID — bypasses history, no ID collision
+      createdAnnotationIds.current.add(newEmbedId)
+      annotationScope.importAnnotations?.([{
+        annotation: {
+          id: newEmbedId,
+          type: embedType,
+          pageIndex,
+          rect: boundingRect,
+          segmentRects,
+          strokeColor: annotation.color,
+          opacity: newType === 'highlight' ? 0.35 : 1,
+          contents: annotation.content?.text || ''
+        }
+      }])
+    }
+
+    // Update store and storage (keeps original ScholarLib ID)
     const patch = { type: newType }
     storeUpdateAnnotation(annotationId, patch)
     AnnotationService.updateAnnotation(adapter, docId, annotationId, patch, {
@@ -645,28 +698,8 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
       onSaveError: () => setSaveStatus('error')
     })
 
-    // 2. Clear all EmbedPDF annotations and re-import from updated service cache
-    if (annotationScope) {
-      // Delete every current annotation from EmbedPDF
-      for (const ann of currentAnnotations) {
-        if (ann.type === 'note') continue // notes are rendered by ScholarLib, not EmbedPDF
-        typeChangeIds.current.add(ann.id)
-        annotationScope.deleteAnnotation?.(ann.position?.page ?? 0, ann.id)
-      }
-
-      // Re-import all from the now-updated service cache
-      const updatedAnnotations = AnnotationService.getAnnotationsForDoc(docId)
-      const embedAnnotations = toEmbedPDFArray(updatedAnnotations)
-      if (embedAnnotations.length > 0) {
-        embedAnnotations.forEach(a => createdAnnotationIds.current.add(a.id))
-        annotationScope.importAnnotations?.(
-          embedAnnotations.map(a => ({ annotation: a }))
-        )
-      }
-    }
-
     return true
-  }, [annotationScope, adapter, docId, currentAnnotations, getAnnotationById, storeUpdateAnnotation, setSaveStatus])
+  }, [annotationScope, adapter, docId, getAnnotationById, getEmbedId, storeUpdateAnnotation, setSaveStatus])
 
   /**
    * Delete an annotation
@@ -677,12 +710,13 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
     const annotation = getAnnotationById(annotationId)
     if (!annotation) return false
 
-    // Delete in EmbedPDF if available
+    // Delete in EmbedPDF using the mapped ID
     if (annotationScope) {
-      annotationScope.deleteAnnotation?.(annotation.position?.page ?? 0, annotationId)
+      const embedId = getEmbedId(annotationId)
+      annotationScope.deleteAnnotation?.(annotation.position?.page ?? 0, embedId)
+      embedIdMap.current.delete(annotationId)
     }
 
-    // Directly update store and storage
     storeDeleteAnnotation(annotationId)
     AnnotationService.deleteAnnotation(adapter, docId, annotationId, {
       onSaveStart: () => setSaveStatus('saving'),
@@ -691,7 +725,7 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
     })
 
     return true
-  }, [annotationScope, adapter, docId, getAnnotationById, storeDeleteAnnotation, setSaveStatus])
+  }, [annotationScope, adapter, docId, getAnnotationById, getEmbedId, storeDeleteAnnotation, setSaveStatus])
 
   /**
    * Select an annotation
@@ -701,10 +735,11 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
     const annotation = getAnnotationById(annotationId)
     if (annotation) {
-      annotationScope.selectAnnotation?.(annotation.position?.page ?? 0, annotationId)
+      const embedId = getEmbedId(annotationId)
+      annotationScope.selectAnnotation?.(annotation.position?.page ?? 0, embedId)
     }
     setSelectedAnnotation(annotationId)
-  }, [annotationScope, getAnnotationById, setSelectedAnnotation])
+  }, [annotationScope, getAnnotationById, getEmbedId, setSelectedAnnotation])
 
   /**
    * Clear selection
@@ -713,11 +748,12 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
     if (annotationScope && selectedAnnotationId) {
       const annotation = getAnnotationById(selectedAnnotationId)
       if (annotation) {
-        annotationScope.deselectAnnotation?.(annotation.position?.page ?? 0, selectedAnnotationId)
+        const embedId = getEmbedId(selectedAnnotationId)
+        annotationScope.deselectAnnotation?.(annotation.position?.page ?? 0, embedId)
       }
     }
     setSelectedAnnotation(null)
-  }, [annotationScope, selectedAnnotationId, getAnnotationById, setSelectedAnnotation])
+  }, [annotationScope, selectedAnnotationId, getAnnotationById, getEmbedId, setSelectedAnnotation])
 
   /**
    * Delete all annotations for the current document
@@ -725,25 +761,24 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
   const deleteAllAnnotations = useCallback(() => {
     if (!adapter || !docId) return false
 
-    // Delete each annotation from EmbedPDF
     if (annotationScope) {
       for (const ann of currentAnnotations) {
-        annotationScope.deleteAnnotation?.(ann.position?.page ?? 0, ann.id)
+        const embedId = getEmbedId(ann.id)
+        annotationScope.deleteAnnotation?.(ann.position?.page ?? 0, embedId)
       }
     }
+    embedIdMap.current.clear()
 
-    // Clear from store
     for (const ann of currentAnnotations) {
       storeDeleteAnnotation(ann.id)
     }
 
-    // Clear from service cache and persist
     AnnotationService.clearDocAnnotations(docId)
     AnnotationService.flushSave(adapter).catch(console.error)
 
     setSaveStatus('saved')
     return true
-  }, [annotationScope, adapter, docId, currentAnnotations, storeDeleteAnnotation, setSaveStatus])
+  }, [annotationScope, adapter, docId, currentAnnotations, getEmbedId, storeDeleteAnnotation, setSaveStatus])
 
   /**
    * Get annotations for AI indexing
