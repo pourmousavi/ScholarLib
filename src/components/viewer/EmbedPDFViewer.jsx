@@ -918,8 +918,12 @@ function EmbedPDFContent({
                             style={{
                               width,
                               height,
-                              maxWidth: 'none'
+                              maxWidth: 'none',
+                              userSelect: 'none',
+                              WebkitUserDrag: 'none'
                             }}
+                            draggable={false}
+                            onDragStart={(e) => e.preventDefault()}
                             data-page-number={pageIndex + 1}
                             onClick={(e) => handlePageClick(e, pageIndex)}
                           >

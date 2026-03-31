@@ -56,13 +56,13 @@
   max-width: 680px;
 }
 
-/* Text selection highlight for EmbedPDF viewer — makes dragged selection visible */
-.pageWrapper ::selection {
-  background: rgba(0, 120, 215, 0.35) !important;
-}
-
-.pageWrapper ::-moz-selection {
-  background: rgba(0, 120, 215, 0.35) !important;
+/* Prevent native browser drag on PDF pages (canvas, images, etc.)
+   so EmbedPDF's custom glyph-based text selection works properly */
+.pageWrapper img,
+.pageWrapper canvas {
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
 }
 
 .page {

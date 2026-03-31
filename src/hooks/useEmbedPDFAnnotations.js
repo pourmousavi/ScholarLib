@@ -98,13 +98,20 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
         // where each item is { annotation: T, ctx?: AnnotationCreateContext<T> }
         const importItems = embedAnnotations.map(ann => ({ annotation: ann }))
         annotationScope.importAnnotations?.(importItems)
+
+        // Ensure the store's currentAnnotations is in sync with the service cache.
+        // setCurrentDoc may have run before the service cache was ready, leaving
+        // currentAnnotations empty even though EmbedPDF now shows the highlights.
+        if (currentAnnotations.length === 0 && existingAnnotations.length > 0) {
+          setCurrentDoc(docId)
+        }
       } catch (error) {
         console.error('Failed to import annotations:', error)
       }
     }
 
     setIsInitialized(true)
-  }, [annotationScope, docId, isInitialized, isLoaded])
+  }, [annotationScope, docId, isInitialized, isLoaded, currentAnnotations.length, setCurrentDoc])
 
   // Native PDF annotation auto-import is disabled — it was pulling in
   // hundreds of internal PDF objects (links, widgets, text markers) as
