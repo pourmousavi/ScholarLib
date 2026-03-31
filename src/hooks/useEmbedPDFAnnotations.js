@@ -621,8 +621,8 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
 
   /**
    * Update annotation type (highlight <-> underline)
-   * Deletes old EmbedPDF annotation and re-imports with new type.
-   * Uses importAnnotations (bypasses history) to avoid ID conflicts.
+   * Updates store/storage first, then rebuilds all EmbedPDF annotations
+   * to avoid history/state conflicts from same-ID delete+create.
    */
   const updateType = useCallback((annotationId, newType) => {
     if (!adapter || !docId) return false
@@ -636,54 +636,7 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
       return false
     }
 
-    // Map type to EmbedPDF type number
-    const typeMap = { highlight: 9, underline: 10 }
-    const embedType = typeMap[newType]
-
-    // Replace visual in EmbedPDF: delete old, import new
-    if (annotationScope && annotation.position?.page !== undefined) {
-      const pageIndex = annotation.position.page
-
-      // Mark as type change so the event handler skips the store delete
-      typeChangeIds.current.add(annotationId)
-      // Track the new ID to skip the create event from import
-      createdAnnotationIds.current.add(annotationId)
-
-      // Delete the old annotation from EmbedPDF (visual only, store is preserved)
-      annotationScope.deleteAnnotation?.(pageIndex, annotationId)
-
-      // Build the replacement annotation
-      const segmentRects = annotation.position.rects?.map(r => ({
-        origin: { x: r.x1, y: r.y1 },
-        size: { width: r.x2 - r.x1, height: r.y2 - r.y1 }
-      })) || []
-
-      const boundingRect = annotation.position.boundingRect ? {
-        origin: { x: annotation.position.boundingRect.x1, y: annotation.position.boundingRect.y1 },
-        size: {
-          width: annotation.position.boundingRect.x2 - annotation.position.boundingRect.x1,
-          height: annotation.position.boundingRect.y2 - annotation.position.boundingRect.y1
-        }
-      } : null
-
-      const embedAnnotation = {
-        id: annotationId,
-        type: embedType,
-        pageIndex,
-        rect: boundingRect,
-        segmentRects,
-        strokeColor: annotation.color,
-        opacity: newType === 'highlight' ? 0.35 : 1,
-        contents: annotation.content?.text || ''
-      }
-
-      // Use importAnnotations which bypasses the history system and
-      // directly dispatches + commits, avoiding ID conflicts with the
-      // just-deleted annotation in the history stack.
-      annotationScope.importAnnotations?.([{ annotation: embedAnnotation }])
-    }
-
-    // Update store and storage
+    // 1. Update store and storage first
     const patch = { type: newType }
     storeUpdateAnnotation(annotationId, patch)
     AnnotationService.updateAnnotation(adapter, docId, annotationId, patch, {
@@ -692,8 +645,28 @@ export function useEmbedPDFAnnotations(docId, annotationScope, annotationCapabil
       onSaveError: () => setSaveStatus('error')
     })
 
+    // 2. Clear all EmbedPDF annotations and re-import from updated service cache
+    if (annotationScope) {
+      // Delete every current annotation from EmbedPDF
+      for (const ann of currentAnnotations) {
+        if (ann.type === 'note') continue // notes are rendered by ScholarLib, not EmbedPDF
+        typeChangeIds.current.add(ann.id)
+        annotationScope.deleteAnnotation?.(ann.position?.page ?? 0, ann.id)
+      }
+
+      // Re-import all from the now-updated service cache
+      const updatedAnnotations = AnnotationService.getAnnotationsForDoc(docId)
+      const embedAnnotations = toEmbedPDFArray(updatedAnnotations)
+      if (embedAnnotations.length > 0) {
+        embedAnnotations.forEach(a => createdAnnotationIds.current.add(a.id))
+        annotationScope.importAnnotations?.(
+          embedAnnotations.map(a => ({ annotation: a }))
+        )
+      }
+    }
+
     return true
-  }, [annotationScope, adapter, docId, getAnnotationById, storeUpdateAnnotation, setSaveStatus])
+  }, [annotationScope, adapter, docId, currentAnnotations, getAnnotationById, storeUpdateAnnotation, setSaveStatus])
 
   /**
    * Delete an annotation
