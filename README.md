@@ -2,7 +2,7 @@
 
 A professional academic reference manager with AI-powered document Q&A. Built for researchers who want complete control over their data.
 
-**Live App:** https://pourmousavi.com/ScholarLib
+**Live App:** https://alipourmousavi.com/ScholarLib/
 
 ## Why ScholarLib?
 
@@ -45,7 +45,7 @@ A professional academic reference manager with AI-powered document Q&A. Built fo
 
 ### For Users
 
-1. Visit [https://pourmousavi.com/ScholarLib](https://pourmousavi.com/ScholarLib)
+1. Visit [https://alipourmousavi.com/ScholarLib/](https://alipourmousavi.com/ScholarLib/)
 2. Connect your Box or Dropbox account
 3. Upload PDFs and start organizing your library
 

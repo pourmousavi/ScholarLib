@@ -74,6 +74,7 @@ export default function Modal({ onClose, width = 600, title, children }) {
         ref={modalRef}
         className={styles.modal}
         style={{ width, maxWidth: '90vw' }}
+        onClick={(e) => e.stopPropagation()}
       >
         {title && <h2 id="modal-title" className="sr-only">{title}</h2>}
         {children}
