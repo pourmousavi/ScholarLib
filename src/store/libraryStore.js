@@ -361,13 +361,20 @@ export const useLibraryStore = create((set, get) => ({
       tagRegistry = syncedRegistry
     }
 
-    // Auto-expand root folders
-    const rootFolderIds = folders
-      .filter(f => f.parent_id === null)
-      .map(f => f.id)
+    // Restore expanded folders from localStorage, default to collapsed
+    let savedExpanded = []
+    try {
+      const stored = localStorage.getItem('sv_expanded_folders')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        // Only keep IDs that still exist as folders
+        const folderIds = new Set(folders.map(f => f.id))
+        savedExpanded = parsed.filter(id => folderIds.has(id))
+      }
+    } catch {}
 
     // Select first root folder if none selected
-    const firstRootId = rootFolderIds[0] || null
+    const firstRootId = folders.find(f => f.parent_id === null)?.id || null
 
     set({
       folders,
@@ -377,7 +384,7 @@ export const useLibraryStore = create((set, get) => ({
       smartCollections,
       libraryVersion: library.version,
       lastModified: library.last_modified,
-      expandedFolders: rootFolderIds,
+      expandedFolders: savedExpanded,
       selectedFolderId: firstRootId,
       selectedDocId: null,
       selectedCollections: [],
@@ -389,6 +396,7 @@ export const useLibraryStore = create((set, get) => ({
 
   // Clear library (for logout)
   clearLibrary: () => {
+    try { localStorage.removeItem('sv_expanded_folders') } catch {}
     set({
       folders: [],
       documents: {},
@@ -423,11 +431,11 @@ export const useLibraryStore = create((set, get) => ({
 
   toggleFolderExpanded: (id) => set((state) => {
     const expanded = state.expandedFolders.includes(id)
-    return {
-      expandedFolders: expanded
-        ? state.expandedFolders.filter(f => f !== id)
-        : [...state.expandedFolders, id]
-    }
+    const newExpanded = expanded
+      ? state.expandedFolders.filter(f => f !== id)
+      : [...state.expandedFolders, id]
+    try { localStorage.setItem('sv_expanded_folders', JSON.stringify(newExpanded)) } catch {}
+    return { expandedFolders: newExpanded }
   }),
 
   // Tag filter actions
