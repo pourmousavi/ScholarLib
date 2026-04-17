@@ -175,7 +175,47 @@ class IndexService {
         }
       }
 
-      // 5. Add new document chunks
+      // 5. Remove old data for this doc if re-indexing
+      const chunksMeta = await this.loadChunksMeta(adapter)
+      if (meta.docs[docId]) {
+        const oldDoc = meta.docs[docId]
+        const oldOffset = oldDoc.chunk_offset
+        const oldCount = oldDoc.chunk_count
+
+        // Remove old vectors
+        indexData.splice(oldOffset, oldCount)
+
+        // Remove old chunk metadata
+        for (let i = 0; i < oldCount; i++) {
+          delete chunksMeta.chunks[oldOffset + i]
+        }
+
+        // Shift offsets for docs that came after this one
+        for (const [id, docMeta] of Object.entries(meta.docs)) {
+          if (docMeta.chunk_offset > oldOffset) {
+            docMeta.chunk_offset -= oldCount
+          }
+        }
+
+        // Reindex chunk metadata keys
+        const newChunks = {}
+        for (const [key, val] of Object.entries(chunksMeta.chunks)) {
+          const idx = parseInt(key, 10)
+          if (idx > oldOffset) {
+            newChunks[idx - oldCount] = val
+          } else {
+            newChunks[idx] = val
+          }
+        }
+        chunksMeta.chunks = newChunks
+
+        meta.total_chunks -= oldCount
+        delete meta.docs[docId]
+
+        console.log(`[IndexService] Removed old index data for ${docId}: ${oldCount} chunks at offset ${oldOffset}`)
+      }
+
+      // 6. Add new document chunks
       const offset = meta.total_chunks
       indexData.push(...embeddings)
 
@@ -193,8 +233,7 @@ class IndexService {
       meta.total_docs_indexed = Object.keys(meta.docs).length
       meta.last_updated = new Date().toISOString()
 
-      // 6. Update chunks metadata
-      const chunksMeta = await this.loadChunksMeta(adapter)
+      // 7. Update chunks metadata
       chunks.forEach((chunk, i) => {
         chunksMeta.chunks[offset + i] = {
           doc_id: docId,
@@ -205,7 +244,7 @@ class IndexService {
         }
       })
 
-      // 7. Save to storage
+      // 8. Save to storage
       onProgress?.({ stage: 'saving', docId, progress: 0 })
 
       const binary = new Float32Array(indexData.flat()).buffer
@@ -213,11 +252,11 @@ class IndexService {
       await adapter.writeJSON('_system/index/index_meta.json', meta)
       await adapter.writeJSON('_system/index/chunks_meta.json', chunksMeta)
 
-      // 8. Update cache
+      // 9. Update cache
       this.indexCache = { indexData, meta }
       this.chunkTextCache = chunksMeta
 
-      // 9. Update document status in library (both store and storage)
+      // 10. Update document status in library (both store and storage)
       const indexStatus = {
         status: 'indexed',
         indexed_at: new Date().toISOString(),
