@@ -615,8 +615,8 @@ function PageCanvas({
 
         await renderTask.promise
 
-        // Render text layer after canvas
-        if (!cancelled && textLayerRef.current) {
+        // Render text layer after canvas (skip on touch devices — not needed)
+        if (!cancelled && textLayerRef.current && !disableAnnotations) {
           // Clear previous text layer
           textLayerRef.current.innerHTML = ''
 
@@ -686,7 +686,9 @@ function PageCanvas({
       data-page-number={pageNumber}
     >
       <canvas ref={canvasRef} className={styles.page} />
-      <div ref={textLayerRef} className={styles.textLayer} data-text-layer />
+      {!disableAnnotations && (
+        <div ref={textLayerRef} className={styles.textLayer} data-text-layer />
+      )}
       <AnnotationLayer
         annotations={annotations}
         selectedAnnotationId={disableAnnotations ? null : selectedAnnotationId}
