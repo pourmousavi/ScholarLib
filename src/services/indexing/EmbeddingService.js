@@ -1,12 +1,16 @@
 /**
  * EmbeddingService - Generate embeddings for text chunks
  *
- * Routes to appropriate embedding provider:
- * 1. Ollama (if available) - fastest for local
- * 2. Browser transformers.js - works everywhere, no server needed
+ * Routes to the user-configured embedding provider:
+ * 1. Gemini API (text-embedding-004, 768-dim) - recommended, free tier
+ * 2. OpenAI API (text-embedding-3-small, 1536-dim) - high quality
+ * 3. Ollama (nomic-embed-text, 768-dim) - local, free
+ * 4. Browser transformers.js (all-MiniLM-L6-v2, 384-dim) - fallback
  */
 import { useAIStore } from '../../store/aiStore'
 import { ollamaService } from '../ai/OllamaService'
+import { geminiService } from '../ai/GeminiService'
+import { openaiService } from '../ai/OpenAIService'
 import { pipeline, env } from '@xenova/transformers'
 
 // Configure transformers.js to use browser cache
@@ -15,8 +19,8 @@ env.allowLocalModels = false
 
 class EmbeddingService {
   constructor() {
-    this.dimensions = 384 // all-MiniLM-L6-v2 dimensions
-    this.modelName = 'Xenova/all-MiniLM-L6-v2'
+    this.dimensions = 384 // default for browser model
+    this.modelName = 'all-MiniLM-L6-v2'
     this.extractor = null
     this.isInitializing = false
     this.initPromise = null
@@ -37,7 +41,7 @@ class EmbeddingService {
     this.initPromise = (async () => {
       try {
         console.log('Loading browser embedding model...')
-        this.extractor = await pipeline('feature-extraction', this.modelName, {
+        this.extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
           progress_callback: (progress) => {
             if (progress.status === 'progress') {
               onProgress?.({
@@ -61,40 +65,125 @@ class EmbeddingService {
   }
 
   /**
-   * Generate embedding for text
+   * Generate embedding for text using the configured provider
    * @param {string} text - Text to embed
    * @param {Function} onProgress - Progress callback for model loading
    * @returns {Promise<number[]>} Embedding vector
    */
   async embed(text, onProgress) {
-    const { provider } = useAIStore.getState()
+    const { embeddingProvider } = useAIStore.getState()
 
     // Truncate very long text (embedding models have limits)
     const truncatedText = text.slice(0, 8000)
 
-    // Always try Ollama first for embeddings (regardless of chat provider)
-    // This ensures consistency between indexing and search
     try {
-      const ollamaAvailable = await ollamaService.isAvailable()
-      console.log('[EmbeddingService] Ollama available:', ollamaAvailable, 'provider:', provider)
-      if (ollamaAvailable) {
-        const embedding = await this.embedWithOllama(truncatedText)
-        console.log('[EmbeddingService] Using Ollama embeddings, dimensions:', embedding.length)
-        return embedding
+      switch (embeddingProvider) {
+        case 'gemini':
+          return await this.embedWithGemini(truncatedText)
+        case 'openai':
+          return await this.embedWithOpenAI(truncatedText)
+        case 'ollama':
+          return await this.embedWithOllama(truncatedText)
+        case 'browser':
+        default:
+          return await this.embedWithBrowser(truncatedText, onProgress)
       }
     } catch (error) {
-      console.log('[EmbeddingService] Ollama embedding failed:', error.message)
+      // If the configured provider fails, fall back to browser
+      console.warn(`[EmbeddingService] ${embeddingProvider} failed: ${error.message}, falling back to browser`)
+      return await this.embedWithBrowser(truncatedText, onProgress)
+    }
+  }
+
+  /**
+   * Generate embedding using Gemini API (text-embedding-004, 768-dim)
+   * @param {string} text
+   * @returns {Promise<number[]>}
+   */
+  async embedWithGemini(text) {
+    const apiKey = geminiService.getApiKey()
+    if (!apiKey) {
+      throw new Error('Gemini API key not configured')
     }
 
-    // Use browser-based embeddings as fallback
-    console.log('[EmbeddingService] Using browser embeddings (fallback)')
-    const embedding = await this.embedWithBrowser(truncatedText, onProgress)
-    console.log('[EmbeddingService] Browser embedding dimensions:', embedding.length)
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: { parts: [{ text }] }
+        })
+      }
+    )
+
+    if (!res.ok) {
+      let msg = 'Gemini embedding request failed'
+      try {
+        const err = await res.json()
+        msg = err.error?.message || msg
+      } catch { /* ignore */ }
+      throw new Error(msg)
+    }
+
+    const data = await res.json()
+    const embedding = data.embedding?.values
+    if (!embedding || !Array.isArray(embedding)) {
+      throw new Error('Invalid Gemini embedding response')
+    }
+
+    this.dimensions = embedding.length
+    this.modelName = 'text-embedding-004'
+    console.log('[EmbeddingService] Gemini embedding, dimensions:', embedding.length)
     return embedding
   }
 
   /**
-   * Generate embedding using Ollama
+   * Generate embedding using OpenAI API (text-embedding-3-small, 1536-dim)
+   * @param {string} text
+   * @returns {Promise<number[]>}
+   */
+  async embedWithOpenAI(text) {
+    const apiKey = openaiService.getApiKey()
+    if (!apiKey) {
+      throw new Error('OpenAI API key not configured')
+    }
+
+    const res = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: text
+      })
+    })
+
+    if (!res.ok) {
+      let msg = 'OpenAI embedding request failed'
+      try {
+        const err = await res.json()
+        msg = err.error?.message || msg
+      } catch { /* ignore */ }
+      throw new Error(msg)
+    }
+
+    const data = await res.json()
+    const embedding = data.data?.[0]?.embedding
+    if (!embedding || !Array.isArray(embedding)) {
+      throw new Error('Invalid OpenAI embedding response')
+    }
+
+    this.dimensions = embedding.length
+    this.modelName = 'text-embedding-3-small'
+    console.log('[EmbeddingService] OpenAI embedding, dimensions:', embedding.length)
+    return embedding
+  }
+
+  /**
+   * Generate embedding using Ollama (nomic-embed-text, 768-dim)
    * @param {string} text
    * @returns {Promise<number[]>}
    */
@@ -104,40 +193,35 @@ class EmbeddingService {
       if (!embedding || !Array.isArray(embedding)) {
         throw new Error('Invalid embedding response')
       }
-      // Update dimensions if different
       this.dimensions = embedding.length
+      this.modelName = 'nomic-embed-text'
+      console.log('[EmbeddingService] Ollama embedding, dimensions:', embedding.length)
       return embedding
     } catch (error) {
-      // If nomic-embed-text not available, throw with helpful message
       if (error.message?.includes('not found')) {
-        throw {
-          code: 'EMBEDDING_MODEL_NOT_FOUND',
-          message: 'Embedding model not found. Run: ollama pull nomic-embed-text'
-        }
+        throw new Error('Embedding model not found. Run: ollama pull nomic-embed-text')
       }
       throw error
     }
   }
 
   /**
-   * Generate embedding using browser transformers.js
+   * Generate embedding using browser transformers.js (all-MiniLM-L6-v2, 384-dim)
    * @param {string} text
    * @param {Function} onProgress
    * @returns {Promise<number[]>}
    */
   async embedWithBrowser(text, onProgress) {
-    // Initialize model if needed
     const extractor = await this.initBrowserModel(onProgress)
 
-    // Generate embedding
     const output = await extractor(text, {
       pooling: 'mean',
       normalize: true
     })
 
-    // Convert to array
     const embedding = Array.from(output.data)
     this.dimensions = embedding.length
+    this.modelName = 'all-MiniLM-L6-v2'
     return embedding
   }
 
@@ -199,19 +283,18 @@ class EmbeddingService {
   }
 
   /**
-   * Get the name of the currently active embedding model
+   * Get the name of the currently configured embedding model
    * @returns {Promise<string>} Model identifier
    */
   async getModelName() {
-    try {
-      const ollamaAvailable = await ollamaService.isAvailable()
-      if (ollamaAvailable) {
-        return 'nomic-embed-text'
-      }
-    } catch {
-      // Ollama not available
+    const { embeddingProvider } = useAIStore.getState()
+    switch (embeddingProvider) {
+      case 'gemini': return 'text-embedding-004'
+      case 'openai': return 'text-embedding-3-small'
+      case 'ollama': return 'nomic-embed-text'
+      case 'browser':
+      default: return 'all-MiniLM-L6-v2'
     }
-    return 'all-MiniLM-L6-v2'
   }
 
   /**

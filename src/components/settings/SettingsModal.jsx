@@ -128,6 +128,8 @@ export default function SettingsModal({ onClose }) {
   const setAvailable = useAIStore((s) => s.setAvailable)
   const allDeviceSettings = useAIStore((s) => s.allDeviceSettings)
   const setDeviceProvider = useAIStore((s) => s.setDeviceProvider)
+  const embeddingProvider = useAIStore((s) => s.embeddingProvider)
+  const setEmbeddingProvider = useAIStore((s) => s.setEmbeddingProvider)
 
   // Current device info
   const currentDeviceType = getDeviceType()
@@ -772,6 +774,16 @@ export default function SettingsModal({ onClose }) {
 
   const renderAISection = () => (
     <div className={styles.section}>
+      {/* ============================================ */}
+      {/* SECTION 1: Chat Model                        */}
+      {/* ============================================ */}
+      <div className={styles.aiSectionBlock}>
+        <h3 className={styles.sectionTitle}>Chat Model</h3>
+        <p className={styles.sectionDesc}>
+          Powers the Q&A conversation when you ask questions about your documents.
+        </p>
+      </div>
+
       {/* Per-device settings notice */}
       <div className={styles.deviceNotice}>
         <div className={styles.deviceHeader}>
@@ -781,7 +793,7 @@ export default function SettingsModal({ onClose }) {
           <span>You're on <strong>{currentDeviceName}</strong></span>
         </div>
         <p className={styles.deviceHint}>
-          AI settings are saved per device. Configure different providers for desktop, tablet, and phone.
+          Chat settings are saved per device. Configure different providers for desktop, tablet, and phone.
         </p>
       </div>
 
@@ -1302,6 +1314,92 @@ export default function SettingsModal({ onClose }) {
           </div>
         </div>
       )}
+
+      {/* ============================================ */}
+      {/* SECTION 2: Embedding Model                   */}
+      {/* ============================================ */}
+      <div className={styles.aiSectionDivider} />
+
+      <div className={styles.aiSectionBlock}>
+        <h3 className={styles.sectionTitle}>Embedding Model</h3>
+        <p className={styles.sectionDesc}>
+          Finds relevant passages in your PDFs before sending them to the chat model.
+          Better embeddings = more accurate answers. This is separate from your chat model.
+        </p>
+      </div>
+
+      <div className={styles.radioGroup}>
+        <label className={styles.radioOption}>
+          <input
+            type="radio"
+            name="embeddingProvider"
+            checked={embeddingProvider === 'gemini'}
+            onChange={() => setEmbeddingProvider('gemini')}
+          />
+          <div className={styles.radioContent}>
+            <span className={styles.radioLabel}>Gemini API</span>
+            <span className={styles.radioDesc}>Recommended — high quality, free tier available. Requires Gemini API key.</span>
+          </div>
+        </label>
+
+        <label className={styles.radioOption}>
+          <input
+            type="radio"
+            name="embeddingProvider"
+            checked={embeddingProvider === 'openai'}
+            onChange={() => setEmbeddingProvider('openai')}
+          />
+          <div className={styles.radioContent}>
+            <span className={styles.radioLabel}>OpenAI API</span>
+            <span className={styles.radioDesc}>Excellent quality, low cost (~$0.02/1M tokens). Requires OpenAI API key.</span>
+          </div>
+        </label>
+
+        <label className={styles.radioOption}>
+          <input
+            type="radio"
+            name="embeddingProvider"
+            checked={embeddingProvider === 'ollama'}
+            onChange={() => setEmbeddingProvider('ollama')}
+          />
+          <div className={styles.radioContent}>
+            <span className={styles.radioLabel}>Ollama (Local)</span>
+            <span className={styles.radioDesc}>Free, private. Requires Ollama running with nomic-embed-text model.</span>
+          </div>
+        </label>
+
+        <label className={styles.radioOption}>
+          <input
+            type="radio"
+            name="embeddingProvider"
+            checked={embeddingProvider === 'browser'}
+            onChange={() => setEmbeddingProvider('browser')}
+          />
+          <div className={styles.radioContent}>
+            <span className={styles.radioLabel}>Browser Built-in</span>
+            <span className={styles.radioDesc}>Works everywhere, no setup needed. Lower search quality than cloud options.</span>
+          </div>
+        </label>
+      </div>
+
+      {/* Embedding provider warnings */}
+      {embeddingProvider === 'gemini' && !geminiService.isConfigured() && (
+        <div className={styles.embeddingWarning}>
+          Gemini API key required. Enter it in the Chat Model section above, or get a free key from{' '}
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a>.
+        </div>
+      )}
+
+      {embeddingProvider === 'openai' && !openaiService.isConfigured() && (
+        <div className={styles.embeddingWarning}>
+          OpenAI API key required. Enter it in the Chat Model section above.
+        </div>
+      )}
+
+      <div className={styles.embeddingInfo}>
+        Changing the embedding model will require re-indexing your documents for AI search.
+        The chat model and embedding model use separate API calls — you can use different providers for each.
+      </div>
     </div>
   )
 

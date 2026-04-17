@@ -78,6 +78,15 @@ const getAllDeviceSettings = () => {
   return settings
 }
 
+// Embedding provider persistence (separate from chat provider)
+const getEmbeddingProvider = () => {
+  return localStorage.getItem('sv_embedding_provider') || 'browser'
+}
+
+const saveEmbeddingProvider = (provider) => {
+  localStorage.setItem('sv_embedding_provider', provider)
+}
+
 const initialSettings = getDeviceSettings()
 
 /**
@@ -93,6 +102,9 @@ export const useAIStore = create((set, get) => ({
   model: initialSettings.model,
   isAvailable: false,
   isChecking: true,
+
+  // Embedding provider (separate from chat - shared across devices)
+  embeddingProvider: getEmbeddingProvider(),
 
   // All device settings (for settings panel)
   allDeviceSettings: getAllDeviceSettings(),
@@ -146,6 +158,12 @@ export const useAIStore = create((set, get) => ({
   },
   setAvailable: (isAvailable) => set({ isAvailable, isChecking: false }),
   setChecking: (isChecking) => set({ isChecking }),
+
+  // Embedding provider actions
+  setEmbeddingProvider: (provider) => {
+    saveEmbeddingProvider(provider)
+    set({ embeddingProvider: provider })
+  },
 
   // Per-device settings actions (for settings panel)
   setDeviceProvider: (deviceType, provider, model) => {
