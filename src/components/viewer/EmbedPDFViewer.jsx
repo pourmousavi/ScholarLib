@@ -24,6 +24,7 @@ import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
 import { ExportPluginPackage, useExport } from '@embedpdf/plugin-export/react'
 
 import { useUIStore } from '../../store/uiStore'
+import { useIsMobilePhone } from '../../hooks/useIsMobilePhone'
 import { useEmbedPDFAnnotations } from '../../hooks/useEmbedPDFAnnotations'
 import { useEmbedPDFTextExtraction } from '../../hooks/useEmbedPDFLoader'
 import { ANNOTATION_COLORS, DEFAULT_HIGHLIGHT_COLOR } from '../../services/annotations'
@@ -450,7 +451,8 @@ function EmbedPDFContent({
   onTotalPagesChange,
   onToggleFullscreen,
   isFullscreen,
-  defaultZoom
+  defaultZoom,
+  isTouchDevice
 }) {
   // useAnnotation returns a scope for the document (for createAnnotation, etc.)
   const { provides: annotationScope } = useAnnotation(documentId)
@@ -886,7 +888,7 @@ function EmbedPDFContent({
             />
             <div className={styles.viewerContent}>
               <div className={styles.embedpdfContainer}>
-                {activeTool === 'freetext' && !noteCreation && (
+                {!isTouchDevice && activeTool === 'freetext' && !noteCreation && (
                   <div className={styles.notePlacementHint}>
                     Click anywhere on the page to place a note &middot; Press Esc to cancel
                   </div>
@@ -914,48 +916,52 @@ function EmbedPDFContent({
                           pageIndex={pageIndex}
                         >
                           <div
-                            className={`${styles.pageWrapper} ${activeTool === 'freetext' ? styles.notePlacementMode : ''}`}
+                            className={`${styles.pageWrapper} ${!isTouchDevice && activeTool === 'freetext' ? styles.notePlacementMode : ''}`}
                             style={{
                               width,
                               height,
                               maxWidth: 'none',
-                              userSelect: 'none',
+                              userSelect: isTouchDevice ? 'none' : 'none',
                               WebkitUserDrag: 'none'
                             }}
                             draggable={false}
                             onDragStart={(e) => e.preventDefault()}
                             data-page-number={pageIndex + 1}
-                            onClick={(e) => handlePageClick(e, pageIndex)}
+                            onClick={isTouchDevice ? undefined : (e) => handlePageClick(e, pageIndex)}
                           >
                             <RenderLayer
                               documentId={documentId}
                               pageIndex={pageIndex}
                             />
-                            <SelectionLayer
-                              documentId={documentId}
-                              pageIndex={pageIndex}
-                              textStyle={{
-                                background: 'rgba(0, 120, 215, 0.4)'
-                              }}
-                              selectionMenu={(props) => (
-                                <TextSelectionMenu
-                                  {...props}
-                                  documentId={documentId}
-                                  pageIndex={pageIndex}
-                                  onHighlight={handleHighlight}
-                                  onUnderline={handleUnderline}
-                                  highlightColor={highlightColor}
-                                />
-                              )}
-                            />
-                            <AnnotationLayer
-                              documentId={documentId}
-                              pageIndex={pageIndex}
-                              resizeUI={{ size: 8, color: 'var(--color-primary)' }}
-                              selectionMenu={renderSelectionMenu}
-                            />
+                            {!isTouchDevice && (
+                              <SelectionLayer
+                                documentId={documentId}
+                                pageIndex={pageIndex}
+                                textStyle={{
+                                  background: 'rgba(0, 120, 215, 0.4)'
+                                }}
+                                selectionMenu={(props) => (
+                                  <TextSelectionMenu
+                                    {...props}
+                                    documentId={documentId}
+                                    pageIndex={pageIndex}
+                                    onHighlight={handleHighlight}
+                                    onUnderline={handleUnderline}
+                                    highlightColor={highlightColor}
+                                  />
+                                )}
+                              />
+                            )}
+                            {!isTouchDevice && (
+                              <AnnotationLayer
+                                documentId={documentId}
+                                pageIndex={pageIndex}
+                                resizeUI={{ size: 8, color: 'var(--color-primary)' }}
+                                selectionMenu={renderSelectionMenu}
+                              />
+                            )}
                             {/* Note pin markers for text notes on this page */}
-                            {annotations
+                            {!isTouchDevice && annotations
                               .filter(a => a.type === 'note' && a.position?.page === pageIndex)
                               .map(note => {
                                 const zoom = zoomState?.currentZoomLevel || 1
@@ -1007,7 +1013,7 @@ function EmbedPDFContent({
             </div>
 
             {/* Text note creation dialog */}
-            {noteCreation && (
+            {!isTouchDevice && noteCreation && (
               <TextNoteDialog
                 position={{ top: noteCreation.screenTop, left: noteCreation.screenLeft }}
                 initialColor={highlightColor}
@@ -1017,7 +1023,7 @@ function EmbedPDFContent({
             )}
 
             {/* Annotation popover for clicked annotation */}
-            {clickedAnnotation && (
+            {!isTouchDevice && clickedAnnotation && (
               <div
                 style={{
                   position: 'fixed',
@@ -1066,7 +1072,8 @@ function DocumentLoader({
   onTotalPagesChange,
   onToggleFullscreen,
   isFullscreen,
-  defaultZoom
+  defaultZoom,
+  isTouchDevice
 }) {
   const { provides: documentManager } = useDocumentManagerCapability()
   const [isDocumentLoading, setIsDocumentLoading] = useState(false)
@@ -1144,11 +1151,13 @@ function DocumentLoader({
       onToggleFullscreen={onToggleFullscreen}
       isFullscreen={isFullscreen}
       defaultZoom={defaultZoom}
+      isTouchDevice={isTouchDevice}
     />
   )
 }
 
 export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
+  const isTouchDevice = useIsMobilePhone()
   const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
   const setFullscreenOverlayVisible = useUIStore((s) => s.setFullscreenOverlayVisible)
   const { engine, isLoading: engineLoading, error: engineError } = usePdfiumEngine({
@@ -1338,6 +1347,7 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
             onToggleFullscreen={toggleFullscreen}
             isFullscreen={isFullscreen}
             defaultZoom={pdfDefaultZoom}
+            isTouchDevice={isTouchDevice}
           />
         )}
       </EmbedPDF>
