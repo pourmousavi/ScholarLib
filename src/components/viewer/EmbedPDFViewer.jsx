@@ -1152,8 +1152,8 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
   const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
   const setFullscreenOverlayVisible = useUIStore((s) => s.setFullscreenOverlayVisible)
   const { engine, isLoading: engineLoading, error: engineError } = usePdfiumEngine({
-    // Use CDN for WASM - this is the default but we're being explicit
-    wasmUrl: 'https://cdn.jsdelivr.net/npm/@embedpdf/pdfium@2/dist/pdfium.wasm'
+    // Pin WASM to match installed @embedpdf/engines version to avoid binary/JS mismatch
+    wasmUrl: 'https://cdn.jsdelivr.net/npm/@embedpdf/pdfium@2.10.1/dist/pdfium.wasm'
   })
 
   const viewerRef = useRef(null)
