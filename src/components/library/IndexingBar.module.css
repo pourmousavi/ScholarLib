@@ -173,3 +173,22 @@
   color: var(--error);
   font-size: 12px;
 }
+
+/* Mismatch state - embedding model changed */
+.bar.mismatch {
+  background: rgba(251, 146, 60, 0.08);
+  border-top-color: rgba(251, 146, 60, 0.2);
+}
+
+.bar.mismatch .icon {
+  color: rgb(251, 146, 60);
+}
+
+.bar.mismatch .message {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.bar.mismatch .message strong {
+  color: rgb(251, 146, 60);
+}

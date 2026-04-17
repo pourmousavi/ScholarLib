@@ -205,7 +205,8 @@ class IndexService {
         status: 'indexed',
         indexed_at: new Date().toISOString(),
         chunk_count: chunks.length,
-        embedding_version: 'v1'
+        embedding_version: 'v1',
+        embedding_model: embeddingModelName
       }
 
       // Update Zustand store

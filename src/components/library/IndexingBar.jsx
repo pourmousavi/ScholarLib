@@ -1,7 +1,7 @@
 import { useIndexStore } from '../../store/indexStore'
 import styles from './IndexingBar.module.css'
 
-export default function IndexingBar({ pendingDocs, onIndexAll }) {
+export default function IndexingBar({ pendingDocs, mismatchedDocs, onIndexAll, onReindexMismatched }) {
   const isIndexing = useIndexStore((s) => s.isIndexing)
   const currentStage = useIndexStore((s) => s.currentStage)
   const progress = useIndexStore((s) => s.progress)
@@ -14,9 +14,10 @@ export default function IndexingBar({ pendingDocs, onIndexAll }) {
   const error = useIndexStore((s) => s.error)
 
   const pendingCount = pendingDocs?.length || 0
+  const mismatchedCount = mismatchedDocs?.length || 0
 
   // Nothing to show
-  if (pendingCount === 0 && !isIndexing && !error) {
+  if (pendingCount === 0 && mismatchedCount === 0 && !isIndexing && !error) {
     return null
   }
 
@@ -155,6 +156,31 @@ export default function IndexingBar({ pendingDocs, onIndexAll }) {
           </div>
           <button className={styles.indexAllBtn} onClick={onIndexAll}>
             Index {pendingCount === 1 ? 'Document' : 'All'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Documents indexed with a different embedding model
+  if (mismatchedCount > 0) {
+    return (
+      <div className={`${styles.bar} ${styles.mismatch}`}>
+        <div className={styles.content}>
+          <div className={styles.statusSection}>
+            <span className={styles.icon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </span>
+            <span className={styles.message}>
+              <strong>{mismatchedCount}</strong> document{mismatchedCount !== 1 ? 's' : ''} indexed with a different embedding model — re-index for accurate AI search
+            </span>
+          </div>
+          <button className={styles.indexAllBtn} onClick={onReindexMismatched}>
+            Re-index {mismatchedCount === 1 ? 'Document' : 'All'}
           </button>
         </div>
       </div>
