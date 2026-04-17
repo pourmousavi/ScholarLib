@@ -272,3 +272,68 @@
   background: var(--bg-hover);
   color: var(--text-primary);
 }
+
+/* Mobile responsive */
+@media (max-width: 639px) {
+  .header {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .header h2 {
+    font-size: 15px;
+  }
+
+  .inviteForm {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .inviteRow {
+    flex-wrap: wrap;
+  }
+
+  .emailInput {
+    flex: 1 1 100%;
+  }
+
+  .permissionSelect {
+    flex: 1;
+    width: auto;
+  }
+
+  .inviteBtn {
+    flex-shrink: 0;
+  }
+
+  .divider {
+    margin: 0 var(--space-4);
+  }
+
+  .section {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .collaborator {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .collabInfo {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .collabPermission {
+    order: 3;
+    margin-left: calc(36px + var(--space-2));
+  }
+
+  .collabActions {
+    order: 4;
+    margin-left: auto;
+  }
+
+  .footer {
+    padding: var(--space-3) var(--space-4);
+  }
+}

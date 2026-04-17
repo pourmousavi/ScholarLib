@@ -273,9 +273,13 @@
     display: none;
   }
 
-  .toolBtn,
-  .annotationBtn,
+  /* Hide fullscreen button on phones - not supported on iOS Safari */
   .fullscreenBtn {
+    display: none;
+  }
+
+  .toolBtn,
+  .annotationBtn {
     width: 32px;
     height: 32px;
   }

@@ -945,3 +945,54 @@
   background: #dc2626;
   border-color: #dc2626;
 }
+
+/* Mobile: switch sidebar nav to horizontal scrollable tabs */
+@media (max-width: 639px) {
+  .container {
+    height: auto;
+    max-height: 90vh;
+  }
+
+  .content {
+    flex-direction: column;
+  }
+
+  .nav {
+    width: 100%;
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: var(--space-2);
+    gap: var(--space-1);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .navItem {
+    flex-shrink: 0;
+    padding: var(--space-2);
+    font-size: 11px;
+    gap: var(--space-1);
+  }
+
+  .navLabel {
+    white-space: nowrap;
+  }
+
+  .sectionContent {
+    padding: var(--space-4);
+  }
+
+  .header {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .footer {
+    padding: var(--space-3) var(--space-4);
+  }
+}

@@ -23,6 +23,19 @@
   max-height: 90vh;
 }
 
+/* Mobile: reduce overlay padding so modal uses more screen */
+@media (max-width: 639px) {
+  .overlay {
+    padding: var(--space-3);
+  }
+
+  .modal {
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: var(--radius-lg);
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

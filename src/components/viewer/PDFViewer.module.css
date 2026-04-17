@@ -127,10 +127,20 @@
   pointer-events: auto;
 }
 
-/* On phones, disable text layer interaction so touch scrolling works */
+/* On phones, disable text layer interaction so touch scrolling works
+   and enable pinch-to-zoom on the PDF container */
 @media (max-width: 639px) and (pointer: coarse) {
   .textLayer {
     pointer-events: none;
+  }
+
+  .container {
+    touch-action: pan-x pan-y pinch-zoom;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pageWrapper {
+    touch-action: pan-x pan-y pinch-zoom;
   }
 }
 
