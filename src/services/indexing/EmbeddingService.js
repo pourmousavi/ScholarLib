@@ -111,47 +111,63 @@ class EmbeddingService {
     }
 
     const allEmbeddings = []
-    const batchSize = 100
+    const batchSize = 50 // Smaller batches to stay within rate limits
 
     for (let i = 0; i < texts.length; i += batchSize) {
       const batch = texts.slice(i, i + batchSize)
+      let retries = 0
+      const maxRetries = 3
 
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            requests: batch.map(t => ({
-              model: 'models/gemini-embedding-001',
-              content: { parts: [{ text: t.slice(0, 8000) }] }
-            }))
-          })
+      while (retries <= maxRetries) {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              requests: batch.map(t => ({
+                model: 'models/gemini-embedding-001',
+                content: { parts: [{ text: t.slice(0, 8000) }] }
+              }))
+            })
+          }
+        )
+
+        if (res.status === 429) {
+          retries++
+          if (retries > maxRetries) {
+            throw new Error('Gemini rate limit exceeded. Please wait a minute and try again.')
+          }
+          const delay = Math.pow(2, retries) * 2000 // 4s, 8s, 16s
+          console.log(`[EmbeddingService] Gemini rate limited, retrying in ${delay / 1000}s (attempt ${retries}/${maxRetries})`)
+          await new Promise(r => setTimeout(r, delay))
+          continue
         }
-      )
 
-      if (!res.ok) {
-        let msg = 'Gemini embedding request failed'
-        try {
-          const err = await res.json()
-          msg = err.error?.message || msg
-        } catch { /* ignore */ }
-        throw new Error(msg)
+        if (!res.ok) {
+          let msg = 'Gemini embedding request failed'
+          try {
+            const err = await res.json()
+            msg = err.error?.message || msg
+          } catch { /* ignore */ }
+          throw new Error(msg)
+        }
+
+        const data = await res.json()
+        const embeddings = data.embeddings
+        if (!embeddings || !Array.isArray(embeddings)) {
+          throw new Error('Invalid Gemini batch embedding response')
+        }
+
+        for (const emb of embeddings) {
+          allEmbeddings.push(emb.values)
+        }
+        break // Success, exit retry loop
       }
 
-      const data = await res.json()
-      const embeddings = data.embeddings
-      if (!embeddings || !Array.isArray(embeddings)) {
-        throw new Error('Invalid Gemini batch embedding response')
-      }
-
-      for (const emb of embeddings) {
-        allEmbeddings.push(emb.values)
-      }
-
-      // Small delay between batches to avoid rate limits
+      // Delay between batches to avoid rate limits
       if (i + batchSize < texts.length) {
-        await new Promise(r => setTimeout(r, 200))
+        await new Promise(r => setTimeout(r, 1500))
       }
     }
 
