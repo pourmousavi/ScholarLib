@@ -1382,17 +1382,63 @@ export default function SettingsModal({ onClose }) {
         </label>
       </div>
 
-      {/* Embedding provider warnings */}
-      {embeddingProvider === 'gemini' && !geminiService.isConfigured() && (
-        <div className={styles.embeddingWarning}>
-          Gemini API key required. Enter it in the Chat Model section above, or get a free key from{' '}
-          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a>.
+      {/* Gemini API key for embeddings */}
+      {embeddingProvider === 'gemini' && (
+        <div className={styles.providerConfig}>
+          <div className={styles.field}>
+            <label>Gemini API Key</label>
+            <div className={styles.inputRow}>
+              <input
+                type="password"
+                value={geminiKey}
+                onChange={(e) => setGeminiKey(e.target.value)}
+                placeholder={geminiService.isConfigured() ? '••••••••••••••••' : 'AI...'}
+              />
+              <button
+                className={styles.testBtn}
+                onClick={handleTestGemini}
+                disabled={testingGemini || !geminiKey}
+              >
+                {testingGemini ? 'Testing...' : 'Test key'}
+              </button>
+            </div>
+            <span className={styles.fieldHint}>
+              {geminiService.isConfigured()
+                ? 'Key configured. Same key is used for chat if Gemini is selected above.'
+                : <>Get a free key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a>. Stored locally only.</>
+              }
+            </span>
+          </div>
         </div>
       )}
 
-      {embeddingProvider === 'openai' && !openaiService.isConfigured() && (
-        <div className={styles.embeddingWarning}>
-          OpenAI API key required. Enter it in the Chat Model section above.
+      {/* OpenAI API key for embeddings */}
+      {embeddingProvider === 'openai' && (
+        <div className={styles.providerConfig}>
+          <div className={styles.field}>
+            <label>OpenAI API Key</label>
+            <div className={styles.inputRow}>
+              <input
+                type="password"
+                value={openaiKey}
+                onChange={(e) => setOpenaiKey(e.target.value)}
+                placeholder={openaiService.isConfigured() ? '••••••••••••••••' : 'sk-...'}
+              />
+              <button
+                className={styles.testBtn}
+                onClick={handleTestOpenai}
+                disabled={testingOpenai || !openaiKey}
+              >
+                {testingOpenai ? 'Testing...' : 'Test key'}
+              </button>
+            </div>
+            <span className={styles.fieldHint}>
+              {openaiService.isConfigured()
+                ? 'Key configured. Same key is used for chat if OpenAI is selected above.'
+                : 'Stored locally on this device only. Never sent to any server.'
+              }
+            </span>
+          </div>
         </div>
       )}
 
