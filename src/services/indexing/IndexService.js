@@ -151,18 +151,10 @@ class IndexService {
             })
             .map(([id]) => id)
 
-          if (mismatchedDocIds.length > 0 && mismatchedDocIds.length === Object.keys(meta.docs).length) {
-            // ALL docs are mismatched — clear everything (same as before, but now we know why)
-            console.log('[IndexService] All docs have mismatched dimensions, clearing index...')
-            onProgress?.({ stage: 'clearing', docId, progress: 0 })
-            await this.clearIndex(adapter)
-            const reloaded = await this.loadIndex(adapter)
-            indexData = reloaded.indexData
-            meta = reloaded.meta
-          } else {
-            // Mixed dimensions — keep compatible docs, log warning about outdated ones
-            console.log(`[IndexService] Mixed dimensions: ${mismatchedDocIds.length} docs with old dimensions will be searchable only when their embedding model is active. New docs will use ${newDimensions}-dim embeddings.`)
-          }
+          // Keep all existing docs regardless of dimension mismatch.
+          // Mixed dimensions are handled at search time by filtering to compatible chunks.
+          // Never silently wipe the entire index — users would lose all their indexed data.
+          console.log(`[IndexService] Dimension mismatch: ${mismatchedDocIds.length} existing doc(s) use ${existingDimensions}-dim, new doc uses ${newDimensions}-dim. All docs are kept; search will filter by compatible dimensions.`)
         }
       }
 
@@ -220,15 +212,16 @@ class IndexService {
       const updateDocument = useLibraryStore.getState().updateDocument
       updateDocument(docId, { index_status: indexStatus })
 
-      // Persist to storage
-      const { folders, documents } = useLibraryStore.getState()
-      const library = {
-        version: '1.0',
-        last_modified: new Date().toISOString(),
-        folders,
-        documents
-      }
-      await LibraryService.saveLibrary(adapter, library)
+      // Persist to storage (include all library fields)
+      const state = useLibraryStore.getState()
+      await LibraryService.saveLibrary(adapter, {
+        version: '1.1',
+        folders: state.folders,
+        documents: state.documents,
+        tag_registry: state.tagRegistry,
+        collection_registry: state.collectionRegistry,
+        smart_collections: state.smartCollections
+      })
 
       onProgress?.({ stage: 'complete', docId, progress: 1 })
 
@@ -246,16 +239,17 @@ class IndexService {
       const updateDocument = useLibraryStore.getState().updateDocument
       updateDocument(docId, { index_status: failedStatus })
 
-      // Persist to storage
+      // Persist to storage (include all library fields)
       try {
-        const { folders, documents } = useLibraryStore.getState()
-        const library = {
-          version: '1.0',
-          last_modified: new Date().toISOString(),
-          folders,
-          documents
-        }
-        await LibraryService.saveLibrary(adapter, library)
+        const state = useLibraryStore.getState()
+        await LibraryService.saveLibrary(adapter, {
+          version: '1.1',
+          folders: state.folders,
+          documents: state.documents,
+          tag_registry: state.tagRegistry,
+          collection_registry: state.collectionRegistry,
+          smart_collections: state.smartCollections
+        })
       } catch (saveError) {
         console.error('Failed to save library after indexing error:', saveError)
       }
@@ -552,13 +546,15 @@ class IndexService {
         }
       }
 
-      // Save library
-      const { folders, documents: updatedDocs } = useLibraryStore.getState()
+      // Save library (include all fields)
+      const state = useLibraryStore.getState()
       await LibraryService.saveLibrary(adapter, {
-        version: '1.0',
-        last_modified: new Date().toISOString(),
-        folders,
-        documents: updatedDocs
+        version: '1.1',
+        folders: state.folders,
+        documents: state.documents,
+        tag_registry: state.tagRegistry,
+        collection_registry: state.collectionRegistry,
+        smart_collections: state.smartCollections
       })
 
       console.log('Index cleared successfully')
@@ -623,16 +619,17 @@ class IndexService {
         }
       }
 
-      // Save updated library if changes were made
+      // Save updated library if changes were made (include all fields)
       if (needsSave) {
         const updatedState = useLibraryStore.getState()
-        const library = {
-          version: '1.0',
-          last_modified: new Date().toISOString(),
+        await LibraryService.saveLibrary(adapter, {
+          version: '1.1',
           folders: updatedState.folders,
-          documents: updatedState.documents
-        }
-        await LibraryService.saveLibrary(adapter, library)
+          documents: updatedState.documents,
+          tag_registry: updatedState.tagRegistry,
+          collection_registry: updatedState.collectionRegistry,
+          smart_collections: updatedState.smartCollections
+        })
         console.log(`Synced ${syncedCount} document(s) index status`)
       }
 
