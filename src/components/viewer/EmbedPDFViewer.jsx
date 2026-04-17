@@ -910,58 +910,72 @@ function EmbedPDFContent({
                     >
                     <Scroller
                       documentId={documentId}
-                      renderPage={({ width, height, pageIndex }) => (
+                      renderPage={({ width, height, pageIndex }) => {
+                        // On touch devices: skip PagePointerProvider and all annotation
+                        // layers so touch events pass through for scrolling and pinch-zoom
+                        if (isTouchDevice) {
+                          return (
+                            <div
+                              className={styles.pageWrapper}
+                              style={{ width, height, maxWidth: 'none' }}
+                              data-page-number={pageIndex + 1}
+                            >
+                              <RenderLayer
+                                documentId={documentId}
+                                pageIndex={pageIndex}
+                              />
+                            </div>
+                          )
+                        }
+
+                        return (
                         <PagePointerProvider
                           documentId={documentId}
                           pageIndex={pageIndex}
                         >
                           <div
-                            className={`${styles.pageWrapper} ${!isTouchDevice && activeTool === 'freetext' ? styles.notePlacementMode : ''}`}
+                            className={`${styles.pageWrapper} ${activeTool === 'freetext' ? styles.notePlacementMode : ''}`}
                             style={{
                               width,
                               height,
                               maxWidth: 'none',
-                              userSelect: isTouchDevice ? 'none' : 'none',
+                              userSelect: 'none',
                               WebkitUserDrag: 'none'
                             }}
                             draggable={false}
                             onDragStart={(e) => e.preventDefault()}
                             data-page-number={pageIndex + 1}
-                            onClick={isTouchDevice ? undefined : (e) => handlePageClick(e, pageIndex)}
+                            onClick={(e) => handlePageClick(e, pageIndex)}
                           >
                             <RenderLayer
                               documentId={documentId}
                               pageIndex={pageIndex}
                             />
-                            {!isTouchDevice && (
-                              <SelectionLayer
-                                documentId={documentId}
-                                pageIndex={pageIndex}
-                                textStyle={{
-                                  background: 'rgba(0, 120, 215, 0.4)'
-                                }}
-                                selectionMenu={(props) => (
-                                  <TextSelectionMenu
-                                    {...props}
-                                    documentId={documentId}
-                                    pageIndex={pageIndex}
-                                    onHighlight={handleHighlight}
-                                    onUnderline={handleUnderline}
-                                    highlightColor={highlightColor}
-                                  />
-                                )}
-                              />
-                            )}
-                            {!isTouchDevice && (
-                              <AnnotationLayer
-                                documentId={documentId}
-                                pageIndex={pageIndex}
-                                resizeUI={{ size: 8, color: 'var(--color-primary)' }}
-                                selectionMenu={renderSelectionMenu}
-                              />
-                            )}
+                            <SelectionLayer
+                              documentId={documentId}
+                              pageIndex={pageIndex}
+                              textStyle={{
+                                background: 'rgba(0, 120, 215, 0.4)'
+                              }}
+                              selectionMenu={(props) => (
+                                <TextSelectionMenu
+                                  {...props}
+                                  documentId={documentId}
+                                  pageIndex={pageIndex}
+                                  onHighlight={handleHighlight}
+                                  onUnderline={handleUnderline}
+                                  highlightColor={highlightColor}
+                                />
+                              )}
+                            />
+                            <AnnotationLayer
+                              documentId={documentId}
+                              pageIndex={pageIndex}
+                              resizeUI={{ size: 8, color: 'var(--color-primary)' }}
+                              selectionMenu={renderSelectionMenu}
+                            />
                             {/* Note pin markers for text notes on this page */}
-                            {!isTouchDevice && annotations
+                            {annotations
                               .filter(a => a.type === 'note' && a.position?.page === pageIndex)
                               .map(note => {
                                 const zoom = zoomState?.currentZoomLevel || 1
@@ -987,7 +1001,8 @@ function EmbedPDFContent({
                               })}
                           </div>
                         </PagePointerProvider>
-                      )}
+                        )
+                      }}
                     />
                   </Viewport>
                   </ZoomGestureWrapper>
