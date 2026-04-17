@@ -101,7 +101,7 @@ class EmbeddingService {
     }
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -127,7 +127,7 @@ class EmbeddingService {
     }
 
     this.dimensions = embedding.length
-    this.modelName = 'text-embedding-004'
+    this.modelName = 'gemini-embedding-001'
     console.log('[EmbeddingService] Gemini embedding, dimensions:', embedding.length)
     return embedding
   }
@@ -283,7 +283,7 @@ class EmbeddingService {
   async getModelName() {
     const { embeddingProvider } = useAIStore.getState()
     switch (embeddingProvider) {
-      case 'gemini': return 'text-embedding-004'
+      case 'gemini': return 'gemini-embedding-001'
       case 'openai': return 'text-embedding-3-small'
       case 'ollama': return 'nomic-embed-text'
       case 'browser':

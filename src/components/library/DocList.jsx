@@ -138,7 +138,7 @@ export default function DocList({ isMobile = false }) {
 
   // Embedding model name for the current provider
   const EMBEDDING_MODEL_NAMES = {
-    gemini: 'text-embedding-004',
+    gemini: 'gemini-embedding-001',
     openai: 'text-embedding-3-small',
     ollama: 'nomic-embed-text',
     browser: 'all-MiniLM-L6-v2'
