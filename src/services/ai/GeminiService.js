@@ -66,7 +66,7 @@ class GeminiService {
    * @param {string} model - Model name
    * @yields {string} Content chunks
    */
-  async *streamChat(messages, model = 'gemini-2.0-flash') {
+  async *streamChat(messages, model = 'gemini-2.5-flash') {
     const apiKey = this.getApiKey()
     if (!apiKey) {
       throw { code: 'AI_NOT_CONFIGURED', message: 'Gemini API key not set' }
@@ -134,7 +134,7 @@ class GeminiService {
    * @param {string} model - Model name
    * @returns {Promise<string>}
    */
-  async chat(messages, model = 'gemini-2.0-flash') {
+  async chat(messages, model = 'gemini-2.5-flash') {
     const apiKey = this.getApiKey()
     if (!apiKey) {
       throw { code: 'AI_NOT_CONFIGURED', message: 'Gemini API key not set' }
@@ -182,13 +182,12 @@ class GeminiService {
    * @param {string} model
    * @returns {number} Cost in USD
    */
-  estimateCost(promptTokens, completionTokens, model = 'gemini-2.0-flash') {
+  estimateCost(promptTokens, completionTokens, model = 'gemini-2.5-flash') {
     const pricing = {
-      'gemini-2.0-flash': { input: 0.0000001, output: 0.0000004 },
       'gemini-2.5-flash': { input: 0.00000015, output: 0.0000006 },
       'gemini-2.5-pro': { input: 0.00000125, output: 0.000005 }
     }
-    const p = pricing[model] || pricing['gemini-2.0-flash']
+    const p = pricing[model] || pricing['gemini-2.5-flash']
     return (promptTokens * p.input) + (completionTokens * p.output)
   }
 
@@ -199,16 +198,9 @@ class GeminiService {
   getAvailableModels() {
     return [
       {
-        id: 'gemini-2.0-flash',
-        name: 'Gemini 2.0 Flash',
-        description: 'Free tier, fast',
-        inputPrice: '$0.10/M',
-        outputPrice: '$0.40/M'
-      },
-      {
         id: 'gemini-2.5-flash',
         name: 'Gemini 2.5 Flash',
-        description: 'Latest, thinking model',
+        description: 'Fast, thinking model, free tier',
         inputPrice: '$0.15/M',
         outputPrice: '$0.60/M'
       },

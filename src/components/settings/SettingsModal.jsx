@@ -366,7 +366,7 @@ export default function SettingsModal({ onClose }) {
       geminiService.setApiKey(geminiKey)
       const response = await geminiService.chat([
         { role: 'user', content: 'Say "OK" and nothing else.' }
-      ], 'gemini-2.0-flash')
+      ], 'gemini-2.5-flash')
 
       if (response) {
         showToast({ message: 'Gemini API key is valid', type: 'success' })
@@ -827,7 +827,7 @@ export default function SettingsModal({ onClose }) {
                   if (newProvider === 'ollama') defaultModel = 'llama3.2'
                   else if (newProvider === 'claude') defaultModel = 'claude-sonnet-4-20250514'
                   else if (newProvider === 'openai') defaultModel = 'gpt-4o-mini'
-                  else if (newProvider === 'gemini') defaultModel = 'gemini-2.0-flash'
+                  else if (newProvider === 'gemini') defaultModel = 'gemini-2.5-flash'
                   else if (newProvider === 'webllm') defaultModel = 'Llama-3.2-3B-Instruct-q4f32_1-MLC'
 
                   setDeviceProvider(deviceType, newProvider, defaultModel)
