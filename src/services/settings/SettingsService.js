@@ -60,9 +60,12 @@ class SettingsService {
     }
 
     const deviceId = this.getDeviceId()
+
+    // Read from per-device settings (primary), fallback to legacy keys
+    const deviceSettings = this._getCurrentDeviceSettings()
     const local = {
-      ai_provider: localStorage.getItem('sv_ai_provider') || 'ollama',
-      ai_model: localStorage.getItem('sv_ai_model') || 'llama3.2',
+      ai_provider: deviceSettings.provider,
+      ai_model: deviceSettings.model,
       claude_key_set: !!localStorage.getItem('sv_claude_key'),
       openai_key_set: !!localStorage.getItem('sv_openai_key')
     }
@@ -89,11 +92,12 @@ class SettingsService {
     existing.global = { ...existing.global, ...globalSettings }
 
     // Update device record
+    const currentDevice = this._getCurrentDeviceSettings()
     existing.devices[this.getDeviceId()] = {
       device_name: this.getDeviceName(),
       last_seen: new Date().toISOString(),
-      ai_provider: localStorage.getItem('sv_ai_provider'),
-      ai_model: localStorage.getItem('sv_ai_model')
+      ai_provider: currentDevice.provider,
+      ai_model: currentDevice.model
     }
 
     await adapter.writeJSON('_system/settings.json', existing)
@@ -127,19 +131,75 @@ class SettingsService {
   }
 
   /**
-   * Save AI provider to localStorage
-   * @param {string} provider
+   * Get current device's AI settings from per-device storage
+   * @returns {{ provider: string, model: string }}
    */
-  setAIProvider(provider) {
-    localStorage.setItem('sv_ai_provider', provider)
+  _getCurrentDeviceSettings() {
+    const saved = localStorage.getItem('sv_ai_device_settings')
+    if (saved) {
+      try {
+        const settings = JSON.parse(saved)
+        const deviceType = this._getDeviceType()
+        if (settings[deviceType]) {
+          return settings[deviceType]
+        }
+      } catch { /* fall through */ }
+    }
+    // Fallback to legacy keys
+    return {
+      provider: localStorage.getItem('sv_ai_provider') || 'ollama',
+      model: localStorage.getItem('sv_ai_model') || 'llama3.2'
+    }
   }
 
   /**
-   * Save AI model to localStorage
+   * Simple device type detection matching aiStore logic
+   */
+  _getDeviceType() {
+    const ua = navigator.userAgent.toLowerCase()
+    const width = window.innerWidth
+    const isMobileUA = /iphone|ipod|android.*mobile|windows phone|blackberry/i.test(ua)
+    const isTabletUA = /ipad|android(?!.*mobile)|tablet/i.test(ua)
+    if (isMobileUA || (width < 640 && 'ontouchstart' in window)) return 'mobile'
+    if (isTabletUA || (width >= 640 && width < 1024 && 'ontouchstart' in window)) return 'tablet'
+    return 'desktop'
+  }
+
+  /**
+   * Save AI provider to localStorage (both per-device and legacy)
+   * @param {string} provider
+   */
+  setAIProvider(provider) {
+    // Write to legacy key for backwards compat
+    localStorage.setItem('sv_ai_provider', provider)
+    // Also update per-device settings
+    this._updateDeviceSetting('provider', provider)
+  }
+
+  /**
+   * Save AI model to localStorage (both per-device and legacy)
    * @param {string} model
    */
   setAIModel(model) {
     localStorage.setItem('sv_ai_model', model)
+    this._updateDeviceSetting('model', model)
+  }
+
+  /**
+   * Update a single field in the current device's per-device settings
+   */
+  _updateDeviceSetting(field, value) {
+    const deviceType = this._getDeviceType()
+    let settings = {}
+    const saved = localStorage.getItem('sv_ai_device_settings')
+    if (saved) {
+      try { settings = JSON.parse(saved) } catch { settings = {} }
+    }
+    if (!settings[deviceType]) {
+      settings[deviceType] = { provider: 'ollama', model: 'llama3.2' }
+    }
+    settings[deviceType][field] = value
+    localStorage.setItem('sv_ai_device_settings', JSON.stringify(settings))
   }
 
   /**
@@ -147,7 +207,7 @@ class SettingsService {
    * @returns {string}
    */
   getAIProvider() {
-    return localStorage.getItem('sv_ai_provider') || 'ollama'
+    return this._getCurrentDeviceSettings().provider
   }
 
   /**
@@ -155,7 +215,7 @@ class SettingsService {
    * @returns {string}
    */
   getAIModel() {
-    return localStorage.getItem('sv_ai_model') || 'llama3.2'
+    return this._getCurrentDeviceSettings().model
   }
 
   /**
