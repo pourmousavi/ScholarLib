@@ -90,46 +90,78 @@ class EmbeddingService {
   }
 
   /**
-   * Generate embedding using Gemini API (text-embedding-004, 768-dim)
+   * Generate embedding using Gemini API (gemini-embedding-001)
    * @param {string} text
    * @returns {Promise<number[]>}
    */
   async embedWithGemini(text) {
+    const results = await this.embedBatchWithGemini([text])
+    return results[0]
+  }
+
+  /**
+   * Batch embed multiple texts with Gemini API (up to 100 per call)
+   * @param {string[]} texts
+   * @returns {Promise<number[][]>}
+   */
+  async embedBatchWithGemini(texts) {
     const apiKey = geminiService.getApiKey()
     if (!apiKey) {
       throw new Error('Gemini API key not configured')
     }
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: { parts: [{ text }] }
-        })
+    const allEmbeddings = []
+    const batchSize = 100
+
+    for (let i = 0; i < texts.length; i += batchSize) {
+      const batch = texts.slice(i, i + batchSize)
+
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requests: batch.map(t => ({
+              model: 'models/gemini-embedding-001',
+              content: { parts: [{ text: t.slice(0, 8000) }] }
+            }))
+          })
+        }
+      )
+
+      if (!res.ok) {
+        let msg = 'Gemini embedding request failed'
+        try {
+          const err = await res.json()
+          msg = err.error?.message || msg
+        } catch { /* ignore */ }
+        throw new Error(msg)
       }
-    )
 
-    if (!res.ok) {
-      let msg = 'Gemini embedding request failed'
-      try {
-        const err = await res.json()
-        msg = err.error?.message || msg
-      } catch { /* ignore */ }
-      throw new Error(msg)
+      const data = await res.json()
+      const embeddings = data.embeddings
+      if (!embeddings || !Array.isArray(embeddings)) {
+        throw new Error('Invalid Gemini batch embedding response')
+      }
+
+      for (const emb of embeddings) {
+        allEmbeddings.push(emb.values)
+      }
+
+      // Small delay between batches to avoid rate limits
+      if (i + batchSize < texts.length) {
+        await new Promise(r => setTimeout(r, 200))
+      }
     }
 
-    const data = await res.json()
-    const embedding = data.embedding?.values
-    if (!embedding || !Array.isArray(embedding)) {
-      throw new Error('Invalid Gemini embedding response')
+    if (allEmbeddings.length > 0) {
+      this.dimensions = allEmbeddings[0].length
+      this.modelName = 'gemini-embedding-001'
+      console.log(`[EmbeddingService] Gemini batch embedding: ${allEmbeddings.length} texts, ${this.dimensions} dimensions`)
     }
 
-    this.dimensions = embedding.length
-    this.modelName = 'gemini-embedding-001'
-    console.log('[EmbeddingService] Gemini embedding, dimensions:', embedding.length)
-    return embedding
+    return allEmbeddings
   }
 
   /**
@@ -138,6 +170,16 @@ class EmbeddingService {
    * @returns {Promise<number[]>}
    */
   async embedWithOpenAI(text) {
+    const results = await this.embedBatchWithOpenAI([text])
+    return results[0]
+  }
+
+  /**
+   * Batch embed multiple texts with OpenAI API
+   * @param {string[]} texts
+   * @returns {Promise<number[][]>}
+   */
+  async embedBatchWithOpenAI(texts) {
     const apiKey = openaiService.getApiKey()
     if (!apiKey) {
       throw new Error('OpenAI API key not configured')
@@ -151,7 +193,7 @@ class EmbeddingService {
       },
       body: JSON.stringify({
         model: 'text-embedding-3-small',
-        input: text
+        input: texts.map(t => t.slice(0, 8000))
       })
     })
 
@@ -165,15 +207,17 @@ class EmbeddingService {
     }
 
     const data = await res.json()
-    const embedding = data.data?.[0]?.embedding
-    if (!embedding || !Array.isArray(embedding)) {
-      throw new Error('Invalid OpenAI embedding response')
+    const embeddings = (data.data || [])
+      .sort((a, b) => a.index - b.index)
+      .map(d => d.embedding)
+
+    if (embeddings.length > 0) {
+      this.dimensions = embeddings[0].length
+      this.modelName = 'text-embedding-3-small'
+      console.log(`[EmbeddingService] OpenAI batch embedding: ${embeddings.length} texts, ${this.dimensions} dimensions`)
     }
 
-    this.dimensions = embedding.length
-    this.modelName = 'text-embedding-3-small'
-    console.log('[EmbeddingService] OpenAI embedding, dimensions:', embedding.length)
-    return embedding
+    return embeddings
   }
 
   /**
@@ -220,20 +264,36 @@ class EmbeddingService {
   }
 
   /**
-   * Generate embeddings for multiple texts (batched)
+   * Generate embeddings for multiple texts (uses native batch APIs when available)
    * @param {string[]} texts - Texts to embed
    * @param {Function} onProgress - Progress callback (current, total)
    * @returns {Promise<number[][]>}
    */
   async embedBatch(texts, onProgress) {
-    const embeddings = []
+    const { embeddingProvider } = useAIStore.getState()
 
+    // Use native batch APIs for cloud providers
+    if (embeddingProvider === 'gemini') {
+      onProgress?.(0, texts.length)
+      const results = await this.embedBatchWithGemini(texts)
+      onProgress?.(texts.length, texts.length)
+      return results
+    }
+
+    if (embeddingProvider === 'openai') {
+      onProgress?.(0, texts.length)
+      const results = await this.embedBatchWithOpenAI(texts)
+      onProgress?.(texts.length, texts.length)
+      return results
+    }
+
+    // For Ollama and browser, embed one at a time
+    const embeddings = []
     for (let i = 0; i < texts.length; i++) {
       const embedding = await this.embed(texts[i])
       embeddings.push(embedding)
       onProgress?.(i + 1, texts.length)
     }
-
     return embeddings
   }
 

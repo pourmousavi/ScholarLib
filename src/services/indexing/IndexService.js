@@ -121,14 +121,12 @@ class IndexService {
         throw { code: 'NO_TEXT', message: 'No text could be extracted from PDF' }
       }
 
-      // 3. Generate embeddings
+      // 3. Generate embeddings (uses batch API for cloud providers)
       onProgress?.({ stage: 'embedding', docId, progress: 0 })
-      const embeddings = []
-      for (let i = 0; i < chunks.length; i++) {
-        const embedding = await embeddingService.embed(chunks[i].text)
-        embeddings.push(embedding)
-        onProgress?.({ stage: 'embedding', docId, progress: (i + 1) / chunks.length, current: i + 1, total: chunks.length })
-      }
+      const chunkTexts = chunks.map(c => c.text)
+      const embeddings = await embeddingService.embedBatch(chunkTexts, (current, total) => {
+        onProgress?.({ stage: 'embedding', docId, progress: current / total, current, total })
+      })
 
       // Check embedding dimensions
       const newDimensions = embeddings[0]?.length
