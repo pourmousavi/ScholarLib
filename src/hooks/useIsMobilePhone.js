@@ -1,18 +1,14 @@
 import { useState, useEffect } from 'react'
 
 /**
- * useIsTouchDevice - Returns true on touch-only devices (phones and tablets).
- * Annotation tools require a mouse and aren't practical on touch screens.
- * Uses multiple signals: pointer capability, touch support, and screen size.
+ * useIsMobilePhone - Returns true on touch devices (phones and tablets).
+ * Annotation tools require a mouse and aren't usable on touch screens.
  */
 export function useIsMobilePhone() {
   const [isTouch, setIsTouch] = useState(() => detectTouchDevice())
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsTouch(detectTouchDevice())
-    }
-
+    const handleResize = () => setIsTouch(detectTouchDevice())
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
@@ -21,15 +17,9 @@ export function useIsMobilePhone() {
 }
 
 function detectTouchDevice() {
-  // Primary pointer is coarse (finger) rather than fine (mouse)
-  if (window.matchMedia('(pointer: coarse)').matches) {
-    return true
-  }
-
-  // Fallback: touch support + no mouse-like pointer
-  if ('ontouchstart' in window && !window.matchMedia('(any-pointer: fine)').matches) {
-    return true
-  }
-
+  // ontouchstart exists on all iOS and Android devices
+  if ('ontouchstart' in window) return true
+  // Coarse pointer = finger-based input
+  if (window.matchMedia('(pointer: coarse)').matches) return true
   return false
 }

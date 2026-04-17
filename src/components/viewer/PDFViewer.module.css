@@ -130,8 +130,11 @@
 /* On phones, disable text layer interaction so touch scrolling works
    and enable pinch-to-zoom on the PDF container */
 @media (max-width: 639px) and (pointer: coarse) {
-  .textLayer {
-    pointer-events: none;
+  .textLayer,
+  .textLayer > span {
+    pointer-events: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
   }
 
   .container {
