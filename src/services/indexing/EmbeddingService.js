@@ -76,22 +76,16 @@ class EmbeddingService {
     // Truncate very long text (embedding models have limits)
     const truncatedText = text.slice(0, 8000)
 
-    try {
-      switch (embeddingProvider) {
-        case 'gemini':
-          return await this.embedWithGemini(truncatedText)
-        case 'openai':
-          return await this.embedWithOpenAI(truncatedText)
-        case 'ollama':
-          return await this.embedWithOllama(truncatedText)
-        case 'browser':
-        default:
-          return await this.embedWithBrowser(truncatedText, onProgress)
-      }
-    } catch (error) {
-      // If the configured provider fails, fall back to browser
-      console.warn(`[EmbeddingService] ${embeddingProvider} failed: ${error.message}, falling back to browser`)
-      return await this.embedWithBrowser(truncatedText, onProgress)
+    switch (embeddingProvider) {
+      case 'gemini':
+        return await this.embedWithGemini(truncatedText)
+      case 'openai':
+        return await this.embedWithOpenAI(truncatedText)
+      case 'ollama':
+        return await this.embedWithOllama(truncatedText)
+      case 'browser':
+      default:
+        return await this.embedWithBrowser(truncatedText, onProgress)
     }
   }
 
@@ -107,7 +101,7 @@ class EmbeddingService {
     }
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
