@@ -2,9 +2,11 @@ import { useState, memo, useCallback } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
+import { useIndexStore } from '../../store/indexStore'
 import { useToast } from '../../hooks/useToast'
 import { LibraryService } from '../../services/library/LibraryService'
-import { ContextMenu, ShareIcon, LinkIcon, UsersIcon, RenameIcon, UnshareIcon, FolderMinusIcon, ExportIcon } from '../ui'
+import { indexService } from '../../services/indexing/IndexService'
+import { ContextMenu, ShareIcon, LinkIcon, UsersIcon, RenameIcon, UnshareIcon, FolderMinusIcon, ExportIcon, RefreshIcon } from '../ui'
 import styles from './FolderTree.module.css'
 
 export default function FolderTree() {
@@ -77,7 +79,17 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
   const updateFolder = useLibraryStore((s) => s.updateFolder)
 
   const adapter = useStorageStore((s) => s.adapter)
+  const isConnected = useStorageStore((s) => s.isConnected)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
+
+  const isIndexing = useIndexStore((s) => s.isIndexing)
+  const startIndexing = useIndexStore((s) => s.startIndexing)
+  const setProgress = useIndexStore((s) => s.setProgress)
+  const completeIndexing = useIndexStore((s) => s.completeIndexing)
+  const failIndexing = useIndexStore((s) => s.failIndexing)
+  const startBatchIndexing = useIndexStore((s) => s.startBatchIndexing)
+  const updateBatchProgress = useIndexStore((s) => s.updateBatchProgress)
+  const completeBatchIndexing = useIndexStore((s) => s.completeBatchIndexing)
 
   const setShowModal = useUIStore((s) => s.setShowModal)
   const showDocCounts = useUIStore((s) => s.showDocCounts)
@@ -233,6 +245,65 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
     }
   }
 
+  const handleReindexFolder = async () => {
+    handleCloseContextMenu()
+
+    if (!adapter || !isConnected || isDemoMode) {
+      showToast({ message: 'Storage connection required for indexing', type: 'warning' })
+      return
+    }
+
+    if (isIndexing) {
+      showToast({ message: 'Indexing already in progress', type: 'info' })
+      return
+    }
+
+    const folderDocs = Object.entries(documents)
+      .filter(([, d]) => d.folder_id === folder.id)
+      .map(([id, d]) => ({ id, ...d }))
+
+    if (folderDocs.length === 0) {
+      showToast({ message: 'No documents in this folder', type: 'info' })
+      return
+    }
+
+    if (!confirm(`Re-index all ${folderDocs.length} document${folderDocs.length !== 1 ? 's' : ''} in "${folder.name}"?`)) {
+      return
+    }
+
+    startBatchIndexing(folderDocs.length)
+    let successCount = 0
+    let failCount = 0
+
+    for (let i = 0; i < folderDocs.length; i++) {
+      const doc = folderDocs[i]
+      updateBatchProgress(i)
+      const docName = doc.metadata?.title || doc.filename || 'document'
+      startIndexing(doc.id, docName)
+
+      try {
+        const pdfURL = await adapter.getFileStreamURL(doc.box_path)
+        await indexService.indexDocument(doc.id, pdfURL, adapter, (progress) => {
+          setProgress(progress)
+        })
+        completeIndexing(doc.id)
+        successCount++
+      } catch (error) {
+        console.error(`Failed to re-index ${doc.id}:`, error)
+        failIndexing(doc.id, error)
+        failCount++
+      }
+    }
+
+    completeBatchIndexing()
+
+    if (failCount === 0) {
+      showToast({ message: `Re-indexed ${successCount} document${successCount !== 1 ? 's' : ''}`, type: 'success' })
+    } else {
+      showToast({ message: `Re-indexed ${successCount}, ${failCount} failed`, type: 'warning' })
+    }
+  }
+
   // Check if folder is shared with anyone
   const isShared = folder.shared_with && folder.shared_with.length > 0
   const canDelete = docCount === 0 && !hasChildren
@@ -253,6 +324,12 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
       icon: <ExportIcon />,
       onClick: handleExportCitations,
       disabled: docCount === 0
+    },
+    {
+      label: isIndexing ? 'Indexing in progress...' : 'Re-index all for AI',
+      icon: <RefreshIcon />,
+      onClick: handleReindexFolder,
+      disabled: docCount === 0 || isIndexing || isDemoMode
     },
     // Only show "View who has access" if folder is shared
     ...(isShared ? [{
