@@ -45,7 +45,7 @@ ScholarLib supports multiple AI providers. Choose the one that works best for yo
 | **Claude API** | Cloud (paid) | Best quality answers — Anthropic's models |
 | **OpenAI API** | Cloud (paid) | Fast responses — GPT models |
 
-For local models via Ollama, recommended options include **Gemma 3** (Google's open model, great for academic tasks) and **Llama 3.2** (Meta's model, good all-rounder).
+For local models via Ollama, recommended options include **Gemma 4** (Google's latest open model, multimodal with 128K-256K context) and **Llama 3.2** (Meta's model, good all-rounder).
 
 Configure your provider in **Settings → AI & Models**. You can set different providers per device (e.g., Ollama on desktop, Gemini on mobile).
 

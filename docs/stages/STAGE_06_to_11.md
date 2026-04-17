@@ -410,7 +410,7 @@ class OllamaService {
     } catch { return false }
   }
 
-  // Popular models: llama3.2, llama3.2:1b, llama3.1:8b, mistral, gemma3:4b, gemma3:12b
+  // Popular models: llama3.2, llama3.2:1b, llama3.1:8b, mistral, gemma4:e2b, gemma4:e4b, gemma4:26b
 
   async *streamChat(messages, model = 'llama3.2') {
     const res = await fetch(`${this.baseURL}/api/chat`, {

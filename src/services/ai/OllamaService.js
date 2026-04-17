@@ -322,20 +322,28 @@ class OllamaService {
         description: 'Fast and capable for general use'
       },
       {
-        id: 'gemma3:4b',
-        name: 'Gemma 3 4B',
-        size: '3.3 GB',
-        ram: '6 GB',
+        id: 'gemma4:e2b',
+        name: 'Gemma 4 E2B',
+        size: '7.2 GB',
+        ram: '8 GB',
         quality: 'good',
-        description: 'Google Gemma 3, fast and efficient'
+        description: 'Google Gemma 4, fast edge model with 128K context'
       },
       {
-        id: 'gemma3:12b',
-        name: 'Gemma 3 12B',
-        size: '8.1 GB',
+        id: 'gemma4:e4b',
+        name: 'Gemma 4 E4B',
+        size: '9.6 GB',
         ram: '12 GB',
         quality: 'good',
-        description: 'Google Gemma 3, recommended for research'
+        description: 'Google Gemma 4, recommended for research'
+      },
+      {
+        id: 'gemma4:26b',
+        name: 'Gemma 4 26B',
+        size: '18 GB',
+        ram: '24 GB',
+        quality: 'excellent',
+        description: 'Google Gemma 4 MoE, 256K context, most capable'
       },
       {
         id: 'llama3.1:70b',
