@@ -33,6 +33,22 @@ Tags and Collections scope options appear when you have tags/collections in your
 This is especially powerful for project-focused research. Scope to a collection like "Thesis Chapter 3" to ask questions only about papers relevant to that chapter.
 :::
 
+## AI Providers
+
+ScholarLib supports multiple AI providers. Choose the one that works best for your setup:
+
+| Provider | Type | Best For |
+|----------|------|----------|
+| **Ollama** | Local (free) | Desktop users who want privacy — runs on your machine |
+| **WebLLM** | Browser (free) | Desktop users with WebGPU — no server needed |
+| **Gemini API** | Cloud (free tier) | Mobile/tablet users — Google's generous free tier (1500 requests/day) |
+| **Claude API** | Cloud (paid) | Best quality answers — Anthropic's models |
+| **OpenAI API** | Cloud (paid) | Fast responses — GPT models |
+
+For local models via Ollama, recommended options include **Gemma 3** (Google's open model, great for academic tasks) and **Llama 3.2** (Meta's model, good all-rounder).
+
+Configure your provider in **Settings → AI & Models**. You can set different providers per device (e.g., Ollama on desktop, Gemini on mobile).
+
 ## How It Works
 
 1. Your question is used to search relevant passages in the scoped documents

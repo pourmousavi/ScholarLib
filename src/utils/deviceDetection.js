@@ -80,12 +80,14 @@ export function getRecommendedProviders(deviceType) {
   switch (deviceType) {
     case DEVICE_TYPES.MOBILE:
       return [
+        { id: 'gemini', name: 'Gemini API', reason: 'Google AI, generous free tier' },
         { id: 'claude', name: 'Claude API', reason: 'Best quality, cloud-based (no device resources needed)' },
         { id: 'openai', name: 'OpenAI API', reason: 'Fast responses, cloud-based' },
         { id: 'none', name: 'Disabled', reason: 'Save battery and data' }
       ]
     case DEVICE_TYPES.TABLET:
       return [
+        { id: 'gemini', name: 'Gemini API', reason: 'Google AI, generous free tier' },
         { id: 'claude', name: 'Claude API', reason: 'Best quality, cloud-based' },
         { id: 'openai', name: 'OpenAI API', reason: 'Fast responses, cloud-based' },
         { id: 'ollama', name: 'Ollama', reason: 'If running Ollama server on your network' },
@@ -98,6 +100,7 @@ export function getRecommendedProviders(deviceType) {
         { id: 'webllm', name: 'WebLLM', reason: 'Free, runs in browser (requires WebGPU)' },
         { id: 'claude', name: 'Claude API', reason: 'Best quality, requires API key' },
         { id: 'openai', name: 'OpenAI API', reason: 'Fast, requires API key' },
+        { id: 'gemini', name: 'Gemini API', reason: 'Google AI, generous free tier' },
         { id: 'none', name: 'Disabled', reason: 'Disable AI features' }
       ]
   }

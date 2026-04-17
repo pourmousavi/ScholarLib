@@ -161,6 +161,8 @@ class WebLLMService {
         size: '4.0 GB',
         description: 'Larger, more capable'
       }
+      // TODO: Add Gemma 3/4 when MLC-compiled builds are available
+      // Check: https://github.com/mlc-ai/web-llm for new model releases
     ]
   }
 }

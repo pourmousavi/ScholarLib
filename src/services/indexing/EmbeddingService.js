@@ -199,6 +199,22 @@ class EmbeddingService {
   }
 
   /**
+   * Get the name of the currently active embedding model
+   * @returns {Promise<string>} Model identifier
+   */
+  async getModelName() {
+    try {
+      const ollamaAvailable = await ollamaService.isAvailable()
+      if (ollamaAvailable) {
+        return 'nomic-embed-text'
+      }
+    } catch {
+      // Ollama not available
+    }
+    return 'all-MiniLM-L6-v2'
+  }
+
+  /**
    * Check if browser embedding model is loaded
    * @returns {boolean}
    */

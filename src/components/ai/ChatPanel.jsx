@@ -11,6 +11,7 @@ import { aiService } from '../../services/ai/AIService'
 import { ollamaService } from '../../services/ai/OllamaService'
 import { claudeService } from '../../services/ai/ClaudeService'
 import { openaiService } from '../../services/ai/OpenAIService'
+import { geminiService } from '../../services/ai/GeminiService'
 import { indexService } from '../../services/indexing/IndexService'
 import { chatHistoryService } from '../../services/ai/ChatHistoryService'
 import { LibraryService } from '../../services/library/LibraryService'
@@ -141,7 +142,7 @@ export default function ChatPanel() {
 
   const setShowModal = useUIStore((s) => s.setShowModal)
 
-  const isCloudProvider = provider === 'claude' || provider === 'openai'
+  const isCloudProvider = provider === 'claude' || provider === 'openai' || provider === 'gemini'
   const availableModels = aiService.getAvailableModels()
 
   // Check provider availability on mount and provider change
@@ -156,6 +157,8 @@ export default function ChatPanel() {
         setAvailable(claudeService.isConfigured())
       } else if (provider === 'openai') {
         setAvailable(openaiService.isConfigured())
+      } else if (provider === 'gemini') {
+        setAvailable(geminiService.isConfigured())
       }
     }
 
@@ -435,6 +438,10 @@ export default function ChatPanel() {
       const m = availableModels.find(m => m.id === currentModel)
       return m?.name || 'GPT'
     }
+    if (provider === 'gemini') {
+      const m = availableModels.find(m => m.id === currentModel)
+      return m?.name || 'Gemini'
+    }
     return currentModel
   }
 
@@ -482,6 +489,15 @@ export default function ChatPanel() {
         <div className={styles.status}>
           <span className={`${styles.statusDot} ${isAvailable ? styles.available : ''}`} />
           <span>{isAvailable ? getModelDisplayName() : 'OpenAI (no key)'}</span>
+        </div>
+      )
+    }
+
+    if (provider === 'gemini') {
+      return (
+        <div className={styles.status}>
+          <span className={`${styles.statusDot} ${isAvailable ? styles.available : ''}`} />
+          <span>{isAvailable ? getModelDisplayName() : 'Gemini (no key)'}</span>
         </div>
       )
     }
@@ -586,8 +602,8 @@ export default function ChatPanel() {
   }
 
   // Render cloud provider not configured state
-  if ((provider === 'claude' || provider === 'openai') && !isAvailable) {
-    const providerName = provider === 'claude' ? 'Claude' : 'OpenAI'
+  if ((provider === 'claude' || provider === 'openai' || provider === 'gemini') && !isAvailable) {
+    const providerName = provider === 'claude' ? 'Claude' : provider === 'gemini' ? 'Gemini' : 'OpenAI'
     return (
       <div className={styles.panel}>
         <div className={styles.header}>

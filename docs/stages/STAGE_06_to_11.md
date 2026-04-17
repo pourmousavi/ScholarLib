@@ -410,6 +410,8 @@ class OllamaService {
     } catch { return false }
   }
 
+  // Popular models: llama3.2, llama3.2:1b, llama3.1:8b, mistral, gemma3:4b, gemma3:12b
+
   async *streamChat(messages, model = 'llama3.2') {
     const res = await fetch(`${this.baseURL}/api/chat`, {
       method: 'POST',
@@ -549,14 +551,14 @@ git commit -m "feat: AI chat panel with Ollama streaming and WebLLM browser infe
 
 ---
 
-# Stage 10 — AI Chat: Claude + OpenAI Cloud Fallback
+# Stage 10 — AI Chat: Claude + OpenAI + Gemini Cloud Fallback
 
 ## ⚠️ Context Window
 `/clear` then load: `CLAUDE.md`, `docs/ARCHITECTURE.md`
 Also read: `src/services/ai/AIService.js` (from Stage 09)
 
 ## Goal
-Add Claude API and OpenAI API as cloud AI providers. Implement token cost estimation. Seamless switching between providers.
+Add Claude API, OpenAI API, and Gemini API as cloud AI providers. Implement token cost estimation. Seamless switching between providers.
 
 ## Claude Code Tasks
 
@@ -659,7 +661,35 @@ class OpenAIService {
 }
 ```
 
-### 3. Cost estimation in ChatPanel
+### 3. `src/services/ai/GeminiService.js`
+```javascript
+class GeminiService {
+  getApiKey() { return localStorage.getItem('sv_gemini_key') || '' }
+
+  // Convert ScholarLib messages to Gemini format:
+  // {role: 'user'|'assistant', content} → {role: 'user'|'model', parts: [{text}]}
+  // System messages → separate systemInstruction field
+  _convertMessages(messages) { /* ... */ }
+
+  async *streamChat(messages, model = 'gemini-2.0-flash') {
+    const apiKey = this.getApiKey()
+    if (!apiKey) throw { code: 'AI_NOT_CONFIGURED' }
+
+    const { systemInstruction, contents } = this._convertMessages(messages)
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents, systemInstruction }) }
+    )
+    // Parse SSE: data.candidates[0].content.parts[0].text
+  }
+}
+```
+
+Available models: `gemini-2.0-flash` (free tier), `gemini-2.5-flash`, `gemini-2.5-pro`.
+Gemini has a generous free tier (1500 RPD for Flash models), making it ideal for mobile/tablet users.
+
+### 4. Cost estimation in ChatPanel
 Before sending a query when using cloud APIs, show estimated cost:
 ```
 "This query will use approximately 3,200 tokens (~$0.001 with Claude Haiku)"
@@ -680,11 +710,13 @@ Wire new services into the provider router from Stage 09.
 ## Verification
 - Enter Claude API key in Settings (Stage 12 not built yet — temporarily hard-code in AIService for testing, remove before commit)
 - AI chat works via Claude API with streaming
+- Enter Gemini API key — chat works with streaming via Gemini 2.0 Flash
 - Cost estimate shows before sending
+- Provider switching between Claude, OpenAI, and Gemini works seamlessly
 
 ## Commit
 ```bash
-git commit -m "feat: Claude API and OpenAI API streaming with cost estimation"
+git commit -m "feat: Claude, OpenAI, and Gemini API streaming with cost estimation"
 ```
 
 ---

@@ -58,14 +58,18 @@ class SettingsService {
 Modal using the Modal base component. Left nav + right content panel. Sections:
 
 #### Section: AI & Models
-- Provider radio options: Ollama (local), WebLLM (browser), Claude API, OpenAI API, None
+- Provider radio options: Ollama (local), WebLLM (browser), Claude API, OpenAI API, Gemini API, None
 - Ollama: shows connection status + "Test connection" button + Ollama download link
+  - Popular models include Gemma 3 (4B/12B) alongside Llama and Mistral
 - WebLLM: shows download status + model size + "Download model" button
-- Claude API: password input for key + "Test key" button + model selector (Haiku / Sonnet)
+- Claude API: password input for key + "Test key" button + model selector (Haiku / Sonnet / Opus)
 - OpenAI API: password input for key + "Test key" button + model selector (gpt-4o-mini / gpt-4o)
+- Gemini API: password input for key + "Test key" button + model selector (Flash / Pro)
+  - Note generous free tier in cost warning
 - Cost warning for cloud APIs
+- Per-device provider configuration (mobile/tablet/desktop)
 
-API key save: `localStorage.setItem('sv_claude_key', key)` — explicitly tell user it stays on this device only.
+API key save: `localStorage.setItem('sv_claude_key', key)`, `localStorage.setItem('sv_gemini_key', key)` — explicitly tell user it stays on this device only.
 
 #### Section: Storage
 - Current provider display (Box / Dropbox)

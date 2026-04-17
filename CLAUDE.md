@@ -101,7 +101,7 @@ scholarlib/
 │   ├── services/
 │   │   ├── storage/         ← Box, Dropbox adapters
 │   │   ├── metadata/        ← CrossRef, Semantic Scholar, AI extraction
-│   │   ├── ai/              ← Ollama, WebLLM, Claude API, OpenAI
+│   │   ├── ai/              ← Ollama, WebLLM, Claude API, OpenAI, Gemini
 │   │   ├── indexing/        ← PDF chunking, embeddings, vector search
 │   │   ├── library/         ← library.json CRUD
 │   │   └── tags/            ← tag registry, smart collections
@@ -133,7 +133,7 @@ scholarlib/
 | Storage | Box API / Dropbox API | User-chosen at setup |
 | Metadata | CrossRef, Semantic Scholar, AI | Cascading pipeline |
 | Local AI | Ollama (API) + WebLLM (browser WASM) | Free, private |
-| Cloud AI | Anthropic Claude API, OpenAI API | Optional fallback |
+| Cloud AI | Anthropic Claude API, OpenAI API, Google Gemini API | Optional fallback (Gemini has free tier) |
 | Embeddings | nomic-embed-text (Ollama) or API | Semantic search |
 | Vector search | usearch (WASM) | In-browser, no server |
 | Backend | Cloudflare Worker + KV | Access logging, sharing |

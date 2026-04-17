@@ -122,11 +122,12 @@ PDF added to library
 3. Each chunk → embedding model:
    a. Ollama: POST localhost:11434/api/embeddings
       { model: "nomic-embed-text", prompt: chunk }
-   b. Cloud: POST api.anthropic.com or api.openai.com
+   b. Browser fallback: Xenova/all-MiniLM-L6-v2 (transformers.js)
   ↓
 4. Embeddings stored as Float32Array binary blob
    → Uploaded to Box: /ScholarLib/_system/index/embeddings_v1.bin
    → index_meta.json updated with doc status = "indexed"
+   → Per-document embedding_model and embedding_dimensions tracked
   ↓
 5. UI reflects: StatusDot turns green
 ```
@@ -149,7 +150,7 @@ User submits query (text)
    [Retrieved chunks with citations]
    [User question]
   ↓
-5. Send to LLM (Ollama / WebLLM / Claude / OpenAI)
+5. Send to LLM (Ollama / WebLLM / Claude / OpenAI / Gemini)
   ↓
 6. Stream response to chat UI
    Citations rendered as [Author Year] links
@@ -159,10 +160,25 @@ User submits query (text)
 
 ```
 if (ollama_reachable) → use Ollama
-else if (webllm_loaded) → use WebLLM  
-else if (api_key_set) → use cloud API
+else if (webllm_loaded) → use WebLLM
+else if (api_key_set) → use cloud API (Claude / OpenAI / Gemini)
 else → show "AI not configured" prompt
 ```
+
+### Supported AI Providers
+
+| Provider | Type | Key Storage | Notes |
+|----------|------|-------------|-------|
+| Ollama | Local | N/A | Requires Ollama server running locally |
+| WebLLM | Browser | N/A | WebGPU required, desktop only |
+| Claude API | Cloud | localStorage (`sv_claude_key`) | Anthropic models |
+| OpenAI API | Cloud | localStorage (`sv_openai_key`) | GPT models |
+| Gemini API | Cloud | localStorage (`sv_gemini_key`) | Google models, generous free tier |
+
+Gemini API uses a different message format than OpenAI/Claude:
+- Messages: `{role: 'user'|'model', parts: [{text}]}` (vs `{role, content}`)
+- System messages: Sent via `systemInstruction` field (not in messages array)
+- Endpoint: `generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent`
 
 ---
 

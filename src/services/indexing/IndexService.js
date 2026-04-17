@@ -142,13 +142,27 @@ class IndexService {
         const existingDimensions = indexData[0]?.length
         if (existingDimensions && existingDimensions !== newDimensions) {
           console.log(`[IndexService] Dimension mismatch detected: existing=${existingDimensions}, new=${newDimensions}`)
-          console.log('[IndexService] Clearing old index to use new embedding model...')
-          onProgress?.({ stage: 'clearing', docId, progress: 0 })
-          await this.clearIndex(adapter)
-          // Reload (will be empty now)
-          const reloaded = await this.loadIndex(adapter)
-          indexData = reloaded.indexData
-          meta = reloaded.meta
+
+          // Find which docs have mismatched dimensions
+          const mismatchedDocIds = Object.entries(meta.docs)
+            .filter(([, doc]) => {
+              const docDim = doc.embedding_dimensions || existingDimensions
+              return docDim !== newDimensions
+            })
+            .map(([id]) => id)
+
+          if (mismatchedDocIds.length > 0 && mismatchedDocIds.length === Object.keys(meta.docs).length) {
+            // ALL docs are mismatched — clear everything (same as before, but now we know why)
+            console.log('[IndexService] All docs have mismatched dimensions, clearing index...')
+            onProgress?.({ stage: 'clearing', docId, progress: 0 })
+            await this.clearIndex(adapter)
+            const reloaded = await this.loadIndex(adapter)
+            indexData = reloaded.indexData
+            meta = reloaded.meta
+          } else {
+            // Mixed dimensions — keep compatible docs, log warning about outdated ones
+            console.log(`[IndexService] Mixed dimensions: ${mismatchedDocIds.length} docs with old dimensions will be searchable only when their embedding model is active. New docs will use ${newDimensions}-dim embeddings.`)
+          }
         }
       }
 
@@ -156,10 +170,15 @@ class IndexService {
       const offset = meta.total_chunks
       indexData.push(...embeddings)
 
+      // Get the active embedding model name for per-doc tracking
+      const embeddingModelName = await embeddingService.getModelName()
+
       meta.docs[docId] = {
         chunk_count: chunks.length,
         chunk_offset: offset,
-        indexed_at: new Date().toISOString()
+        indexed_at: new Date().toISOString(),
+        embedding_model: embeddingModelName,
+        embedding_dimensions: newDimensions
       }
       meta.total_chunks += chunks.length
       meta.total_docs_indexed = Object.keys(meta.docs).length
@@ -286,26 +305,50 @@ class IndexService {
       return []
     }
 
-    // Check for dimension mismatch
+    // Check for dimension mismatch — filter to compatible chunks instead of failing
+    const queryDim = queryEmbedding.length
     if (indexData.length > 0 && relevantIndices.length > 0) {
       const storedDim = indexData[relevantIndices[0]]?.length
-      const queryDim = queryEmbedding.length
       console.log('Embedding dimensions:', { query: queryDim, stored: storedDim })
 
       if (storedDim !== queryDim) {
-        console.error('DIMENSION MISMATCH!')
-        console.error(`Stored embeddings: ${storedDim} dims, Query: ${queryDim} dims`)
-        // Clear the cache to force re-download of index
-        this.indexCache = null
-        this.chunkTextCache = null
-        // Throw an error that can be caught and shown to user
-        const error = new Error(
-          storedDim === 768 && queryDim === 384
-            ? 'Ollama is not responding. Documents were indexed with Ollama but it\'s currently unavailable. Please ensure Ollama is running.'
-            : `Embedding dimension mismatch (${storedDim} vs ${queryDim}). Please re-index documents.`
+        // Filter to only indices with matching dimensions
+        const compatibleIndices = relevantIndices.filter(i =>
+          indexData[i]?.length === queryDim
         )
-        error.code = 'DIMENSION_MISMATCH'
-        throw error
+
+        if (compatibleIndices.length === 0) {
+          // No compatible embeddings at all — throw with helpful message
+          this.indexCache = null
+          this.chunkTextCache = null
+          const error = new Error(
+            storedDim === 768 && queryDim === 384
+              ? 'Ollama is not responding. Documents were indexed with Ollama but it\'s currently unavailable. Please ensure Ollama is running.'
+              : `Embedding dimension mismatch (${storedDim} vs ${queryDim}). Please re-index documents.`
+          )
+          error.code = 'DIMENSION_MISMATCH'
+          throw error
+        }
+
+        // Some docs have matching dimensions — search those, warn about others
+        const totalDocs = new Set(relevantIndices.map(i => {
+          const chunk = Object.values(meta.docs).find(d =>
+            i >= d.chunk_offset && i < d.chunk_offset + d.chunk_count
+          )
+          return chunk
+        })).size
+        const compatibleDocs = new Set(compatibleIndices.map(i => {
+          const chunk = Object.values(meta.docs).find(d =>
+            i >= d.chunk_offset && i < d.chunk_offset + d.chunk_count
+          )
+          return chunk
+        })).size
+
+        console.warn(`[IndexService] Dimension mismatch: searching ${compatibleDocs}/${totalDocs} compatible docs. Re-index outdated documents for full coverage.`)
+
+        // Use only compatible indices for the search
+        relevantIndices.length = 0
+        relevantIndices.push(...compatibleIndices)
       }
     }
 
@@ -569,7 +612,9 @@ class IndexService {
               status: 'indexed',
               indexed_at: indexInfo.indexed_at,
               chunk_count: indexInfo.chunk_count,
-              embedding_version: 'v1'
+              embedding_version: 'v1',
+              embedding_model: indexInfo.embedding_model || meta.embedding_model,
+              embedding_dimensions: indexInfo.embedding_dimensions || meta.embedding_dimensions
             }
           })
           syncedCount++

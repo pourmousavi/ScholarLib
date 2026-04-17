@@ -11,6 +11,7 @@ import { ollamaService } from '../../services/ai/OllamaService'
 import { webllmService } from '../../services/ai/WebLLMService'
 import { claudeService } from '../../services/ai/ClaudeService'
 import { openaiService } from '../../services/ai/OpenAIService'
+import { geminiService } from '../../services/ai/GeminiService'
 import { getDeviceType, getDeviceName, getRecommendedProviders, DEVICE_TYPES, isWebLLMSuitable } from '../../utils/deviceDetection'
 import { useToast } from '../../hooks/useToast'
 import Modal from '../ui/Modal'
@@ -83,8 +84,10 @@ export default function SettingsModal({ onClose }) {
   const [openaiKey, setOpenaiKey] = useState('')
   const [ollamaStatus, setOllamaStatus] = useState({ available: false, models: [], lastError: null })
   const [testingOllama, setTestingOllama] = useState(false)
+  const [geminiKey, setGeminiKey] = useState('')
   const [testingClaude, setTestingClaude] = useState(false)
   const [testingOpenai, setTestingOpenai] = useState(false)
+  const [testingGemini, setTestingGemini] = useState(false)
 
   // WebLLM state
   const [webllmSupported, setWebllmSupported] = useState(false)
@@ -350,6 +353,31 @@ export default function SettingsModal({ onClose }) {
     }
   }
 
+  const handleTestGemini = async () => {
+    if (!geminiKey) {
+      showToast({ message: 'Enter an API key first', type: 'warning' })
+      return
+    }
+
+    setTestingGemini(true)
+    try {
+      geminiService.setApiKey(geminiKey)
+      const response = await geminiService.chat([
+        { role: 'user', content: 'Say "OK" and nothing else.' }
+      ], 'gemini-2.0-flash')
+
+      if (response) {
+        showToast({ message: 'Gemini API key is valid', type: 'success' })
+        setLocalSettings(prev => ({ ...prev, gemini_key_set: true }))
+      }
+    } catch (error) {
+      geminiService.setApiKey('')
+      showToast({ message: error.message || 'Invalid API key', type: 'error' })
+    } finally {
+      setTestingGemini(false)
+    }
+  }
+
   const handleProviderChange = (newProvider) => {
     setProvider(newProvider)
     settingsService.setAIProvider(newProvider)
@@ -363,6 +391,8 @@ export default function SettingsModal({ onClose }) {
       setAvailable(claudeService.isConfigured())
     } else if (newProvider === 'openai') {
       setAvailable(openaiService.isConfigured())
+    } else if (newProvider === 'gemini') {
+      setAvailable(geminiService.isConfigured())
     } else if (newProvider === 'none') {
       setAvailable(false)
     }
@@ -785,6 +815,7 @@ export default function SettingsModal({ onClose }) {
                   if (newProvider === 'ollama') defaultModel = 'llama3.2'
                   else if (newProvider === 'claude') defaultModel = 'claude-sonnet-4-20250514'
                   else if (newProvider === 'openai') defaultModel = 'gpt-4o-mini'
+                  else if (newProvider === 'gemini') defaultModel = 'gemini-2.0-flash'
                   else if (newProvider === 'webllm') defaultModel = 'Llama-3.2-3B-Instruct-q4f32_1-MLC'
 
                   setDeviceProvider(deviceType, newProvider, defaultModel)
@@ -795,6 +826,7 @@ export default function SettingsModal({ onClose }) {
                     else if (newProvider === 'webllm') setAvailable(webllmReady)
                     else if (newProvider === 'claude') setAvailable(claudeService.isConfigured())
                     else if (newProvider === 'openai') setAvailable(openaiService.isConfigured())
+                    else if (newProvider === 'gemini') setAvailable(geminiService.isConfigured())
                     else setAvailable(false)
                   }
                 }}
@@ -871,6 +903,19 @@ export default function SettingsModal({ onClose }) {
           <div className={styles.radioContent}>
             <span className={styles.radioLabel}>OpenAI API</span>
             <span className={styles.radioDesc}>GPT-4o and other OpenAI models</span>
+          </div>
+        </label>
+
+        <label className={styles.radioOption}>
+          <input
+            type="radio"
+            name="provider"
+            checked={provider === 'gemini'}
+            onChange={() => handleProviderChange('gemini')}
+          />
+          <div className={styles.radioContent}>
+            <span className={styles.radioLabel}>Gemini API</span>
+            <span className={styles.radioDesc}>Google Gemini models, generous free tier</span>
           </div>
         </label>
 
@@ -1209,6 +1254,51 @@ export default function SettingsModal({ onClose }) {
 
           <div className={styles.costWarning}>
             Cloud API usage incurs costs. Check OpenAI's pricing.
+          </div>
+        </div>
+      )}
+
+      {/* Gemini Config */}
+      {provider === 'gemini' && (
+        <div className={styles.providerConfig}>
+          <div className={styles.field}>
+            <label>API Key</label>
+            <div className={styles.inputRow}>
+              <input
+                type="password"
+                value={geminiKey}
+                onChange={(e) => setGeminiKey(e.target.value)}
+                placeholder={localSettings?.gemini_key_set ? '••••••••••••••••' : 'AI...'}
+              />
+              <button
+                className={styles.testBtn}
+                onClick={handleTestGemini}
+                disabled={testingGemini || !geminiKey}
+              >
+                {testingGemini ? 'Testing...' : 'Test key'}
+              </button>
+            </div>
+            <span className={styles.fieldHint}>
+              Stored locally on this device only. Never sent to any server.
+            </span>
+          </div>
+
+          <div className={styles.field}>
+            <label>Model</label>
+            <select
+              value={model}
+              onChange={(e) => handleModelChange(e.target.value)}
+            >
+              {geminiService.getAvailableModels().map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.name} - {m.inputPrice} input
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.costWarning}>
+            Gemini has a generous free tier. Paid models incur costs — check Google's pricing.
           </div>
         </div>
       )}

@@ -6,12 +6,14 @@
  * - WebLLM (browser)
  * - Claude API
  * - OpenAI API
+ * - Gemini API
  */
 import { useAIStore } from '../../store/aiStore'
 import { ollamaService } from './OllamaService'
 import { webllmService } from './WebLLMService'
 import { claudeService } from './ClaudeService'
 import { openaiService } from './OpenAIService'
+import { geminiService } from './GeminiService'
 
 class AIService {
   /**
@@ -79,6 +81,10 @@ Rules:
       return openaiService.isConfigured()
     }
 
+    if (provider === 'gemini') {
+      return geminiService.isConfigured()
+    }
+
     return false
   }
 
@@ -109,6 +115,11 @@ Rules:
         throw { code: 'AI_NOT_CONFIGURED', message: 'OpenAI API key not set. Add it in Settings.' }
       }
       yield* openaiService.streamChat(messages, modelOverride)
+    } else if (provider === 'gemini') {
+      if (!geminiService.isConfigured()) {
+        throw { code: 'AI_NOT_CONFIGURED', message: 'Gemini API key not set. Add it in Settings.' }
+      }
+      yield* geminiService.streamChat(messages, modelOverride)
     } else {
       throw { code: 'AI_NOT_CONFIGURED', message: 'No AI provider configured' }
     }
@@ -132,6 +143,8 @@ Rules:
       return await claudeService.chat(messages, modelOverride)
     } else if (provider === 'openai') {
       return await openaiService.chat(messages, modelOverride)
+    } else if (provider === 'gemini') {
+      return await geminiService.chat(messages, modelOverride)
     }
 
     throw { code: 'AI_NOT_CONFIGURED', message: 'No AI provider configured' }
@@ -187,6 +200,8 @@ Rules:
       return claudeService.estimateTokens(text)
     } else if (provider === 'openai') {
       return openaiService.estimateTokens(text)
+    } else if (provider === 'gemini') {
+      return geminiService.estimateTokens(text)
     }
 
     // Default estimation
@@ -203,7 +218,7 @@ Rules:
     const { provider, model } = useAIStore.getState()
 
     // Only cloud providers have costs
-    if (provider !== 'claude' && provider !== 'openai') {
+    if (provider !== 'claude' && provider !== 'openai' && provider !== 'gemini') {
       return null
     }
 
@@ -216,6 +231,8 @@ Rules:
       cost = claudeService.estimateCost(promptTokens, estimatedCompletionTokens, model)
     } else if (provider === 'openai') {
       cost = openaiService.estimateCost(promptTokens, estimatedCompletionTokens, model)
+    } else if (provider === 'gemini') {
+      cost = geminiService.estimateCost(promptTokens, estimatedCompletionTokens, model)
     }
 
     return {
@@ -231,7 +248,7 @@ Rules:
    */
   isCloudProvider() {
     const { provider } = useAIStore.getState()
-    return provider === 'claude' || provider === 'openai'
+    return provider === 'claude' || provider === 'openai' || provider === 'gemini'
   }
 
   /**
@@ -245,6 +262,8 @@ Rules:
       return claudeService.getAvailableModels()
     } else if (provider === 'openai') {
       return openaiService.getAvailableModels()
+    } else if (provider === 'gemini') {
+      return geminiService.getAvailableModels()
     } else if (provider === 'webllm') {
       return webllmService.getAvailableModels()
     }
@@ -264,6 +283,7 @@ Rules:
       case 'webllm': return webllmService
       case 'claude': return claudeService
       case 'openai': return openaiService
+      case 'gemini': return geminiService
       default: return null
     }
   }
