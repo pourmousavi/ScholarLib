@@ -153,10 +153,9 @@ export default function DocList({ isMobile = false }) {
          d.index_status?.status === 'failed'
   )
 
-  // Get documents indexed with a different embedding model
+  // Get documents indexed with a different embedding model (or unknown model)
   const getMismatchedDocs = () => allDocs.filter(
     d => d.index_status?.status === 'indexed' &&
-         d.index_status?.embedding_model &&
          d.index_status.embedding_model !== currentEmbeddingModel
   )
 
