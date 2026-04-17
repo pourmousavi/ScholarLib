@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  * @param {function} options.onSelectionChange - Callback when selection changes
  * @returns {Object} Selection state and methods
  */
-export function useTextSelection({ containerRef, currentPage, onSelectionChange }) {
+export function useTextSelection({ containerRef, currentPage, onSelectionChange, disabled = false }) {
   const [selection, setSelection] = useState(null)
   const isMouseDownRef = useRef(false)
   const lastProcessedRef = useRef(null)
@@ -203,10 +203,10 @@ export function useTextSelection({ containerRef, currentPage, onSelectionChange 
     onSelectionChange?.(null)
   }, [onSelectionChange])
 
-  // Set up event listeners on the container
+  // Set up event listeners on the container (skip on mobile phones)
   useEffect(() => {
     const container = containerRef?.current
-    if (!container) return
+    if (!container || disabled) return
 
     container.addEventListener('mousedown', handleMouseDown)
     container.addEventListener('mouseup', handleMouseUp)
@@ -215,7 +215,7 @@ export function useTextSelection({ containerRef, currentPage, onSelectionChange 
       container.removeEventListener('mousedown', handleMouseDown)
       container.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [containerRef, handleMouseDown, handleMouseUp])
+  }, [containerRef, handleMouseDown, handleMouseUp, disabled])
 
   return {
     selection,

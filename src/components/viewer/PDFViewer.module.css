@@ -127,6 +127,13 @@
   pointer-events: auto;
 }
 
+/* On phones, disable text layer interaction so touch scrolling works */
+@media (max-width: 639px) and (pointer: coarse) {
+  .textLayer {
+    pointer-events: none;
+  }
+}
+
 .pageLoading {
   position: absolute;
   inset: 0;

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import { usePDFLoader } from '../../hooks/usePDFLoader'
-import { useAnnotations, useTextSelection } from '../../hooks'
+import { useAnnotations, useTextSelection, useIsMobilePhone } from '../../hooks'
 import { useUIStore } from '../../store/uiStore'
 import { useAnnotationStore } from '../../store/annotationStore'
 import { Spinner, Btn } from '../ui'
@@ -12,6 +12,7 @@ import FullscreenOverlay from '../layout/FullscreenOverlay'
 import styles from './PDFViewer.module.css'
 
 export default function PDFViewer({ url, docId, onTextExtracted }) {
+  const isMobilePhone = useIsMobilePhone()
   const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
   const splitViewEnabled = useUIStore((s) => s.splitViewEnabled)
   const setFullscreenOverlayVisible = useUIStore((s) => s.setFullscreenOverlayVisible)
@@ -431,15 +432,16 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
                 setRef={(ref) => setPageRef(pageNum, ref)}
                 annotations={getAnnotationsForPage(pageNum)}
                 selectedAnnotationId={selectedAnnotationId}
-                onAnnotationClick={handleAnnotationClick}
-                onTextSelection={handleTextSelection}
+                onAnnotationClick={isMobilePhone ? undefined : handleAnnotationClick}
+                onTextSelection={isMobilePhone ? undefined : handleTextSelection}
                 containerRef={containerRef}
+                disableAnnotations={isMobilePhone}
               />
             ))}
           </div>
 
-          {/* Highlight toolbar on text selection */}
-          {textSelection && !areaSelectMode && (
+          {/* Highlight toolbar on text selection (disabled on phones) */}
+          {!isMobilePhone && textSelection && !areaSelectMode && (
             <HighlightToolbar
               selection={textSelection}
               onHighlight={handleCreateHighlight}
@@ -450,16 +452,18 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
             />
           )}
 
-          {/* Area selector overlay */}
-          <AreaSelector
-            active={areaSelectMode}
-            onAreaSelected={handleAreaSelected}
-            onCancel={() => setAreaSelectMode(false)}
-            containerRef={containerRef}
-          />
+          {/* Area selector overlay (disabled on phones) */}
+          {!isMobilePhone && (
+            <AreaSelector
+              active={areaSelectMode}
+              onAreaSelected={handleAreaSelected}
+              onCancel={() => setAreaSelectMode(false)}
+              containerRef={containerRef}
+            />
+          )}
 
-          {/* Annotation popover */}
-          {popoverAnnotation && popoverPosition && (
+          {/* Annotation popover (disabled on phones) */}
+          {!isMobilePhone && popoverAnnotation && popoverPosition && (
             <AnnotationPopover
               annotation={popoverAnnotation}
               onUpdateComment={updateComment}
@@ -514,7 +518,8 @@ function PageCanvas({
   selectedAnnotationId,
   onAnnotationClick,
   onTextSelection,
-  containerRef
+  containerRef,
+  disableAnnotations = false
 }) {
   const canvasRef = useRef(null)
   const textLayerRef = useRef(null)
@@ -531,10 +536,11 @@ function PageCanvas({
     }
   }, [setRef])
 
-  // Text selection tracking
+  // Text selection tracking (disabled on mobile phones to allow touch scrolling)
   const { selection, clearSelection } = useTextSelection({
     containerRef: wrapperRef,
     currentPage: pageNumber,
+    disabled: disableAnnotations,
     onSelectionChange: (sel) => {
       if (sel) {
         onTextSelection?.({ ...sel, page: pageNumber })
@@ -683,9 +689,10 @@ function PageCanvas({
       <div ref={textLayerRef} className={styles.textLayer} data-text-layer />
       <AnnotationLayer
         annotations={annotations}
-        selectedAnnotationId={selectedAnnotationId}
-        onAnnotationClick={onAnnotationClick}
+        selectedAnnotationId={disableAnnotations ? null : selectedAnnotationId}
+        onAnnotationClick={disableAnnotations ? undefined : onAnnotationClick}
         scale={zoom}
+        nonInteractive={disableAnnotations}
       />
       {isRendering && (
         <div className={styles.pageLoading}>

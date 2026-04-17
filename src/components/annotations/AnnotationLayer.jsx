@@ -16,7 +16,8 @@ function AnnotationLayer({
   annotations = [],
   selectedAnnotationId,
   onAnnotationClick,
-  scale = 100
+  scale = 100,
+  nonInteractive = false
 }) {
   const handleClick = useCallback((e, annotation) => {
     e.stopPropagation()
@@ -31,7 +32,7 @@ function AnnotationLayer({
   const scaleFactor = scale / 100
 
   return (
-    <div className={styles.layer}>
+    <div className={styles.layer} style={nonInteractive ? { pointerEvents: 'none' } : undefined}>
       {annotations.map((annotation) => (
         <AnnotationHighlight
           key={annotation.id}
