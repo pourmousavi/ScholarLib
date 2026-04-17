@@ -57,10 +57,29 @@ class IndexService {
       const arrayBuffer = await binaryBlob.arrayBuffer()
       const arr = new Float32Array(arrayBuffer)
       const vectors = []
-      const dims = meta.embedding_dimensions || 768
 
-      for (let i = 0; i < arr.length; i += dims) {
-        vectors.push(Array.from(arr.slice(i, i + dims)))
+      // Parse vectors using per-doc dimensions (supports mixed-dimension indexes)
+      const sortedDocs = Object.values(meta.docs)
+        .sort((a, b) => a.chunk_offset - b.chunk_offset)
+
+      if (sortedDocs.length > 0 && sortedDocs.some(d => d.embedding_dimensions)) {
+        // Per-doc dimension parsing
+        let floatOffset = 0
+        for (const docMeta of sortedDocs) {
+          const dims = docMeta.embedding_dimensions || meta.embedding_dimensions || 768
+          for (let i = 0; i < docMeta.chunk_count; i++) {
+            if (floatOffset + dims <= arr.length) {
+              vectors.push(Array.from(arr.slice(floatOffset, floatOffset + dims)))
+            }
+            floatOffset += dims
+          }
+        }
+      } else {
+        // Legacy: single global dimension
+        const dims = meta.embedding_dimensions || 768
+        for (let i = 0; i < arr.length; i += dims) {
+          vectors.push(Array.from(arr.slice(i, i + dims)))
+        }
       }
 
       this.indexCache = { indexData: vectors, meta }
