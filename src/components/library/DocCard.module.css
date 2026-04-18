@@ -54,6 +54,14 @@
   color: var(--text-primary);
 }
 
+.pdfIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  opacity: 0.6;
+}
+
 .noPdfBadge {
   font-family: 'DM Mono', monospace;
   font-size: 9px;
