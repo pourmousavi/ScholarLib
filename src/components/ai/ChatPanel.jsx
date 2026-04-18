@@ -225,6 +225,15 @@ export default function ChatPanel() {
     setIsIndexingDoc(true)
     setIndexingProgress('Starting...')
 
+    if (!selectedDoc.box_path) {
+      setIndexingProgress('Cannot index: no PDF attached to this document')
+      setTimeout(() => {
+        setIsIndexingDoc(false)
+        setIndexingProgress('')
+      }, 3000)
+      return
+    }
+
     try {
       // Get the PDF URL
       const pdfURL = await adapter.getFileStreamURL(selectedDoc.box_path)

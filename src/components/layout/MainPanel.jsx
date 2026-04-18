@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useUIStore } from '../../store/uiStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { LibraryService } from '../../services/library/LibraryService'
+import { useToast } from '../../hooks/useToast'
 import ViewerSwitch from '../viewer/ViewerSwitch'
 import SplitViewPanel from './SplitViewPanel'
 import { NotesPanel } from '../notes'
@@ -33,6 +34,57 @@ export default function MainPanel({ isMobile = false }) {
   const isConnected = useStorageStore((s) => s.isConnected)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
 
+  const { showToast } = useToast()
+  const attachInputRef = useRef(null)
+
+  const noPdfAttached = selectedDoc && !selectedDoc.box_path
+
+  const handleAttachPdf = useCallback(() => {
+    if (isDemoMode || !adapter) return
+    attachInputRef.current?.click()
+  }, [isDemoMode, adapter])
+
+  const handleAttachFileSelected = useCallback(async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      showToast({ message: 'Only PDF files are supported', type: 'error' })
+      return
+    }
+    if (file.size > 200 * 1024 * 1024) {
+      showToast({ message: 'File must be under 200MB', type: 'error' })
+      return
+    }
+
+    const title = selectedDoc?.metadata?.title
+    const sanitized = title ? title.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 80) : ''
+    const filename = sanitized ? sanitized + '.pdf' : file.name
+
+    try {
+      const state = useLibraryStore.getState()
+      const library = {
+        version: '1.1',
+        folders: state.folders,
+        documents: { ...state.documents },
+        tag_registry: state.tagRegistry,
+        collection_registry: state.collectionRegistry,
+        smart_collections: state.smartCollections
+      }
+      const result = await LibraryService.attachPdf(adapter, library, selectedDocId, file, filename)
+      updateDocument(selectedDocId, {
+        box_path: result.box_path,
+        box_file_id: result.box_file_id,
+        filename: result.filename
+      })
+      showToast({ message: 'PDF attached successfully', type: 'success' })
+    } catch (error) {
+      console.error('Failed to attach PDF:', error)
+      showToast({ message: 'Failed to attach PDF', type: 'error' })
+    }
+  }, [selectedDoc, selectedDocId, adapter, updateDocument, showToast])
+
   const panels = [
     { id: 'pdf', label: 'PDF' },
     { id: 'ai', label: 'AI Chat' },
@@ -60,12 +112,13 @@ export default function MainPanel({ isMobile = false }) {
       if (!isDemoMode && adapter) {
         const saveAsync = async () => {
           try {
-            const { folders, documents, tagRegistry, smartCollections } = useLibraryStore.getState()
+            const { folders, documents, tagRegistry, collectionRegistry, smartCollections } = useLibraryStore.getState()
             await LibraryService.saveLibrary(adapter, {
-              version: '1.0',
+              version: '1.1',
               folders,
               documents,
               tag_registry: tagRegistry,
+              collection_registry: collectionRegistry,
               smart_collections: smartCollections
             })
           } catch (e) {
@@ -195,6 +248,8 @@ export default function MainPanel({ isMobile = false }) {
             docId={selectedDocId}
             onTextExtracted={handleTextExtracted}
             pdfError={pdfError}
+            noPdfAttached={noPdfAttached}
+            onAttachPdf={handleAttachPdf}
           />
         ) : (
           <>
@@ -204,6 +259,8 @@ export default function MainPanel({ isMobile = false }) {
                 docId={selectedDocId}
                 onTextExtracted={handleTextExtracted}
                 error={pdfError}
+                noPdfAttached={noPdfAttached}
+                onAttachPdf={handleAttachPdf}
               />
             )}
             {activePanel === 'ai' && (
@@ -215,6 +272,14 @@ export default function MainPanel({ isMobile = false }) {
           </>
         )}
       </div>
+
+      <input
+        ref={attachInputRef}
+        type="file"
+        accept=".pdf"
+        onChange={handleAttachFileSelected}
+        style={{ display: 'none' }}
+      />
     </div>
   )
 }

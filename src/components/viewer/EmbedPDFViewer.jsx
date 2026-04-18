@@ -1171,7 +1171,7 @@ function DocumentLoader({
   )
 }
 
-export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
+export default function EmbedPDFViewer({ url, docId, onTextExtracted, noPdfAttached, onAttachPdf }) {
   const isTouchDevice = useIsMobilePhone()
   const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
   const setFullscreenOverlayVisible = useUIStore((s) => s.setFullscreenOverlayVisible)
@@ -1287,6 +1287,24 @@ export default function EmbedPDFViewer({ url, docId, onTextExtracted }) {
   }, [url])
 
   if (!url) {
+    if (noPdfAttached) {
+      return (
+        <div className={styles.viewer}>
+          <div className={styles.placeholder}>
+            <div className={styles.placeholderIcon}>PDF</div>
+            <span className={styles.placeholderTitle}>No PDF attached</span>
+            <span className={styles.placeholderText}>
+              This document only has metadata. Attach a PDF to enable viewing, annotations, and AI indexing.
+            </span>
+            {onAttachPdf && (
+              <button className={styles.attachBtn} onClick={onAttachPdf}>
+                Attach PDF
+              </button>
+            )}
+          </div>
+        </div>
+      )
+    }
     return (
       <div className={styles.viewer}>
         <div className={styles.placeholder}>

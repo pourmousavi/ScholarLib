@@ -54,6 +54,18 @@
   color: var(--text-primary);
 }
 
+.noPdfBadge {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .star {
   color: var(--accent);
   margin-left: auto;

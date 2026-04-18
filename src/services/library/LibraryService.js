@@ -133,6 +133,48 @@ export const LibraryService = {
     return doc
   },
 
+  async attachPdf(adapter, library, docId, file, filename) {
+    const doc = library.documents[docId]
+    if (!doc) {
+      throw new Error(`Document not found: ${docId}`)
+    }
+
+    const box_path = `PDFs/${filename}`
+    const box_file_id = await adapter.uploadFile(box_path, file)
+
+    doc.box_path = box_path
+    doc.box_file_id = box_file_id
+    doc.filename = filename
+
+    await this.saveLibrary(adapter, library)
+    return doc
+  },
+
+  async replacePdf(adapter, library, docId, file, filename) {
+    const doc = library.documents[docId]
+    if (!doc) {
+      throw new Error(`Document not found: ${docId}`)
+    }
+
+    const box_path = `PDFs/${filename}`
+    const box_file_id = await adapter.uploadFile(box_path, file)
+
+    doc.box_path = box_path
+    doc.box_file_id = box_file_id
+    doc.filename = filename
+    doc.index_status = {
+      status: 'none',
+      indexed_at: null,
+      indexed_on_device: null,
+      model_used: null,
+      chunk_count: 0,
+      embedding_version: null,
+    }
+
+    await this.saveLibrary(adapter, library)
+    return doc
+  },
+
   async updateDocument(adapter, library, docId, updates) {
     const doc = library.documents[docId]
     if (!doc) {

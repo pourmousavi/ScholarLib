@@ -82,6 +82,10 @@ export default function EditMetadataModal({ onClose }) {
       showToast({ message: 'Storage not connected', type: 'error' })
       return
     }
+    if (!doc.box_path) {
+      showToast({ message: 'No PDF attached — cannot re-extract metadata', type: 'error' })
+      return
+    }
 
     setIsExtracting(true)
 
@@ -156,13 +160,14 @@ export default function EditMetadataModal({ onClose }) {
 
       // Save to storage
       if (!isDemoMode && adapter) {
-        const { tagRegistry, smartCollections } = useLibraryStore.getState()
+        const { tagRegistry, collectionRegistry, smartCollections } = useLibraryStore.getState()
         const library = {
           folders,
           documents: { ...documents, [doc.id]: updatedDoc },
           tag_registry: tagRegistry,
+          collection_registry: collectionRegistry,
           smart_collections: smartCollections,
-          version: '1.0',
+          version: '1.1',
           last_modified: new Date().toISOString()
         }
         await LibraryService.saveLibrary(adapter, library)
@@ -336,7 +341,7 @@ export default function EditMetadataModal({ onClose }) {
             </div>
 
             <div className={styles.footer}>
-              <Btn onClick={handleReExtract} disabled={isExtracting || !adapter}>
+              <Btn onClick={handleReExtract} disabled={isExtracting || !adapter || !doc.box_path} title={!doc.box_path ? 'Attach a PDF first' : ''}>
                 Re-extract with AI
               </Btn>
               <div className={styles.actions}>

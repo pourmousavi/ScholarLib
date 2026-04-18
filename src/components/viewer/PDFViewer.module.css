@@ -208,6 +208,24 @@
   line-height: 1.5;
 }
 
+.attachBtn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+  background: var(--accent);
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+  margin-top: var(--space-2);
+}
+
+.attachBtn:hover {
+  opacity: 0.85;
+}
+
 .loading {
   flex: 1;
   display: flex;

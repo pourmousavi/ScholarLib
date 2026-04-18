@@ -11,7 +11,7 @@ import PDFToolbar from './PDFToolbar'
 import FullscreenOverlay from '../layout/FullscreenOverlay'
 import styles from './PDFViewer.module.css'
 
-export default function PDFViewer({ url, docId, onTextExtracted }) {
+export default function PDFViewer({ url, docId, onTextExtracted, noPdfAttached, onAttachPdf }) {
   const isMobilePhone = useIsMobilePhone()
   const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
   const splitViewEnabled = useUIStore((s) => s.splitViewEnabled)
@@ -365,6 +365,24 @@ export default function PDFViewer({ url, docId, onTextExtracted }) {
   }, [])
 
   if (!url) {
+    if (noPdfAttached) {
+      return (
+        <div className={styles.viewer}>
+          <div className={styles.placeholder}>
+            <div className={styles.placeholderIcon}>PDF</div>
+            <span className={styles.placeholderTitle}>No PDF attached</span>
+            <span className={styles.placeholderText}>
+              This document only has metadata. Attach a PDF to enable viewing, annotations, and AI indexing.
+            </span>
+            {onAttachPdf && (
+              <button className={styles.attachBtn} onClick={onAttachPdf}>
+                Attach PDF
+              </button>
+            )}
+          </div>
+        </div>
+      )
+    }
     return (
       <div className={styles.viewer}>
         <div className={styles.placeholder}>

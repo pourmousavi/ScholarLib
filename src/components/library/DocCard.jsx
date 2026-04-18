@@ -1,4 +1,4 @@
-import { useState, useMemo, memo, useCallback } from 'react'
+import { useState, useRef, useMemo, memo, useCallback } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
@@ -8,7 +8,8 @@ import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
 import { settingsService } from '../../services/settings/SettingsService'
 import { collectionService } from '../../services/tags/CollectionService'
-import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon, FolderIcon, ExportIcon } from '../ui'
+import { AnnotationService } from '../../services/annotations'
+import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon, FolderIcon, ExportIcon, LinkIcon } from '../ui'
 import QuickTagModal from './QuickTagModal'
 import AddToCollectionModal from './AddToCollectionModal'
 import styles from './DocCard.module.css'
@@ -18,6 +19,8 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   const [isReindexing, setIsReindexing] = useState(false)
   const [showTagModal, setShowTagModal] = useState(false)
   const [showAddToCollectionModal, setShowAddToCollectionModal] = useState(false)
+  const attachInputRef = useRef(null)
+  const replaceInputRef = useRef(null)
 
   // Display settings
   const showTags = settingsService.getShowTags()
@@ -191,7 +194,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
 
     const path = doc.box_path
     if (!path) {
-      showToast({ message: 'Document has no file path', type: 'error' })
+      showToast({ message: 'Attach a PDF first to enable AI indexing', type: 'error' })
       return
     }
 
@@ -235,6 +238,124 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
     handleCloseContextMenu()
   }
 
+  const handleAttachPdf = () => {
+    handleCloseContextMenu()
+    if (isDemoMode || !adapter) {
+      showToast({ message: 'Connect to storage first', type: 'error' })
+      return
+    }
+    attachInputRef.current?.click()
+  }
+
+  const handleAttachFileSelected = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    // Reset input so re-selecting same file triggers change
+    e.target.value = ''
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      showToast({ message: 'Only PDF files are supported', type: 'error' })
+      return
+    }
+    if (file.size > 200 * 1024 * 1024) {
+      showToast({ message: 'File must be under 200MB', type: 'error' })
+      return
+    }
+
+    // Sanitize filename from doc title or use original
+    const title = doc.metadata?.title
+    const sanitized = title ? title.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 80) : ''
+    const filename = sanitized ? sanitized + '.pdf' : file.name
+
+    try {
+      const state = useLibraryStore.getState()
+      const library = {
+        version: '1.1',
+        folders: state.folders,
+        documents: { ...state.documents },
+        tag_registry: state.tagRegistry,
+        collection_registry: state.collectionRegistry,
+        smart_collections: state.smartCollections
+      }
+      const result = await LibraryService.attachPdf(adapter, library, doc.id, file, filename)
+      updateDocument(doc.id, {
+        box_path: result.box_path,
+        box_file_id: result.box_file_id,
+        filename: result.filename
+      })
+      showToast({ message: 'PDF attached successfully', type: 'success' })
+    } catch (error) {
+      console.error('Failed to attach PDF:', error)
+      showToast({ message: 'Failed to attach PDF', type: 'error' })
+    }
+  }
+
+  const handleReplacePdf = () => {
+    handleCloseContextMenu()
+    if (isDemoMode || !adapter) {
+      showToast({ message: 'Connect to storage first', type: 'error' })
+      return
+    }
+    const isIndexed = doc.index_status?.status === 'indexed'
+    const message = isIndexed
+      ? 'Replace PDF? This will remove all annotations, highlights, and AI index data for this document. This cannot be undone.'
+      : 'Replace PDF? This will remove any annotations and highlights on this document. This cannot be undone.'
+    if (!confirm(message)) return
+    replaceInputRef.current?.click()
+  }
+
+  const handleReplaceFileSelected = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      showToast({ message: 'Only PDF files are supported', type: 'error' })
+      return
+    }
+    if (file.size > 200 * 1024 * 1024) {
+      showToast({ message: 'File must be under 200MB', type: 'error' })
+      return
+    }
+
+    const title = doc.metadata?.title
+    const sanitized = title ? title.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 80) : ''
+    const filename = sanitized ? sanitized + '.pdf' : file.name
+
+    try {
+      // Upload replacement PDF first (so failure doesn't destroy existing data)
+      const state = useLibraryStore.getState()
+      const library = {
+        version: '1.1',
+        folders: state.folders,
+        documents: { ...state.documents },
+        tag_registry: state.tagRegistry,
+        collection_registry: state.collectionRegistry,
+        smart_collections: state.smartCollections
+      }
+      const result = await LibraryService.replacePdf(adapter, library, doc.id, file, filename)
+
+      // Upload succeeded — now safe to clear annotations and index
+      AnnotationService.clearDocAnnotations(doc.id)
+      await AnnotationService.flushSave(adapter)
+
+      if (doc.index_status?.status === 'indexed') {
+        await indexService.removeDocumentIndex(doc.id, adapter)
+      }
+
+      updateDocument(doc.id, {
+        box_path: result.box_path,
+        box_file_id: result.box_file_id,
+        filename: result.filename,
+        index_status: result.index_status
+      })
+      showToast({ message: 'PDF replaced successfully', type: 'success' })
+    } catch (error) {
+      console.error('Failed to replace PDF:', error)
+      showToast({ message: 'Failed to replace PDF', type: 'error' })
+    }
+  }
+
   const handleRemoveFromCollection = async (collectionSlug, collectionName) => {
     const result = removeDocFromCollection(collectionSlug, doc.id)
     if (result.error) {
@@ -258,12 +379,23 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
       ]
     : []
 
+  const hasPdf = !!doc.box_path
+
   const contextMenuItems = [
     {
       label: 'Edit metadata...',
       icon: <EditIcon />,
       onClick: handleEditMetadata
     },
+    ...(!hasPdf ? [{
+      label: 'Attach PDF...',
+      icon: <LinkIcon />,
+      onClick: handleAttachPdf
+    }] : [{
+      label: 'Replace PDF...',
+      icon: <RefreshIcon />,
+      onClick: handleReplacePdf
+    }]),
     {
       label: 'Manage tags...',
       icon: <TagIcon />,
@@ -354,6 +486,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
           <h3 className={`${styles.title} ${isUnread ? styles.unread : ''}`}>
             {title}
           </h3>
+          {!hasPdf && <span className={styles.noPdfBadge} title="No PDF attached">metadata only</span>}
           {isStarred && <span className={styles.star} aria-hidden="true"><StarFilledIcon /></span>}
         </div>
         <div className={styles.authors}>{authorText}</div>
@@ -440,6 +573,21 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
           onClose={() => setShowAddToCollectionModal(false)}
         />
       )}
+
+      <input
+        ref={attachInputRef}
+        type="file"
+        accept=".pdf"
+        onChange={handleAttachFileSelected}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept=".pdf"
+        onChange={handleReplaceFileSelected}
+        style={{ display: 'none' }}
+      />
     </>
   )
 })

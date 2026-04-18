@@ -579,6 +579,68 @@ class IndexService {
   }
 
   /**
+   * Remove index data for a single document
+   * @param {string} docId - Document ID
+   * @param {StorageAdapter} adapter
+   */
+  async removeDocumentIndex(docId, adapter) {
+    try {
+      const { indexData, meta } = await this.loadIndex(adapter)
+      if (!meta.docs[docId]) return // Not indexed, nothing to do
+
+      const chunksMeta = await this.loadChunksMeta(adapter)
+      const oldDoc = meta.docs[docId]
+      const oldOffset = oldDoc.chunk_offset
+      const oldCount = oldDoc.chunk_count
+
+      // Remove old vectors
+      indexData.splice(oldOffset, oldCount)
+
+      // Remove old chunk metadata
+      for (let i = 0; i < oldCount; i++) {
+        delete chunksMeta.chunks[oldOffset + i]
+      }
+
+      // Shift offsets for docs that came after this one
+      for (const [id, docMeta] of Object.entries(meta.docs)) {
+        if (docMeta.chunk_offset > oldOffset) {
+          docMeta.chunk_offset -= oldCount
+        }
+      }
+
+      // Reindex chunk metadata keys
+      const newChunks = {}
+      for (const [key, val] of Object.entries(chunksMeta.chunks)) {
+        const idx = parseInt(key, 10)
+        if (idx > oldOffset) {
+          newChunks[idx - oldCount] = val
+        } else {
+          newChunks[idx] = val
+        }
+      }
+      chunksMeta.chunks = newChunks
+
+      meta.total_chunks -= oldCount
+      delete meta.docs[docId]
+      meta.total_docs_indexed = Object.keys(meta.docs).length
+
+      // Save updated index
+      const binary = new Float32Array(indexData.flat()).buffer
+      await adapter.uploadFile('_system/index/embeddings_v1.bin', new Blob([binary]))
+      await adapter.writeJSON('_system/index/index_meta.json', meta)
+      await adapter.writeJSON('_system/index/chunks_meta.json', chunksMeta)
+
+      // Update cache
+      this.indexCache = { indexData, meta }
+      this.chunkTextCache = chunksMeta
+
+      console.log(`[IndexService] Removed index for ${docId}: ${oldCount} chunks`)
+    } catch (error) {
+      console.error(`[IndexService] Failed to remove index for ${docId}:`, error)
+    }
+  }
+
+  /**
    * Clear entire index from storage (use when embedding model changes)
    * @param {StorageAdapter} adapter
    */
