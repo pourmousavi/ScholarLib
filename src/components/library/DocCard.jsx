@@ -9,7 +9,7 @@ import { indexService } from '../../services/indexing/IndexService'
 import { settingsService } from '../../services/settings/SettingsService'
 import { collectionService } from '../../services/tags/CollectionService'
 import { AnnotationService } from '../../services/annotations'
-import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon, FolderIcon, ExportIcon, LinkIcon } from '../ui'
+import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon, FolderIcon, ExportIcon, LinkIcon, DownloadIcon } from '../ui'
 import QuickTagModal from './QuickTagModal'
 import AddToCollectionModal from './AddToCollectionModal'
 import styles from './DocCard.module.css'
@@ -238,6 +238,27 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
     handleCloseContextMenu()
   }
 
+  const handleDownloadPdf = async () => {
+    handleCloseContextMenu()
+    if (!adapter || !doc.box_path) return
+
+    try {
+      showToast({ message: 'Downloading...', type: 'info' })
+      const blob = await adapter.downloadFile(doc.box_path)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = doc.filename || doc.metadata?.title?.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 80) + '.pdf' || 'document.pdf'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Failed to download PDF:', error)
+      showToast({ message: 'Failed to download PDF', type: 'error' })
+    }
+  }
+
   const handleAttachPdf = () => {
     handleCloseContextMenu()
     if (isDemoMode || !adapter) {
@@ -413,6 +434,11 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
       icon: <ExportIcon />,
       onClick: handleExportCitation
     },
+    ...(hasPdf ? [{
+      label: 'Download PDF',
+      icon: <DownloadIcon />,
+      onClick: handleDownloadPdf
+    }] : []),
     { separator: true },
     {
       label: 'Move to folder...',
