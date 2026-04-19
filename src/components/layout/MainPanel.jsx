@@ -128,7 +128,8 @@ export default function MainPanel({ isMobile = false }) {
     { id: 'notes', label: 'Notes' }
   ]
 
-  // Auto-mark document as read when opened
+  // Auto-mark document as read when opened (debounced to avoid racing with user-initiated saves)
+  const readMarkTimerRef = useRef(null)
   useEffect(() => {
     if (!selectedDocId) return
 
@@ -145,15 +146,17 @@ export default function MainPanel({ isMobile = false }) {
         }
       })
 
-      // Persist to storage
+      // Persist to storage with a delay to avoid racing with immediate user actions
       if (!isDemoMode && adapter) {
-        const saveAsync = async () => {
+        clearTimeout(readMarkTimerRef.current)
+        readMarkTimerRef.current = setTimeout(async () => {
           try {
-            const { folders, documents, tagRegistry, collectionRegistry, smartCollections } = useLibraryStore.getState()
+            // Re-read store state at save time to capture any interim changes
+            const { folders, documents: docs, tagRegistry, collectionRegistry, smartCollections } = useLibraryStore.getState()
             await LibraryService.saveLibrary(adapter, {
-              version: '1.1',
+              version: '1.2',
               folders,
-              documents,
+              documents: docs,
               tag_registry: tagRegistry,
               collection_registry: collectionRegistry,
               smart_collections: smartCollections
@@ -161,10 +164,11 @@ export default function MainPanel({ isMobile = false }) {
           } catch (e) {
             console.error('Failed to save read status:', e)
           }
-        }
-        saveAsync()
+        }, 2000)
       }
     }
+
+    return () => clearTimeout(readMarkTimerRef.current)
   }, [selectedDocId, adapter, isDemoMode, updateDocument]) // Include necessary deps
 
   // Fetch PDF URL when document changes
