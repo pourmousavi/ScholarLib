@@ -38,7 +38,9 @@ export default function ShareModal({ onClose }) {
       }
 
       try {
-        const result = await workerClient.getAccess(folderPath)
+        // TODO: Get actual Box token from storage adapter
+        const boxToken = localStorage.getItem('sv_box_access') ? atob(localStorage.getItem('sv_box_access')) : null
+        const result = await workerClient.getAccess(folderPath, boxToken)
         setCollaborators(result.collaborators || [])
       } catch (error) {
         console.error('Failed to load collaborators:', error)

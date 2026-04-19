@@ -8,9 +8,38 @@
  *
  * KV Namespaces:
  * - SHARES: Share records (shareId -> share data)
- * - ACCESS: Access lookup (folderPath::email -> access data)
- * - LOGS: Activity logs with 90-day TTL
+ * - ACCESS: Access lookup (encodedFolderPath|encodedEmail -> access data)
+ * - LOGS: Activity logs with 90-day TTL (encodedFolderPath|encodedEmail|timestamp)
+ * - AUTH_CACHE: Short-lived Box token verification cache (SHA-256 hash -> user info, 5 min TTL)
  */
+
+/**
+ * Build a JSON Response with proper status and CORS headers.
+ * @param {object} body
+ * @param {number} status
+ * @param {Record<string,string>} corsHeaders
+ */
+function jsonResponse(body, status, corsHeaders) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}
+
+/**
+ * Build an ACCESS or LOGS key from parts using URL-encoded components
+ * joined by '|' (which cannot appear in encodeURIComponent output).
+ */
+function makeKey(...parts) {
+  return parts.map(p => encodeURIComponent(p)).join('|')
+}
+
+/**
+ * Parse a '|'-delimited key back into its raw parts.
+ */
+function parseKey(key) {
+  return key.split('|').map(p => decodeURIComponent(p))
+}
 
 export default {
   async fetch(request, env) {
@@ -18,21 +47,21 @@ export default {
     const origin = request.headers.get('Origin')
     const allowedOrigins = (env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim())
 
-    // Allow requests without origin (e.g., curl) in development
+    // Allow requests without origin (non-browser traffic) — no CORS header needed
     const isAllowedOrigin = !origin || allowedOrigins.includes(origin)
 
     if (!isAllowedOrigin) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return jsonResponse({ error: 'Forbidden' }, 403, {})
     }
 
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': origin || '*',
-      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    }
+    // Only set CORS headers when a valid browser origin is present
+    const corsHeaders = origin
+      ? {
+          'Access-Control-Allow-Origin': origin,
+          'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+      : {}
 
     // Handle preflight requests
     if (request.method === 'OPTIONS') {
@@ -43,65 +72,111 @@ export default {
     const path = url.pathname
 
     try {
-      let response
+      // Route handlers — each returns { status, body }
+      let result
 
-      // Route handlers
       if (path === '/health' && request.method === 'GET') {
-        response = { status: 'ok', timestamp: new Date().toISOString() }
+        result = { status: 200, body: { status: 'ok', timestamp: new Date().toISOString() } }
       } else if (path === '/share' && request.method === 'POST') {
-        response = await handleCreateShare(request, env)
+        result = await handleCreateShare(request, env)
       } else if (path.startsWith('/share/') && request.method === 'DELETE') {
-        response = await handleDeleteShare(request, env, path)
+        result = await handleDeleteShare(request, env, path)
       } else if (path.startsWith('/access/') && request.method === 'GET') {
-        response = await handleGetAccess(request, env, path)
+        result = await handleGetAccess(request, env, path)
       } else if (path === '/log' && request.method === 'POST') {
-        response = await handleLog(request, env)
+        result = await handleLog(request, env)
       } else if (path.startsWith('/activity/') && request.method === 'GET') {
-        response = await handleGetActivity(request, env, path, url)
+        result = await handleGetActivity(request, env, path, url)
       } else if (path === '/token' && request.method === 'POST') {
-        response = await handleGetToken(request, env)
+        result = await handleGetToken(request, env)
       } else if (path === '/check-access' && request.method === 'POST') {
-        response = await handleCheckAccess(request, env)
+        result = await handleCheckAccess(request, env)
       } else {
-        response = { error: 'Not found' }
-        return new Response(JSON.stringify(response), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
+        return jsonResponse({ error: 'Not found' }, 404, corsHeaders)
       }
 
-      return new Response(JSON.stringify(response), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      return jsonResponse(result.body, result.status, corsHeaders)
     } catch (e) {
       console.error('Worker error:', e)
-      return new Response(JSON.stringify({ error: e.message || 'Internal server error' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      return jsonResponse({ error: 'Internal server error' }, 500, corsHeaders)
     }
   }
 }
 
 /**
- * Verify that the requesting user owns the folder
- * Uses Box API to check folder ownership
+ * Verify the caller's identity via Box API.
+ *
+ * - Extracts the Bearer token from the Authorization header.
+ * - Checks AUTH_CACHE (keyed by SHA-256 hash of token) to avoid redundant Box calls.
+ * - Falls back to GET https://api.box.com/2.0/users/me to validate.
+ * - Caches successful results for 5 minutes.
+ *
+ * @returns {{ valid: true, token: string, userId: string, login: string }
+ *          | { valid: false, status: number, error: string }}
  */
-async function verifyOwner(request, env, folderPath) {
+async function verifyOwner(request, env) {
   const authHeader = request.headers.get('Authorization')
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { valid: false, error: 'Missing authorization token' }
+    return { valid: false, status: 401, error: 'Missing authorization token' }
   }
 
   const token = authHeader.slice(7)
+  if (!token) {
+    return { valid: false, status: 401, error: 'Empty authorization token' }
+  }
 
-  // For now, we trust the token if present
-  // In production, verify against Box API:
-  // const boxUser = await fetch('https://api.box.com/2.0/users/me', {
-  //   headers: { 'Authorization': `Bearer ${token}` }
-  // }).then(r => r.json())
+  // Cache key = SHA-256 hash of token (never store the raw token)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
+  const cacheKey = Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
 
-  return { valid: true, token }
+  // Check cache first
+  const cached = await env.AUTH_CACHE.get(cacheKey, 'json')
+  if (cached) {
+    return { valid: true, token, userId: cached.userId, login: cached.login }
+  }
+
+  // Verify against Box API
+  let boxRes
+  try {
+    boxRes = await fetch('https://api.box.com/2.0/users/me', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+  } catch (err) {
+    console.error('Box API request failed:', err)
+    return { valid: false, status: 401, error: 'Failed to verify token with Box' }
+  }
+
+  if (!boxRes.ok) {
+    return { valid: false, status: 401, error: 'Invalid or expired Box token' }
+  }
+
+  const boxUser = await boxRes.json()
+  const userId = boxUser.id
+  const login = boxUser.login
+
+  // Cache for 5 minutes
+  await env.AUTH_CACHE.put(cacheKey, JSON.stringify({ userId, login }), {
+    expirationTtl: 300
+  })
+
+  return { valid: true, token, userId, login }
+}
+
+/**
+ * Find the first share record whose folder_path matches, and return its owner_user_id.
+ * Returns null if no shares exist for the folder.
+ */
+async function findOwnerForFolder(env, folderPath) {
+  const list = await env.SHARES.list()
+  for (const key of list.keys) {
+    const share = await env.SHARES.get(key.name, 'json')
+    if (share?.folder_path === folderPath) {
+      return share.owner_user_id || null
+    }
+  }
+  return null
 }
 
 /**
@@ -110,44 +185,51 @@ async function verifyOwner(request, env, folderPath) {
  * Body: { folder_path, collaborator_email, permission, expires_at? }
  */
 async function handleCreateShare(request, env) {
-  // Verify ownership
   const auth = await verifyOwner(request, env)
   if (!auth.valid) {
-    return { error: auth.error }
+    return { status: auth.status, body: { error: auth.error } }
   }
 
-  const { folder_path, collaborator_email, permission, expires_at } = await request.json()
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return { status: 400, body: { error: 'Invalid JSON body' } }
+  }
+
+  const { folder_path, collaborator_email, permission, expires_at } = body
 
   // Validate required fields
   if (!folder_path || !collaborator_email || !permission) {
-    return { error: 'Missing required fields: folder_path, collaborator_email, permission' }
+    return { status: 400, body: { error: 'Missing required fields: folder_path, collaborator_email, permission' } }
   }
 
   // Validate permission
   const validPermissions = ['viewer', 'annotator', 'contributor']
   if (!validPermissions.includes(permission)) {
-    return { error: `Invalid permission. Must be one of: ${validPermissions.join(', ')}` }
+    return { status: 400, body: { error: `Invalid permission. Must be one of: ${validPermissions.join(', ')}` } }
   }
 
   // Validate email format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(collaborator_email)) {
-    return { error: 'Invalid email format' }
+    return { status: 400, body: { error: 'Invalid email format' } }
   }
 
   // Check if share already exists
-  const accessKey = `${folder_path}::${collaborator_email}`
+  const accessKey = makeKey(folder_path, collaborator_email)
   const existingAccess = await env.ACCESS.get(accessKey)
   if (existingAccess) {
-    return { error: 'Share already exists for this folder and email' }
+    return { status: 409, body: { error: 'Share already exists for this folder and email' } }
   }
 
-  // Create share record
+  // Create share record (includes owner_user_id for ownership checks)
   const shareId = `sh_${crypto.randomUUID()}`
   const shareData = {
     folder_path,
     collaborator_email,
     permission,
+    owner_user_id: auth.userId,
     created_at: new Date().toISOString(),
     expires_at: expires_at || null
   }
@@ -162,10 +244,16 @@ async function handleCreateShare(request, env) {
   }
   await env.ACCESS.put(accessKey, JSON.stringify(accessData))
 
+  // Don't leak owner_user_id to the client
+  const { owner_user_id: _, ...publicShareData } = shareData
+
   return {
-    share_id: shareId,
-    created: true,
-    share: shareData
+    status: 200,
+    body: {
+      share_id: shareId,
+      created: true,
+      share: publicShareData
+    }
   }
 }
 
@@ -174,30 +262,34 @@ async function handleCreateShare(request, env) {
  * DELETE /share/:shareId
  */
 async function handleDeleteShare(request, env, path) {
-  // Verify ownership
   const auth = await verifyOwner(request, env)
   if (!auth.valid) {
-    return { error: auth.error }
+    return { status: auth.status, body: { error: auth.error } }
   }
 
   const shareId = path.split('/')[2]
   if (!shareId) {
-    return { error: 'Missing share ID' }
+    return { status: 400, body: { error: 'Missing share ID' } }
   }
 
   const share = await env.SHARES.get(shareId, 'json')
   if (!share) {
-    return { error: 'Share not found' }
+    return { status: 404, body: { error: 'Share not found' } }
+  }
+
+  // Ownership check
+  if (share.owner_user_id && share.owner_user_id !== auth.userId) {
+    return { status: 403, body: { error: 'You do not own this share' } }
   }
 
   // Delete access lookup
-  const accessKey = `${share.folder_path}::${share.collaborator_email}`
+  const accessKey = makeKey(share.folder_path, share.collaborator_email)
   await env.ACCESS.delete(accessKey)
 
   // Delete share record
   await env.SHARES.delete(shareId)
 
-  return { deleted: true, share_id: shareId }
+  return { status: 200, body: { deleted: true, share_id: shareId } }
 }
 
 /**
@@ -205,23 +297,32 @@ async function handleDeleteShare(request, env, path) {
  * GET /access/:folderPath
  */
 async function handleGetAccess(request, env, path) {
+  const auth = await verifyOwner(request, env)
+  if (!auth.valid) {
+    return { status: auth.status, body: { error: auth.error } }
+  }
+
   const folderPath = decodeURIComponent(path.split('/access/')[1])
   if (!folderPath) {
-    return { error: 'Missing folder path' }
+    return { status: 400, body: { error: 'Missing folder path' } }
   }
 
   // List all shares and filter by folder path
   const list = await env.SHARES.list()
   const shares = []
+  let folderOwner = null
 
   for (const key of list.keys) {
     const share = await env.SHARES.get(key.name, 'json')
     if (share?.folder_path === folderPath) {
+      if (!folderOwner && share.owner_user_id) {
+        folderOwner = share.owner_user_id
+      }
+
       // Get last access time from logs
-      const logPrefix = `${folderPath}::${share.collaborator_email}::`
+      const logPrefix = makeKey(folderPath, share.collaborator_email) + '|'
       const logList = await env.LOGS.list({ prefix: logPrefix })
 
-      // Find most recent log entry
       let lastAccess = null
       let accessCount = 0
 
@@ -229,11 +330,14 @@ async function handleGetAccess(request, env, path) {
         accessCount = logList.keys.length
         const sortedKeys = logList.keys.map(k => k.name).sort()
         const lastKey = sortedKeys[sortedKeys.length - 1]
-        lastAccess = lastKey.split('::')[2] || null
+        const parts = parseKey(lastKey)
+        lastAccess = parts[2] || null
       }
 
+      // Don't leak owner_user_id
+      const { owner_user_id: _, ...publicShare } = share
       shares.push({
-        ...share,
+        ...publicShare,
         share_id: key.name,
         last_accessed: lastAccess,
         access_count: accessCount
@@ -241,9 +345,22 @@ async function handleGetAccess(request, env, path) {
     }
   }
 
+  // If no shares exist, return 404
+  if (shares.length === 0) {
+    return { status: 404, body: { error: 'No shares found for this folder' } }
+  }
+
+  // Ownership check
+  if (folderOwner && folderOwner !== auth.userId) {
+    return { status: 403, body: { error: 'You do not own shares for this folder' } }
+  }
+
   return {
-    folder_path: folderPath,
-    collaborators: shares
+    status: 200,
+    body: {
+      folder_path: folderPath,
+      collaborators: shares
+    }
   }
 }
 
@@ -253,21 +370,28 @@ async function handleGetAccess(request, env, path) {
  * Body: { action, doc_id?, folder_path, collaborator_email }
  */
 async function handleLog(request, env) {
-  const { action, doc_id, folder_path, collaborator_email } = await request.json()
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return { status: 400, body: { error: 'Invalid JSON body' } }
+  }
+
+  const { action, doc_id, folder_path, collaborator_email } = body
 
   // Validate required fields
   if (!action || !folder_path || !collaborator_email) {
-    return { error: 'Missing required fields: action, folder_path, collaborator_email' }
+    return { status: 400, body: { error: 'Missing required fields: action, folder_path, collaborator_email' } }
   }
 
   // Validate action
   const validActions = ['view', 'download', 'annotate', 'upload']
   if (!validActions.includes(action)) {
-    return { error: `Invalid action. Must be one of: ${validActions.join(', ')}` }
+    return { status: 400, body: { error: `Invalid action. Must be one of: ${validActions.join(', ')}` } }
   }
 
   const timestamp = new Date().toISOString()
-  const key = `${folder_path}::${collaborator_email}::${timestamp}`
+  const key = makeKey(folder_path, collaborator_email, timestamp)
 
   const logData = {
     action,
@@ -280,7 +404,7 @@ async function handleLog(request, env) {
     expirationTtl: 60 * 60 * 24 * 90
   })
 
-  return { logged: true, timestamp }
+  return { status: 200, body: { logged: true, timestamp } }
 }
 
 /**
@@ -288,21 +412,37 @@ async function handleLog(request, env) {
  * GET /activity/:folderPath?since=&limit=
  */
 async function handleGetActivity(request, env, path, url) {
+  const auth = await verifyOwner(request, env)
+  if (!auth.valid) {
+    return { status: auth.status, body: { error: auth.error } }
+  }
+
   const folderPath = decodeURIComponent(path.split('/activity/')[1])
   if (!folderPath) {
-    return { error: 'Missing folder path' }
+    return { status: 400, body: { error: 'Missing folder path' } }
+  }
+
+  // Ownership check: find the owner from any share for this folder
+  const folderOwner = await findOwnerForFolder(env, folderPath)
+  if (folderOwner === null) {
+    return { status: 404, body: { error: 'No shares found for this folder' } }
+  }
+  if (folderOwner !== auth.userId) {
+    return { status: 403, body: { error: 'You do not own shares for this folder' } }
   }
 
   const since = url.searchParams.get('since') || '1970-01-01T00:00:00Z'
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100)
 
-  const list = await env.LOGS.list({ prefix: `${folderPath}::` })
+  const logPrefix = encodeURIComponent(folderPath) + '|'
+  const list = await env.LOGS.list({ prefix: logPrefix })
   const events = []
 
   // Filter and collect events
   const filteredKeys = list.keys
     .filter(k => {
-      const timestamp = k.name.split('::')[2]
+      const parts = parseKey(k.name)
+      const timestamp = parts[2]
       return timestamp > since
     })
     .slice(0, limit)
@@ -310,7 +450,7 @@ async function handleGetActivity(request, env, path, url) {
   for (const key of filteredKeys) {
     const log = await env.LOGS.get(key.name, 'json')
     if (log) {
-      const parts = key.name.split('::')
+      const parts = parseKey(key.name)
       events.push({
         email: parts[1],
         timestamp: parts[2],
@@ -323,9 +463,12 @@ async function handleGetActivity(request, env, path, url) {
   events.sort((a, b) => b.timestamp.localeCompare(a.timestamp))
 
   return {
-    folder_path: folderPath,
-    events,
-    total: events.length
+    status: 200,
+    body: {
+      folder_path: folderPath,
+      events,
+      total: events.length
+    }
   }
 }
 
@@ -333,33 +476,43 @@ async function handleGetActivity(request, env, path, url) {
  * Check if a user has access to a folder and return token info
  * POST /token
  * Body: { email, folder_path }
+ *
+ * Collaborator-facing — no bearer token required, no owner_user_id leaked.
  */
 async function handleGetToken(request, env) {
-  const { email, folder_path } = await request.json()
-
-  if (!email || !folder_path) {
-    return { error: 'Missing required fields: email, folder_path' }
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return { status: 400, body: { error: 'Invalid JSON body' } }
   }
 
-  const accessKey = `${folder_path}::${email}`
+  const { email, folder_path } = body
+
+  if (!email || !folder_path) {
+    return { status: 400, body: { error: 'Missing required fields: email, folder_path' } }
+  }
+
+  const accessKey = makeKey(folder_path, email)
   const access = await env.ACCESS.get(accessKey, 'json')
 
   if (!access) {
-    return { error: 'Access denied', authorized: false }
+    return { status: 200, body: { error: 'Access denied', authorized: false } }
   }
 
   // Check expiration
   if (access.expires_at && new Date(access.expires_at) < new Date()) {
-    return { error: 'Access expired', authorized: false }
+    return { status: 200, body: { error: 'Access expired', authorized: false } }
   }
 
-  // Return access confirmation
-  // In production, this could return a signed JWT or exchange for a Box token
   return {
-    authorized: true,
-    permission: access.permission,
-    share_id: access.share_id,
-    granted_at: access.granted_at
+    status: 200,
+    body: {
+      authorized: true,
+      permission: access.permission,
+      share_id: access.share_id,
+      granted_at: access.granted_at
+    }
   }
 }
 
@@ -367,28 +520,40 @@ async function handleGetToken(request, env) {
  * Quick check if user has access (for UI display)
  * POST /check-access
  * Body: { email, folder_path }
+ *
+ * Collaborator-facing — no bearer token required, no owner_user_id leaked.
  */
 async function handleCheckAccess(request, env) {
-  const { email, folder_path } = await request.json()
-
-  if (!email || !folder_path) {
-    return { error: 'Missing required fields', has_access: false }
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return { status: 400, body: { error: 'Invalid JSON body' } }
   }
 
-  const accessKey = `${folder_path}::${email}`
+  const { email, folder_path } = body
+
+  if (!email || !folder_path) {
+    return { status: 400, body: { error: 'Missing required fields', has_access: false } }
+  }
+
+  const accessKey = makeKey(folder_path, email)
   const access = await env.ACCESS.get(accessKey, 'json')
 
   if (!access) {
-    return { has_access: false }
+    return { status: 200, body: { has_access: false } }
   }
 
   // Check expiration
   if (access.expires_at && new Date(access.expires_at) < new Date()) {
-    return { has_access: false, expired: true }
+    return { status: 200, body: { has_access: false, expired: true } }
   }
 
   return {
-    has_access: true,
-    permission: access.permission
+    status: 200,
+    body: {
+      has_access: true,
+      permission: access.permission
+    }
   }
 }

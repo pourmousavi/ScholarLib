@@ -52,10 +52,11 @@ class WorkerClient {
   /**
    * Get all collaborators for a folder
    * @param {string} folderPath - Path to the folder
+   * @param {string} boxToken - User's Box access token for authorization
    * @returns {Promise<object>}
    */
-  async getAccess(folderPath) {
-    return this.get(`/access/${encodeURIComponent(folderPath)}`)
+  async getAccess(folderPath, boxToken) {
+    return this.get(`/access/${encodeURIComponent(folderPath)}`, boxToken)
   }
 
   /**
@@ -78,17 +79,18 @@ class WorkerClient {
   /**
    * Get activity log for a folder
    * @param {string} folderPath - Path to the folder
+   * @param {string} boxToken - User's Box access token for authorization
    * @param {string} [since] - ISO date string to filter events after
    * @param {number} [limit] - Maximum number of events to return
    * @returns {Promise<object>}
    */
-  async getActivity(folderPath, since = null, limit = 50) {
+  async getActivity(folderPath, boxToken, since = null, limit = 50) {
     let url = `/activity/${encodeURIComponent(folderPath)}`
     const params = []
     if (since) params.push(`since=${encodeURIComponent(since)}`)
     if (limit) params.push(`limit=${limit}`)
     if (params.length) url += `?${params.join('&')}`
-    return this.get(url)
+    return this.get(url, boxToken)
   }
 
   /**
@@ -204,13 +206,18 @@ class WorkerClient {
    * Make a GET request
    * @private
    */
-  async get(path) {
+  async get(path, authToken = null) {
     if (!this.baseURL) {
       throw new Error('Worker URL not configured')
     }
 
+    const headers = {}
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`
+    }
+
     try {
-      const response = await fetch(this.baseURL + path)
+      const response = await fetch(this.baseURL + path, { headers })
 
       const data = await response.json()
 

@@ -40,7 +40,9 @@ export default function ActivityDashboard({ onClose }) {
 
       try {
         // Load activity for current folder (or all accessible folders)
-        const result = await workerClient.getActivity(folderPath, null, 100)
+        // TODO: Get actual Box token from storage adapter
+        const boxToken = localStorage.getItem('sv_box_access') ? atob(localStorage.getItem('sv_box_access')) : null
+        const result = await workerClient.getActivity(folderPath, boxToken, null, 100)
         setEvents(result.events || [])
       } catch (error) {
         console.error('Failed to load activity:', error)

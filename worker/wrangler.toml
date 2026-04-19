@@ -18,6 +18,11 @@ id = "e73acc4a444f4b77a544fc3bb9615a42"
 binding = "LOGS"
 id = "9204f5d5d3a145f3b92aa17cba901d5c"
 
+[[kv_namespaces]]
+binding = "AUTH_CACHE"
+# TODO(ali): Run `wrangler kv:namespace create AUTH_CACHE` and paste the resulting ID here
+id = "REPLACE_WITH_NEW_KV_ID"
+
 [vars]
 # Update with your actual domains
 ALLOWED_ORIGINS = "https://alipourmousavi.com,http://localhost:5173"
