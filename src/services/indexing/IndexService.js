@@ -343,7 +343,7 @@ class IndexService {
     })
 
     if (indexData.length === 0) {
-      console.log('Index is empty, no vectors stored')
+      console.warn('Index is empty, no vectors stored')
       return []
     }
 
@@ -352,7 +352,15 @@ class IndexService {
     console.log('Relevant indices for scope:', relevantIndices.length, 'indices')
 
     if (relevantIndices.length === 0) {
-      console.log('No relevant indices found for scope')
+      // Log detailed info about why no indices were found
+      if (scope.type === 'document' && scope.docId) {
+        const docInIndex = !!meta.docs[scope.docId]
+        console.warn(`No indices for document scope. Doc ${scope.docId} in index: ${docInIndex}. Indexed docs: [${Object.keys(meta.docs).join(', ')}]`)
+        if (docInIndex) {
+          const docMeta = meta.docs[scope.docId]
+          console.warn(`Doc index meta: chunk_offset=${docMeta.chunk_offset}, chunk_count=${docMeta.chunk_count}`)
+        }
+      }
       return []
     }
 

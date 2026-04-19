@@ -302,6 +302,7 @@ export default function ChatPanel() {
     try {
       // Search for relevant chunks (RAG)
       let retrievedChunks = []
+      let ragWarning = null
       if (adapter && !isDemoMode) {
         try {
           // Check if document is indexed first
@@ -309,38 +310,50 @@ export default function ChatPanel() {
             const isIndexed = await indexService.isIndexed(selectedDocId, adapter)
             console.log('Document indexed check:', { docId: selectedDocId, isIndexed })
             if (!isIndexed) {
-              console.log('Document not indexed yet, skipping RAG search')
+              ragWarning = 'This document has not been indexed yet. Click "Index for AI" to enable document-aware answers.'
             }
           }
 
-          const searchScope = {
-            type: scope.type,
-            docId: selectedDocId,
-            folderId: selectedFolderId
-          }
-          console.log('Search scope:', searchScope)
+          if (!ragWarning) {
+            const searchScope = {
+              type: scope.type,
+              docId: selectedDocId,
+              folderId: selectedFolderId
+            }
+            console.log('Search scope:', searchScope)
 
-          // Use fewer chunks for WebLLM (smaller context window)
-          const topK = provider === 'webllm' ? 3 : 6
-          retrievedChunks = await indexService.search(trimmedInput, searchScope, adapter, topK)
-          console.log('RAG search results:', retrievedChunks.length, 'chunks found')
+            // Use fewer chunks for WebLLM (smaller context window)
+            const topK = provider === 'webllm' ? 3 : 6
+            retrievedChunks = await indexService.search(trimmedInput, searchScope, adapter, topK)
+            console.log('RAG search results:', retrievedChunks.length, 'chunks found')
 
-          // Log if no chunks found for an indexed document
-          if (retrievedChunks.length === 0 && scope.type === 'document' && selectedDocId) {
-            console.warn('No chunks found for indexed document.')
+            // Warn if no chunks found for a document that should be indexed
+            if (retrievedChunks.length === 0 && scope.type === 'document' && selectedDocId) {
+              ragWarning = 'No matching content found in this document. The index may be corrupted — try re-indexing the document.'
+            }
           }
         } catch (err) {
           console.error('RAG search failed:', err)
-          // Show dimension mismatch errors to the user
           if (err.code === 'DIMENSION_MISMATCH') {
             setError(err.message)
             setStreaming(false)
             return
           }
-          // Continue without RAG for other errors
+          // Show all search errors to the user instead of silently continuing
+          ragWarning = `Search failed: ${err.message || 'Unknown error'}. Responding without document context.`
         }
       } else {
         console.log('RAG search skipped - adapter:', !!adapter, 'isDemoMode:', isDemoMode)
+      }
+
+      // Show RAG warning as a system message so the user knows what happened
+      if (ragWarning) {
+        addMessage({ role: 'assistant', content: `⚠️ ${ragWarning}` })
+        if (scope.type === 'document' && selectedDocId) {
+          // For document scope with no context, don't call the LLM — it can't help
+          setStreaming(false)
+          return
+        }
       }
 
       // Build messages array with system prompt including retrieved context
@@ -362,6 +375,11 @@ export default function ChatPanel() {
         fullContent += chunk
         appendStreamingContent(chunk)
         updateLastMessage(fullContent)
+      }
+
+      // Handle empty response from LLM
+      if (!fullContent.trim()) {
+        updateLastMessage('No response received from the AI provider. Please check your connection and API configuration.')
       }
 
       // Save assistant message to history
