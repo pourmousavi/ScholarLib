@@ -40,6 +40,8 @@ function AppContent() {
 
   const setLibraryData = useLibraryStore((s) => s.setLibraryData)
   const useMockData = useLibraryStore((s) => s.useMockData)
+  const libraryConflict = useLibraryStore((s) => s.libraryConflict)
+  const clearConflict = useLibraryStore((s) => s.clearConflict)
   const { showToast } = useToast()
 
   // Track if we've already processed the OAuth callback
@@ -80,6 +82,32 @@ function AppContent() {
 
     initializeApp()
   }, [handleCallback, showToast, initialize])
+
+  // Show conflict toast when library was modified externally
+  useEffect(() => {
+    if (libraryConflict) {
+      showToast({
+        message: 'Your library was updated elsewhere. Refresh to see the latest changes.',
+        type: 'warning',
+        duration: 0, // persistent
+        action: {
+          label: 'Reload',
+          onClick: async () => {
+            clearConflict()
+            if (adapter) {
+              try {
+                const library = await LibraryService.loadLibrary(adapter)
+                setLibraryData(library)
+                showToast({ message: 'Library reloaded', type: 'success' })
+              } catch (e) {
+                showToast({ message: 'Failed to reload library', type: 'error' })
+              }
+            }
+          },
+        },
+      })
+    }
+  }, [libraryConflict, clearConflict, adapter, setLibraryData, showToast])
 
   // Load library when connected
   useEffect(() => {

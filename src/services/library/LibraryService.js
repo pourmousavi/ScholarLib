@@ -2,11 +2,68 @@ import { nanoid } from 'nanoid'
 
 const LIBRARY_PATH = '_system/library.json'
 
-const CURRENT_VERSION = '1.1'
+const CURRENT_VERSION = '1.2'
+
+/**
+ * Sanitize a filename for safe storage.
+ * Strips path separators, collapses '..' segments, removes control chars,
+ * and truncates to 200 chars preserving the extension.
+ */
+export function sanitizeFilename(name) {
+  if (!name) return name
+
+  // Strip path separators and collapse '..' segments
+  let sanitized = name.replace(/[/\\]/g, '').replace(/\.\./g, '')
+  // Remove control characters
+  sanitized = sanitized.replace(/[\x00-\x1f]/g, '')
+  // Trim whitespace
+  sanitized = sanitized.trim()
+
+  // Truncate to 200 chars, preserving extension
+  if (sanitized.length > 200) {
+    const lastDot = sanitized.lastIndexOf('.')
+    if (lastDot > 0) {
+      const ext = sanitized.slice(lastDot)
+      sanitized = sanitized.slice(0, 200 - ext.length) + ext
+    } else {
+      sanitized = sanitized.slice(0, 200)
+    }
+  }
+
+  // If result is empty or just an extension (e.g. ".pdf")
+  if (!sanitized || /^\.[^.]*$/.test(sanitized)) {
+    throw new Error('Invalid filename')
+  }
+
+  return sanitized
+}
+
+/**
+ * Generate a unique slug for a folder, appending -2, -3, etc. if needed.
+ */
+export function uniqueSlug(baseName, existingSlugs) {
+  const baseSlug = baseName.toLowerCase().replace(/\s+/g, '-')
+  if (!existingSlugs.includes(baseSlug)) return baseSlug
+  let counter = 2
+  while (existingSlugs.includes(`${baseSlug}-${counter}`)) {
+    counter++
+  }
+  return `${baseSlug}-${counter}`
+}
+
+export class LibraryConflictError extends Error {
+  constructor(message, { onDisk, local } = {}) {
+    super(message)
+    this.name = 'LibraryConflictError'
+    this.onDisk = onDisk
+    this.local = local
+  }
+}
 
 function createEmptyLibrary() {
   return {
     version: CURRENT_VERSION,
+    schema_revision: 0,
     schema_updated: new Date().toISOString().split('T')[0],
     last_modified: new Date().toISOString(),
     last_modified_by: 'local',
@@ -22,7 +79,7 @@ function createEmptyLibrary() {
  * Migrate library data from older versions to current version
  */
 function migrateLibrary(library) {
-  const version = library.version || '1.0'
+  let version = library.version || '1.0'
 
   // v1.0 → v1.1: Add collection_registry
   if (version === '1.0') {
@@ -30,6 +87,15 @@ function migrateLibrary(library) {
     library.version = '1.1'
     library.schema_updated = new Date().toISOString().split('T')[0]
     console.log('Migrated library from v1.0 to v1.1 (added collection_registry)')
+    version = '1.1'
+  }
+
+  // v1.1 → v1.2: Add schema_revision for optimistic concurrency
+  if (version === '1.1') {
+    library.schema_revision = library.schema_revision ?? 0
+    library.version = '1.2'
+    library.schema_updated = new Date().toISOString().split('T')[0]
+    console.log('Migrated library from v1.1 to v1.2 (added schema_revision)')
   }
 
   return library
@@ -49,6 +115,13 @@ export const LibraryService = {
         await this.saveLibrary(adapter, library)
       }
 
+      // Clean up any orphaned files from failed deletes
+      if (library.orphaned_files?.length > 0) {
+        try { await this.cleanupOrphans(adapter, library) } catch (e) {
+          console.warn('Orphan cleanup failed:', e)
+        }
+      }
+
       return library
     } catch (e) {
       if (e.code === 'STORAGE_NOT_FOUND') {
@@ -61,16 +134,36 @@ export const LibraryService = {
     }
   },
 
-  async saveLibrary(adapter, library) {
+  async saveLibrary(adapter, library, { expectedRevision, modifiedBy } = {}) {
+    // Optimistic concurrency check
+    let current
+    try {
+      current = await adapter.readJSON(LIBRARY_PATH)
+    } catch (e) {
+      if (e.code !== 'STORAGE_NOT_FOUND') throw e
+      current = null
+    }
+    const onDisk = current?.schema_revision ?? 0
+    const expected = expectedRevision ?? library.schema_revision ?? 0
+    if (current && onDisk !== expected) {
+      throw new LibraryConflictError(
+        `Library was modified by another session (disk: ${onDisk}, expected: ${expected})`,
+        { onDisk: current, local: library }
+      )
+    }
+
+    library.schema_revision = (library.schema_revision ?? 0) + 1
     library.last_modified = new Date().toISOString()
+    library.last_modified_by = modifiedBy || library.last_modified_by || 'local'
     await adapter.writeJSON(LIBRARY_PATH, library)
   },
 
   async addFolder(adapter, library, folderData) {
+    const existingSlugs = library.folders.map(f => f.slug)
     const folder = {
       id: `f_${nanoid(10)}`,
       name: folderData.name,
-      slug: folderData.name.toLowerCase().replace(/\s+/g, '-'),
+      slug: uniqueSlug(folderData.name, existingSlugs),
       parent_id: folderData.parent_id || null,
       children: [],
       created_at: new Date().toISOString(),
@@ -95,12 +188,13 @@ export const LibraryService = {
   },
 
   async addDocument(adapter, library, docData, file) {
+    const sanitizedFilename = docData.filename ? sanitizeFilename(docData.filename) : ''
     const doc = {
       id: `d_${nanoid(10)}`,
       folder_id: docData.folder_id,
-      box_path: `PDFs/${docData.filename}`,
-      box_file_id: null, // Set after upload
-      filename: docData.filename,
+      box_path: sanitizedFilename ? `PDFs/${sanitizedFilename}` : '',
+      box_file_id: null,
+      filename: sanitizedFilename,
       added_at: new Date().toISOString(),
       added_by: 'local',
       metadata: docData.metadata || {},
@@ -123,15 +217,25 @@ export const LibraryService = {
       },
     }
 
-    // Upload file
-    if (file) {
-      const fileId = await adapter.uploadFile(doc.box_path, file)
-      doc.box_file_id = fileId
+    let uploadedFileId = null
+    try {
+      if (file) {
+        uploadedFileId = await adapter.uploadFile(doc.box_path, file)
+        doc.box_file_id = uploadedFileId
+      }
+      library.documents[doc.id] = doc
+      await this.saveLibrary(adapter, library)
+      return doc
+    } catch (err) {
+      // Rollback: if we uploaded but couldn't save the library, delete the upload
+      if (uploadedFileId) {
+        try { await adapter.deleteFile(doc.box_path) } catch (e) {
+          console.warn('Rollback failed — orphan file may exist at', doc.box_path, e)
+        }
+      }
+      delete library.documents[doc.id]
+      throw err
     }
-
-    library.documents[doc.id] = doc
-    await this.saveLibrary(adapter, library)
-    return doc
   },
 
   async attachPdf(adapter, library, docId, file, filename) {
@@ -140,15 +244,31 @@ export const LibraryService = {
       throw new Error(`Document not found: ${docId}`)
     }
 
-    const box_path = `PDFs/${filename}`
+    const sanitized = sanitizeFilename(filename)
+    const box_path = `PDFs/${sanitized}`
     const box_file_id = await adapter.uploadFile(box_path, file)
+
+    const prevPath = doc.box_path
+    const prevFileId = doc.box_file_id
+    const prevFilename = doc.filename
 
     doc.box_path = box_path
     doc.box_file_id = box_file_id
-    doc.filename = filename
+    doc.filename = sanitized
 
-    await this.saveLibrary(adapter, library)
-    return doc
+    try {
+      await this.saveLibrary(adapter, library)
+      return doc
+    } catch (err) {
+      // Rollback: restore previous values and try to delete the new upload
+      doc.box_path = prevPath
+      doc.box_file_id = prevFileId
+      doc.filename = prevFilename
+      try { await adapter.deleteFile(box_path) } catch (e) {
+        console.warn('Rollback failed — orphan file may exist at', box_path, e)
+      }
+      throw err
+    }
   },
 
   async replacePdf(adapter, library, docId, file, filename) {
@@ -157,12 +277,18 @@ export const LibraryService = {
       throw new Error(`Document not found: ${docId}`)
     }
 
-    const box_path = `PDFs/${filename}`
+    const sanitized = sanitizeFilename(filename)
+    const box_path = `PDFs/${sanitized}`
     const box_file_id = await adapter.uploadFile(box_path, file)
+
+    const prevPath = doc.box_path
+    const prevFileId = doc.box_file_id
+    const prevFilename = doc.filename
+    const prevIndexStatus = { ...doc.index_status }
 
     doc.box_path = box_path
     doc.box_file_id = box_file_id
-    doc.filename = filename
+    doc.filename = sanitized
     doc.index_status = {
       status: 'none',
       indexed_at: null,
@@ -172,8 +298,20 @@ export const LibraryService = {
       embedding_version: null,
     }
 
-    await this.saveLibrary(adapter, library)
-    return doc
+    try {
+      await this.saveLibrary(adapter, library)
+      return doc
+    } catch (err) {
+      // Rollback: restore previous values and try to delete the new upload
+      doc.box_path = prevPath
+      doc.box_file_id = prevFileId
+      doc.filename = prevFilename
+      doc.index_status = prevIndexStatus
+      try { await adapter.deleteFile(box_path) } catch (e) {
+        console.warn('Rollback failed — orphan file may exist at', box_path, e)
+      }
+      throw err
+    }
   },
 
   async updateDocument(adapter, library, docId, updates) {
@@ -221,14 +359,38 @@ export const LibraryService = {
       throw new Error(`Document not found: ${docId}`)
     }
 
-    // Delete file from storage
-    try {
-      await adapter.deleteFile(doc.box_path)
-    } catch (e) {
-      console.warn('Failed to delete file:', e)
-    }
+    const filePath = doc.box_path
 
+    // Remove from library and save first — this is the authoritative operation
     delete library.documents[docId]
+    await this.saveLibrary(adapter, library)
+
+    // Then try to delete the file from storage
+    if (filePath) {
+      try {
+        await adapter.deleteFile(filePath)
+      } catch (e) {
+        console.warn('Failed to delete file, tracking as orphan:', filePath, e)
+        if (!library.orphaned_files) library.orphaned_files = []
+        library.orphaned_files.push(filePath)
+        try { await this.saveLibrary(adapter, library) } catch { /* best effort */ }
+      }
+    }
+  },
+
+  async cleanupOrphans(adapter, library) {
+    if (!library.orphaned_files || library.orphaned_files.length === 0) return
+
+    const remaining = []
+    for (const path of library.orphaned_files) {
+      try {
+        await adapter.deleteFile(path)
+      } catch (e) {
+        console.warn('Orphan cleanup failed for:', path, e)
+        remaining.push(path)
+      }
+    }
+    library.orphaned_files = remaining.length > 0 ? remaining : undefined
     await this.saveLibrary(adapter, library)
   },
 

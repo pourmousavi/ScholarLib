@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { tagService } from '../services/tags/TagService'
 import { smartCollectionService } from '../services/tags/SmartCollectionService'
 import { collectionService } from '../services/tags/CollectionService'
+import { LibraryConflictError } from '../services/library/LibraryService'
 
 // Mock folder data for development/offline mode
 const mockFolders = [
@@ -343,6 +344,9 @@ export const useLibraryStore = create((set, get) => ({
   // Smart collection state
   selectedCollectionId: null,
 
+  // Conflict state
+  libraryConflict: false,
+
   // Bulk selection state
   selectedDocIds: [],
   selectionMode: false,
@@ -411,6 +415,17 @@ export const useLibraryStore = create((set, get) => ({
       selectedCollections: [],
     })
   },
+
+  // Check if an error is a library conflict and set state accordingly
+  handleSaveError: (err) => {
+    if (err instanceof LibraryConflictError) {
+      set({ libraryConflict: true })
+      return true
+    }
+    return false
+  },
+
+  clearConflict: () => set({ libraryConflict: false }),
 
   // Use mock data (for development without storage)
   useMockData: () => {

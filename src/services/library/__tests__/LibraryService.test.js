@@ -8,7 +8,8 @@ const mockAdapter = {
 }
 
 const emptyLibrary = {
-  version: '1.1',
+  version: '1.2',
+  schema_revision: 0,
   folders: [{ id: 'f_root', name: 'Root', slug: 'root', parent_id: null, children: [] }],
   documents: {},
   tag_registry: {},

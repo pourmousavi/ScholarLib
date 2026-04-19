@@ -8,6 +8,7 @@ export const useStorageStore = create((set, get) => ({
   isConnecting: false,
   isDemoMode: false,
   error: null,
+  userEmail: null,
 
   // Initialize on app load
   initialize: async () => {
@@ -27,6 +28,9 @@ export const useStorageStore = create((set, get) => ({
     try {
       const connected = await adapter.isConnected()
       set({ isConnected: connected, isConnecting: false })
+      if (connected) {
+        get()._fetchUserEmail(adapter)
+      }
       if (!connected) {
         // Clear both provider and tokens when connection is invalid
         await adapter.disconnect()
@@ -78,6 +82,8 @@ export const useStorageStore = create((set, get) => ({
     try {
       await adapter.handleCallback(code, state)
       set({ isConnected: true, isConnecting: false })
+      // Fetch user email for last_modified_by tracking
+      get()._fetchUserEmail(adapter)
     } catch (error) {
       // Clear tokens and provider on callback failure
       if (adapter && adapter.disconnect) {
@@ -96,7 +102,7 @@ export const useStorageStore = create((set, get) => ({
       await adapter.disconnect()
     }
     clearProvider()
-    set({ provider: null, adapter: null, isConnected: false, error: null })
+    set({ provider: null, adapter: null, isConnected: false, error: null, userEmail: null })
   },
 
   // Get adapter for use in other services
@@ -106,6 +112,23 @@ export const useStorageStore = create((set, get) => ({
       return null
     }
     return adapter
+  },
+
+  // Fetch and cache user email from storage provider
+  _fetchUserEmail: async (adapter) => {
+    try {
+      if (adapter?.axiosInstance) {
+        // Box: use /users/me
+        const res = await adapter.axiosInstance.get('/users/me')
+        set({ userEmail: res.data.login || res.data.email || null })
+      } else if (adapter?._apiCall) {
+        // Dropbox: use /users/get_current_account
+        const account = await adapter._apiCall('/users/get_current_account', null)
+        set({ userEmail: account.email || null })
+      }
+    } catch (e) {
+      console.warn('Failed to fetch user email:', e)
+    }
   },
 
   // Enable demo mode (skip storage, use mock data)

@@ -365,9 +365,15 @@ export class DropboxAdapter {
 
   async listFolder(path) {
     const fullPath = this._getFullPath(path)
-    const result = await this._apiCall('/files/list_folder', { path: fullPath })
+    let result = await this._apiCall('/files/list_folder', { path: fullPath })
+    let allEntries = [...result.entries]
 
-    return result.entries.map((item) => ({
+    while (result.has_more) {
+      result = await this._apiCall('/files/list_folder/continue', { cursor: result.cursor })
+      allEntries.push(...result.entries)
+    }
+
+    return allEntries.map((item) => ({
       id: item.id,
       name: item.name,
       type: item['.tag'] === 'folder' ? 'folder' : 'file',

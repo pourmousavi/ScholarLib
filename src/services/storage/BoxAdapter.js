@@ -247,15 +247,32 @@ export class BoxAdapter {
     this._storeTokens(access_token, refresh_token, expires_in)
   }
 
+  async _listAllFolderItems(folderId, fields = 'id,name,type') {
+    const all = []
+    let offset = 0
+    const limit = 1000
+    while (true) {
+      const res = await this.axiosInstance.get(`/folders/${folderId}/items`, {
+        params: { fields, limit, offset },
+      })
+      all.push(...res.data.entries)
+      if (res.data.entries.length < limit) break
+      offset += limit
+      if (offset > 100000) {
+        console.warn(`Folder ${folderId} has >100k items — truncating`)
+        break
+      }
+    }
+    return all
+  }
+
   async _ensureRootFolder() {
     if (this.rootFolderId) return this.rootFolderId
 
     // Search for existing ScholarLib folder in root (folder_id 0)
-    const searchResponse = await this.axiosInstance.get('/folders/0/items', {
-      params: { fields: 'id,name,type', limit: 1000 },
-    })
+    const entries = await this._listAllFolderItems('0')
 
-    const existing = searchResponse.data.entries.find(
+    const existing = entries.find(
       (item) => item.type === 'folder' && item.name === 'ScholarLib'
     )
 
@@ -291,11 +308,9 @@ export class BoxAdapter {
     let currentId = this.rootFolderId
 
     for (const part of parts) {
-      const response = await this.axiosInstance.get(`/folders/${currentId}/items`, {
-        params: { fields: 'id,name,type', limit: 1000 },
-      })
+      const entries = await this._listAllFolderItems(currentId)
 
-      const folder = response.data.entries.find(
+      const folder = entries.find(
         (item) => item.type === 'folder' && item.name === part
       )
 
@@ -316,11 +331,9 @@ export class BoxAdapter {
 
     const folderId = await this._getPathFolderId(folderPath)
 
-    const response = await this.axiosInstance.get(`/folders/${folderId}/items`, {
-      params: { fields: 'id,name,type', limit: 1000 },
-    })
+    const entries = await this._listAllFolderItems(folderId)
 
-    const file = response.data.entries.find(
+    const file = entries.find(
       (item) => item.type === 'file' && item.name === fileName
     )
 
@@ -423,11 +436,9 @@ export class BoxAdapter {
 
   async listFolder(path) {
     const folderId = await this._getPathFolderId(path)
-    const response = await this.axiosInstance.get(`/folders/${folderId}/items`, {
-      params: { fields: 'id,name,type,size,modified_at', limit: 1000 },
-    })
+    const entries = await this._listAllFolderItems(folderId, 'id,name,type,size,modified_at')
 
-    return response.data.entries.map((item) => ({
+    return entries.map((item) => ({
       id: item.id,
       name: item.name,
       type: item.type,
@@ -444,11 +455,9 @@ export class BoxAdapter {
 
     for (const part of parts) {
       // Check if folder exists
-      const response = await this.axiosInstance.get(`/folders/${currentId}/items`, {
-        params: { fields: 'id,name,type', limit: 1000 },
-      })
+      const entries = await this._listAllFolderItems(currentId)
 
-      const existing = response.data.entries.find(
+      const existing = entries.find(
         (item) => item.type === 'folder' && item.name === part
       )
 
