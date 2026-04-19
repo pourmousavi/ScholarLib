@@ -540,7 +540,17 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
         </div>
         <div className={styles.authors}>{authorText}</div>
         {yearJournal && (
-          <div className={styles.meta}>{yearJournal}</div>
+          <div className={styles.meta}>
+            {yearJournal}
+            {doc.import_source?.type === 'litorbit' && (
+              <span className={styles.originBadge}>LitOrbit</span>
+            )}
+          </div>
+        )}
+        {!yearJournal && doc.import_source?.type === 'litorbit' && (
+          <div className={styles.meta}>
+            <span className={styles.originBadge}>LitOrbit</span>
+          </div>
         )}
         {/* Tags (user-assigned) */}
         {showTags && tags.length > 0 && (

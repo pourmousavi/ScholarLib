@@ -11,7 +11,7 @@ import PDFToolbar from './PDFToolbar'
 import FullscreenOverlay from '../layout/FullscreenOverlay'
 import styles from './PDFViewer.module.css'
 
-export default function PDFViewer({ url, docId, onTextExtracted, noPdfAttached, onAttachPdf }) {
+export default function PDFViewer({ url, docId, onTextExtracted, noPdfAttached, onAttachPdf, showEnrichment, isEnriching, onEnrichMetadata, isLitOrbitImport }) {
   const isMobilePhone = useIsMobilePhone()
   const pdfDefaultZoom = useUIStore((s) => s.pdfDefaultZoom)
   const splitViewEnabled = useUIStore((s) => s.splitViewEnabled)
@@ -372,12 +372,26 @@ export default function PDFViewer({ url, docId, onTextExtracted, noPdfAttached, 
             <div className={styles.placeholderIcon}>PDF</div>
             <span className={styles.placeholderTitle}>No PDF attached</span>
             <span className={styles.placeholderText}>
-              This document only has metadata. Attach a PDF to enable viewing, annotations, and AI indexing.
+              {isLitOrbitImport
+                ? 'This paper was added from LitOrbit with basic metadata.'
+                : 'This document only has metadata. Attach a PDF to enable viewing, annotations, and AI indexing.'}
             </span>
-            {onAttachPdf && (
-              <button className={styles.attachBtn} onClick={onAttachPdf}>
-                Attach PDF
-              </button>
+            <div className={styles.placeholderActions}>
+              {showEnrichment && onEnrichMetadata && (
+                <button className={styles.attachBtn} onClick={onEnrichMetadata} disabled={isEnriching}>
+                  {isEnriching ? 'Enriching...' : 'Enrich Metadata'}
+                </button>
+              )}
+              {onAttachPdf && (
+                <button className={`${styles.attachBtn} ${styles.attachBtnGold}`} onClick={onAttachPdf}>
+                  Attach PDF
+                </button>
+              )}
+            </div>
+            {showEnrichment && (
+              <span className={styles.placeholderHint}>
+                Enrichment will look up complete publication details via CrossRef.
+              </span>
             )}
           </div>
         </div>

@@ -5,7 +5,7 @@ import { NotesPanel } from '../notes'
 import { ChatPanel } from '../ai'
 import styles from './SplitViewPanel.module.css'
 
-export default function SplitViewPanel({ pdfUrl, docId, onTextExtracted, pdfError, noPdfAttached, onAttachPdf }) {
+export default function SplitViewPanel({ pdfUrl, docId, onTextExtracted, pdfError, noPdfAttached, onAttachPdf, showEnrichment, isEnriching, onEnrichMetadata, isLitOrbitImport }) {
   const splitViewRatio = useUIStore((s) => s.splitViewRatio)
   const setSplitViewRatio = useUIStore((s) => s.setSplitViewRatio)
   const splitViewRightTab = useUIStore((s) => s.splitViewRightTab)
@@ -97,6 +97,10 @@ export default function SplitViewPanel({ pdfUrl, docId, onTextExtracted, pdfErro
           error={pdfError}
           noPdfAttached={noPdfAttached}
           onAttachPdf={onAttachPdf}
+          showEnrichment={showEnrichment}
+          isEnriching={isEnriching}
+          onEnrichMetadata={onEnrichMetadata}
+          isLitOrbitImport={isLitOrbitImport}
         />
       </div>
 

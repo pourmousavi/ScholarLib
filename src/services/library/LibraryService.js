@@ -112,6 +112,7 @@ export const LibraryService = {
         rating: null,
         custom_fields: {},
       },
+      import_source: docData.import_source || null,
       index_status: {
         status: 'none',
         indexed_at: null,
@@ -240,6 +241,22 @@ export const LibraryService = {
     doc.folder_id = newFolderId
     await this.saveLibrary(adapter, library)
     return doc
+  },
+
+  findDuplicateByDOI(library, doi) {
+    if (!doi) return null
+    const normalizedDoi = doi.toLowerCase().trim()
+    return Object.values(library.documents).find(
+      doc => doc.metadata?.doi?.toLowerCase().trim() === normalizedDoi
+    ) || null
+  },
+
+  findDuplicateByTitle(library, title) {
+    if (!title) return null
+    const normalized = title.toLowerCase().trim()
+    return Object.values(library.documents).find(
+      doc => doc.metadata?.title?.toLowerCase().trim() === normalized
+    ) || null
   },
 
   async deleteFolder(adapter, library, folderId) {

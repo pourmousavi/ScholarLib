@@ -6,6 +6,21 @@ const BOX_UPLOAD_BASE = 'https://upload.box.com/api/2.0'
 const BOX_AUTH_URL = 'https://account.box.com/api/oauth2/authorize'
 const BOX_TOKEN_URL = 'https://api.box.com/oauth2/token'
 
+// External configuration (for consumers like LitOrbit)
+let _boxConfig = null
+
+export function configureBox({ clientId, redirectUri }) {
+  _boxConfig = { clientId, redirectUri }
+}
+
+function _getClientId() {
+  return _boxConfig?.clientId || import.meta.env.VITE_BOX_CLIENT_ID
+}
+
+function _getRedirectUri() {
+  return _boxConfig?.redirectUri || import.meta.env.VITE_BOX_REDIRECT_URI
+}
+
 // PKCE helpers
 async function sha256(plain) {
   const encoder = new TextEncoder()
@@ -123,8 +138,8 @@ export class BoxAdapter {
   }
 
   connect() {
-    const clientId = import.meta.env.VITE_BOX_CLIENT_ID
-    const redirectUri = import.meta.env.VITE_BOX_REDIRECT_URI
+    const clientId = _getClientId()
+    const redirectUri = _getRedirectUri()
 
     if (!clientId || !redirectUri) {
       throw new StorageError(
@@ -163,8 +178,8 @@ export class BoxAdapter {
       throw new StorageError(STORAGE_ERRORS.NOT_CONNECTED, 'PKCE verifier not found')
     }
 
-    const clientId = import.meta.env.VITE_BOX_CLIENT_ID
-    const redirectUri = import.meta.env.VITE_BOX_REDIRECT_URI
+    const clientId = _getClientId()
+    const redirectUri = _getRedirectUri()
 
     const response = await fetch(BOX_TOKEN_URL, {
       method: 'POST',
@@ -211,7 +226,7 @@ export class BoxAdapter {
       throw new StorageError(STORAGE_ERRORS.AUTH_EXPIRED, 'No refresh token available')
     }
 
-    const clientId = import.meta.env.VITE_BOX_CLIENT_ID
+    const clientId = _getClientId()
 
     const response = await fetch(BOX_TOKEN_URL, {
       method: 'POST',

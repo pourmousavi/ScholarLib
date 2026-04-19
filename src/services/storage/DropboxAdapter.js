@@ -5,6 +5,22 @@ const DROPBOX_TOKEN_URL = 'https://api.dropboxapi.com/oauth2/token'
 const DROPBOX_API_BASE = 'https://api.dropboxapi.com/2'
 const DROPBOX_CONTENT_BASE = 'https://content.dropboxapi.com/2'
 
+// External configuration (for consumers like LitOrbit)
+let _dropboxConfig = null
+
+export function configureDropbox({ appKey, redirectUri }) {
+  _dropboxConfig = { appKey, redirectUri }
+}
+
+function _getAppKey() {
+  return _dropboxConfig?.appKey || import.meta.env.VITE_DROPBOX_APP_KEY
+}
+
+function _getRedirectUri() {
+  return _dropboxConfig?.redirectUri || import.meta.env.VITE_DROPBOX_REDIRECT_URI ||
+    `${window.location.origin}${import.meta.env.BASE_URL}auth/dropbox`
+}
+
 function generateState() {
   const array = new Uint8Array(16)
   crypto.getRandomValues(array)
@@ -162,9 +178,8 @@ export class DropboxAdapter {
   }
 
   connect() {
-    const appKey = import.meta.env.VITE_DROPBOX_APP_KEY
-    const redirectUri = import.meta.env.VITE_DROPBOX_REDIRECT_URI ||
-      `${window.location.origin}${import.meta.env.BASE_URL}auth/dropbox`
+    const appKey = _getAppKey()
+    const redirectUri = _getRedirectUri()
 
     if (!appKey) {
       throw new StorageError(
@@ -204,9 +219,8 @@ export class DropboxAdapter {
       throw new StorageError(STORAGE_ERRORS.NOT_CONNECTED, 'PKCE verifier not found')
     }
 
-    const appKey = import.meta.env.VITE_DROPBOX_APP_KEY
-    const redirectUri = import.meta.env.VITE_DROPBOX_REDIRECT_URI ||
-      `${window.location.origin}${import.meta.env.BASE_URL}auth/dropbox`
+    const appKey = _getAppKey()
+    const redirectUri = _getRedirectUri()
 
     const response = await fetch(DROPBOX_TOKEN_URL, {
       method: 'POST',
@@ -251,7 +265,7 @@ export class DropboxAdapter {
       throw new StorageError(STORAGE_ERRORS.AUTH_EXPIRED, 'No refresh token')
     }
 
-    const appKey = import.meta.env.VITE_DROPBOX_APP_KEY
+    const appKey = _getAppKey()
 
     const response = await fetch(DROPBOX_TOKEN_URL, {
       method: 'POST',

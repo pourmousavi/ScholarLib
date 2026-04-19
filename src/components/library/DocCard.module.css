@@ -74,6 +74,22 @@
   white-space: nowrap;
 }
 
+.originBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border, var(--border-subtle));
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .star {
   color: var(--accent);
   margin-left: auto;
@@ -104,6 +120,9 @@
   color: var(--text-muted);
   margin-bottom: var(--space-2);
   padding-left: 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .tags {

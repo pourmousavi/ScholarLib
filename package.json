@@ -3,10 +3,19 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "exports": {
+    "./services/library": "./src/services/library/LibraryService.js",
+    "./services/storage/box": "./src/services/storage/BoxAdapter.js",
+    "./services/storage/dropbox": "./src/services/storage/DropboxAdapter.js",
+    "./services/storage/factory": "./src/services/storage/StorageFactory.js",
+    "./services/storage/errors": "./src/services/storage/StorageAdapter.js"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@embedpdf/core": "^2.10.1",
@@ -35,13 +44,17 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "canvas": "^3.2.1",
+    "jsdom": "^29.0.2",
     "vite": "^6.0.7",
     "vite-plugin-pwa": "^1.2.0",
     "vite-plugin-static-copy": "^3.3.0",
+    "vitest": "^4.1.4",
     "workbox-window": "^7.4.0"
   }
 }

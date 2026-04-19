@@ -4,10 +4,13 @@ import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { LibraryService } from '../../services/library/LibraryService'
 import { useToast } from '../../hooks/useToast'
+import { needsEnrichment } from '../../utils/enrichment'
+import { enrichFromDOI } from '../../services/metadata/EnrichmentService'
 import ViewerSwitch from '../viewer/ViewerSwitch'
 import SplitViewPanel from './SplitViewPanel'
 import { NotesPanel } from '../notes'
 import { ChatPanel } from '../ai'
+import LitOrbitInsights from '../library/LitOrbitInsights'
 import styles from './MainPanel.module.css'
 
 export default function MainPanel({ isMobile = false }) {
@@ -84,6 +87,40 @@ export default function MainPanel({ isMobile = false }) {
       showToast({ message: 'Failed to attach PDF', type: 'error' })
     }
   }, [selectedDoc, selectedDocId, adapter, updateDocument, showToast])
+
+  const isLitOrbitImport = selectedDoc?.import_source?.type === 'litorbit'
+  const showEnrichment = noPdfAttached && isLitOrbitImport && needsEnrichment(selectedDoc)
+
+  const [isEnriching, setIsEnriching] = useState(false)
+
+  const handleEnrichMetadata = useCallback(async () => {
+    if (!selectedDoc?.metadata?.doi || isEnriching) return
+    setIsEnriching(true)
+    try {
+      const enrichedFields = await enrichFromDOI(selectedDoc.metadata.doi)
+      if (!enrichedFields) {
+        showToast({ message: 'Could not enrich metadata — DOI not found in CrossRef', type: 'warning' })
+        return
+      }
+      const state = useLibraryStore.getState()
+      const library = {
+        version: '1.1',
+        folders: state.folders,
+        documents: { ...state.documents },
+        tag_registry: state.tagRegistry,
+        collection_registry: state.collectionRegistry,
+        smart_collections: state.smartCollections
+      }
+      await LibraryService.updateDocumentMetadata(adapter, library, selectedDocId, enrichedFields)
+      updateDocument(selectedDocId, { metadata: { ...selectedDoc.metadata, ...enrichedFields } })
+      showToast({ message: 'Metadata enriched from CrossRef', type: 'success' })
+    } catch (error) {
+      console.error('Enrichment failed:', error)
+      showToast({ message: 'Could not enrich metadata — DOI not found in CrossRef', type: 'warning' })
+    } finally {
+      setIsEnriching(false)
+    }
+  }, [selectedDoc, selectedDocId, adapter, updateDocument, showToast, isEnriching])
 
   const panels = [
     { id: 'pdf', label: 'PDF' },
@@ -250,18 +287,33 @@ export default function MainPanel({ isMobile = false }) {
             pdfError={pdfError}
             noPdfAttached={noPdfAttached}
             onAttachPdf={handleAttachPdf}
+            showEnrichment={showEnrichment}
+            isEnriching={isEnriching}
+            onEnrichMetadata={handleEnrichMetadata}
+            isLitOrbitImport={isLitOrbitImport}
           />
         ) : (
           <>
             {activePanel === 'pdf' && (
-              <ViewerSwitch
-                url={pdfUrl}
-                docId={selectedDocId}
-                onTextExtracted={handleTextExtracted}
-                error={pdfError}
-                noPdfAttached={noPdfAttached}
-                onAttachPdf={handleAttachPdf}
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'auto', minWidth: 0 }}>
+                <ViewerSwitch
+                  url={pdfUrl}
+                  docId={selectedDocId}
+                  onTextExtracted={handleTextExtracted}
+                  error={pdfError}
+                  noPdfAttached={noPdfAttached}
+                  onAttachPdf={handleAttachPdf}
+                  showEnrichment={showEnrichment}
+                  isEnriching={isEnriching}
+                  onEnrichMetadata={handleEnrichMetadata}
+                  isLitOrbitImport={isLitOrbitImport}
+                />
+                {isLitOrbitImport && (selectedDoc?.import_source?.litorbit_score != null || selectedDoc?.import_source?.litorbit_summary) && (
+                  <div style={{ padding: 'var(--space-3) var(--space-4)' }}>
+                    <LitOrbitInsights importSource={selectedDoc.import_source} />
+                  </div>
+                )}
+              </div>
             )}
             {activePanel === 'ai' && (
               <ChatPanel />
