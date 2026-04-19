@@ -250,12 +250,7 @@ export default function DocList({ isMobile = false }) {
 
     try {
       // Build library object from current state
-      const library = {
-        folders,
-        documents,
-        version: '1.0',
-        last_modified: new Date().toISOString()
-      }
+      const library = useLibraryStore.getState().getLibrarySnapshot()
 
       // Add document via LibraryService
       const doc = await LibraryService.addDocument(adapter, library, {

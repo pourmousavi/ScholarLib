@@ -342,13 +342,8 @@ export async function importDocuments(parsedData, options, onProgress, signal, o
       results.cancelled = true
       // Save library before returning
       try {
-        const { folders, documents: updatedDocs } = useLibraryStore.getState()
-        await LibraryService.saveLibrary(adapter, {
-          version: '1.0',
-          last_modified: new Date().toISOString(),
-          folders,
-          documents: updatedDocs
-        })
+        const library = useLibraryStore.getState().getLibrarySnapshot()
+        await LibraryService.saveLibrary(adapter, library)
       } catch (saveError) {
         console.error('Failed to save library on cancellation:', saveError)
       }
@@ -533,13 +528,8 @@ export async function importDocuments(parsedData, options, onProgress, signal, o
       // Checkpoint: save library every 10 items
       if (results.imported.length % 10 === 0) {
         try {
-          const { folders, documents: updatedDocs } = useLibraryStore.getState()
-          await LibraryService.saveLibrary(adapter, {
-            version: '1.0',
-            last_modified: new Date().toISOString(),
-            folders,
-            documents: updatedDocs
-          })
+          const library = useLibraryStore.getState().getLibrarySnapshot()
+          await LibraryService.saveLibrary(adapter, library)
           onCheckpoint?.({ lastCompletedIndex: i, results: { ...results } })
         } catch (saveError) {
           console.error('Failed to save checkpoint:', saveError)
@@ -557,13 +547,8 @@ export async function importDocuments(parsedData, options, onProgress, signal, o
 
   // Save library
   try {
-    const { folders, documents: updatedDocs } = useLibraryStore.getState()
-    await LibraryService.saveLibrary(adapter, {
-      version: '1.0',
-      last_modified: new Date().toISOString(),
-      folders,
-      documents: updatedDocs
-    })
+    const library = useLibraryStore.getState().getLibrarySnapshot()
+    await LibraryService.saveLibrary(adapter, library)
   } catch (saveError) {
     console.error('Failed to save library after import:', saveError)
   }

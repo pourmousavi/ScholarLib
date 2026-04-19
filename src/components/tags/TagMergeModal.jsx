@@ -23,14 +23,8 @@ export default function TagMergeModal({ onClose }) {
   const saveLibrary = useCallback(async () => {
     if (isDemoMode || !adapter) return
     try {
-      const { folders, documents, tagRegistry, smartCollections } = useLibraryStore.getState()
-      await LibraryService.saveLibrary(adapter, {
-        version: '1.0',
-        folders,
-        documents,
-        tag_registry: tagRegistry,
-        smart_collections: smartCollections
-      })
+      const library = useLibraryStore.getState().getLibrarySnapshot()
+      await LibraryService.saveLibrary(adapter, library)
     } catch (e) {
       console.error('Failed to save library:', e)
     }

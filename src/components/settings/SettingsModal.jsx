@@ -552,8 +552,8 @@ export default function SettingsModal({ onClose }) {
       }
 
       // Save to storage
-      const { folders, documents: updatedDocs } = useLibraryStore.getState()
-      await LibraryService.saveLibrary(adapter, { version: '1.0', folders, documents: updatedDocs })
+      const library = useLibraryStore.getState().getLibrarySnapshot()
+      await LibraryService.saveLibrary(adapter, library)
 
       showToast({ message: `Removed ${orphanedIds.length} orphaned document(s)`, type: 'success' })
     }
@@ -572,15 +572,8 @@ export default function SettingsModal({ onClose }) {
 
       // Save to storage
       if (!isDemoMode && adapter) {
-        const state = useLibraryStore.getState()
-        await LibraryService.saveLibrary(adapter, {
-          version: '1.1',
-          folders: state.folders,
-          documents: state.documents,
-          tag_registry: state.tagRegistry,
-          collection_registry: state.collectionRegistry,
-          smart_collections: state.smartCollections,
-        })
+        const library = useLibraryStore.getState().getLibrarySnapshot()
+        await LibraryService.saveLibrary(adapter, library)
       }
 
       showToast({
@@ -599,15 +592,8 @@ export default function SettingsModal({ onClose }) {
 
       // Save to storage
       if (!isDemoMode && adapter) {
-        const state = useLibraryStore.getState()
-        await LibraryService.saveLibrary(adapter, {
-          version: '1.1',
-          folders: state.folders,
-          documents: state.documents,
-          tag_registry: state.tagRegistry,
-          collection_registry: state.collectionRegistry,
-          smart_collections: state.smartCollections,
-        })
+        const library = useLibraryStore.getState().getLibrarySnapshot()
+        await LibraryService.saveLibrary(adapter, library)
       }
 
       showToast({
@@ -632,15 +618,8 @@ export default function SettingsModal({ onClose }) {
 
       // Save to storage
       if (!isDemoMode && adapter) {
-        const state = useLibraryStore.getState()
-        await LibraryService.saveLibrary(adapter, {
-          version: '1.1',
-          folders: state.folders,
-          documents: state.documents,
-          tag_registry: state.tagRegistry,
-          collection_registry: state.collectionRegistry,
-          smart_collections: state.smartCollections,
-        })
+        const library = useLibraryStore.getState().getLibrarySnapshot()
+        await LibraryService.saveLibrary(adapter, library)
       }
 
       let message = `Deleted ${result.foldersDeleted} folder(s), ${result.documentsDeleted} document(s)`
@@ -667,15 +646,8 @@ export default function SettingsModal({ onClose }) {
 
       // Save to storage
       if (!isDemoMode && adapter) {
-        const state = useLibraryStore.getState()
-        await LibraryService.saveLibrary(adapter, {
-          version: '1.1',
-          folders: state.folders,
-          documents: state.documents,
-          tag_registry: state.tagRegistry,
-          collection_registry: state.collectionRegistry,
-          smart_collections: state.smartCollections,
-        })
+        const library = useLibraryStore.getState().getLibrarySnapshot()
+        await LibraryService.saveLibrary(adapter, library)
       }
 
       let message = 'Library reset complete'

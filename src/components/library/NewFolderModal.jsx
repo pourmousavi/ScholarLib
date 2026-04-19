@@ -87,14 +87,8 @@ export default function NewFolderModal({ onClose }) {
 
       // Persist to storage
       if (!isDemoMode && adapter) {
-        const state = useLibraryStore.getState()
-        await LibraryService.saveLibrary(adapter, {
-          version: '1.0',
-          folders: state.folders,
-          documents: state.documents,
-          tag_registry: state.tagRegistry,
-          smart_collections: state.smartCollections
-        })
+        const library = useLibraryStore.getState().getLibrarySnapshot()
+        await LibraryService.saveLibrary(adapter, library)
       }
 
       setSelectedFolderId(folderId)

@@ -152,15 +152,8 @@ export default function MainPanel({ isMobile = false }) {
         readMarkTimerRef.current = setTimeout(async () => {
           try {
             // Re-read store state at save time to capture any interim changes
-            const { folders, documents: docs, tagRegistry, collectionRegistry, smartCollections } = useLibraryStore.getState()
-            await LibraryService.saveLibrary(adapter, {
-              version: '1.2',
-              folders,
-              documents: docs,
-              tag_registry: tagRegistry,
-              collection_registry: collectionRegistry,
-              smart_collections: smartCollections
-            })
+            const library = useLibraryStore.getState().getLibrarySnapshot()
+            await LibraryService.saveLibrary(adapter, library)
           } catch (e) {
             console.error('Failed to save read status:', e)
           }

@@ -158,18 +158,9 @@ export default function EditMetadataModal({ onClose }) {
         user_data: updatedDoc.user_data
       })
 
-      // Save to storage
+      // Save to storage (getLibrarySnapshot reads from store which already has the updated doc)
       if (!isDemoMode && adapter) {
-        const { tagRegistry, collectionRegistry, smartCollections } = useLibraryStore.getState()
-        const library = {
-          folders,
-          documents: { ...documents, [doc.id]: updatedDoc },
-          tag_registry: tagRegistry,
-          collection_registry: collectionRegistry,
-          smart_collections: smartCollections,
-          version: '1.1',
-          last_modified: new Date().toISOString()
-        }
+        const library = useLibraryStore.getState().getLibrarySnapshot()
         await LibraryService.saveLibrary(adapter, library)
       }
 

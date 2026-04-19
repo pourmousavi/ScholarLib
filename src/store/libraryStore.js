@@ -419,6 +419,21 @@ export const useLibraryStore = create((set, get) => ({
     })
   },
 
+  // Build a complete library object for saving — use this instead of
+  // constructing ad-hoc objects in components to avoid missing fields.
+  getLibrarySnapshot: () => {
+    const { folders, documents, tagRegistry, collectionRegistry, smartCollections, schemaRevision } = get()
+    return {
+      version: '1.2',
+      schema_revision: schemaRevision ?? 0,
+      folders,
+      documents,
+      tag_registry: tagRegistry,
+      collection_registry: collectionRegistry,
+      smart_collections: smartCollections,
+    }
+  },
+
   // Check if an error is a library conflict and set state accordingly
   handleSaveError: (err) => {
     if (err instanceof LibraryConflictError) {
@@ -429,6 +444,8 @@ export const useLibraryStore = create((set, get) => ({
   },
 
   clearConflict: () => set({ libraryConflict: false }),
+
+  setSchemaRevision: (rev) => set({ schemaRevision: rev }),
 
   // Use mock data (for development without storage)
   useMockData: () => {

@@ -326,15 +326,8 @@ class IndexService {
       updateDocument(docId, { index_status: indexStatus })
 
       // Persist to storage (include all library fields)
-      const state = useLibraryStore.getState()
-      await LibraryService.saveLibrary(adapter, {
-        version: '1.1',
-        folders: state.folders,
-        documents: state.documents,
-        tag_registry: state.tagRegistry,
-        collection_registry: state.collectionRegistry,
-        smart_collections: state.smartCollections
-      })
+      const library = useLibraryStore.getState().getLibrarySnapshot()
+      await LibraryService.saveLibrary(adapter, library)
 
       onProgress?.({ stage: 'complete', docId, progress: 1 })
 
@@ -354,15 +347,8 @@ class IndexService {
 
       // Persist to storage (include all library fields)
       try {
-        const state = useLibraryStore.getState()
-        await LibraryService.saveLibrary(adapter, {
-          version: '1.1',
-          folders: state.folders,
-          documents: state.documents,
-          tag_registry: state.tagRegistry,
-          collection_registry: state.collectionRegistry,
-          smart_collections: state.smartCollections
-        })
+        const library = useLibraryStore.getState().getLibrarySnapshot()
+        await LibraryService.saveLibrary(adapter, library)
       } catch (saveError) {
         console.error('Failed to save library after indexing error:', saveError)
       }
@@ -750,15 +736,8 @@ class IndexService {
       }
 
       // Save library (include all fields)
-      const state = useLibraryStore.getState()
-      await LibraryService.saveLibrary(adapter, {
-        version: '1.1',
-        folders: state.folders,
-        documents: state.documents,
-        tag_registry: state.tagRegistry,
-        collection_registry: state.collectionRegistry,
-        smart_collections: state.smartCollections
-      })
+      const library = useLibraryStore.getState().getLibrarySnapshot()
+      await LibraryService.saveLibrary(adapter, library)
 
       console.log('Index cleared successfully')
       return true
@@ -824,15 +803,8 @@ class IndexService {
 
       // Save updated library if changes were made (include all fields)
       if (needsSave) {
-        const updatedState = useLibraryStore.getState()
-        await LibraryService.saveLibrary(adapter, {
-          version: '1.1',
-          folders: updatedState.folders,
-          documents: updatedState.documents,
-          tag_registry: updatedState.tagRegistry,
-          collection_registry: updatedState.collectionRegistry,
-          smart_collections: updatedState.smartCollections
-        })
+        const library = useLibraryStore.getState().getLibrarySnapshot()
+        await LibraryService.saveLibrary(adapter, library)
         console.log(`Synced ${syncedCount} document(s) index status`)
       }
 
