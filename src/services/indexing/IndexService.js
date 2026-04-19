@@ -197,30 +197,42 @@ class IndexService {
 
       // 4. Load existing index
       let { indexData, meta } = await this.loadIndex(adapter)
+      let chunksMeta = await this.loadChunksMeta(adapter)
 
-      // Check for dimension mismatch with existing index
-      if (indexData.length > 0 && newDimensions) {
-        const existingDimensions = indexData[0]?.length
-        if (existingDimensions && existingDimensions !== newDimensions) {
-          console.log(`[IndexService] Dimension mismatch detected: existing=${existingDimensions}, new=${newDimensions}`)
+      // 4a. Validate index integrity — if vector count doesn't match metadata,
+      // the binary is corrupted (from previous parsing/save with wrong dimensions).
+      // In that case, clear the entire index and start fresh.
+      const isCorrupted = indexData.length > 0 && indexData.length !== meta.total_chunks
+      if (isCorrupted) {
+        console.warn(`[IndexService] Index corruption detected: ${indexData.length} vectors vs ${meta.total_chunks} expected. Clearing corrupted index.`)
 
-          // Find which docs have mismatched dimensions
-          const mismatchedDocIds = Object.entries(meta.docs)
-            .filter(([, doc]) => {
-              const docDim = doc.embedding_dimensions || existingDimensions
-              return docDim !== newDimensions
-            })
-            .map(([id]) => id)
+        // Reset all previously-indexed documents' status to pending
+        const updateDocument = useLibraryStore.getState().updateDocument
+        for (const existingDocId of Object.keys(meta.docs)) {
+          if (existingDocId !== docId) {
+            updateDocument(existingDocId, { index_status: { status: 'pending' } })
+          }
+        }
 
-          // Keep all existing docs regardless of dimension mismatch.
-          // Mixed dimensions are handled at search time by filtering to compatible chunks.
-          // Never silently wipe the entire index — users would lose all their indexed data.
-          console.log(`[IndexService] Dimension mismatch: ${mismatchedDocIds.length} existing doc(s) use ${existingDimensions}-dim, new doc uses ${newDimensions}-dim. All docs are kept; search will filter by compatible dimensions.`)
+        // Start with a clean slate
+        indexData = []
+        meta = this.createEmptyMeta()
+        // Override the dimensions with actual value (not the default)
+        meta.embedding_dimensions = newDimensions
+        chunksMeta = { chunks: {} }
+        this.indexCache = { indexData, meta }
+        this.chunkTextCache = chunksMeta
+      } else {
+        // Check for dimension mismatch with existing index (non-corrupted)
+        if (indexData.length > 0 && newDimensions) {
+          const existingDimensions = indexData[0]?.length
+          if (existingDimensions && existingDimensions !== newDimensions) {
+            console.log(`[IndexService] Dimension mismatch: existing docs use ${existingDimensions}-dim, new doc uses ${newDimensions}-dim. Mixed dimensions supported.`)
+          }
         }
       }
 
       // 5. Remove old data for this doc if re-indexing
-      const chunksMeta = await this.loadChunksMeta(adapter)
       if (meta.docs[docId]) {
         const oldDoc = meta.docs[docId]
         const oldOffset = oldDoc.chunk_offset
@@ -418,8 +430,14 @@ class IndexService {
         // Clear cache to force re-read from storage on next attempt
         this.indexCache = null
         this.chunkTextCache = null
+        // Reset the corrupted document's status so the green circle goes away
+        if (scope.type === 'document' && scope.docId) {
+          useLibraryStore.getState().updateDocument(scope.docId, {
+            index_status: { status: 'pending' }
+          })
+        }
         const error = new Error(
-          'Document index is corrupted — embedding data is missing. Please re-index this document.'
+          'Document index is corrupted. Please re-index this document — indexing will automatically repair the index.'
         )
         error.code = 'DIMENSION_MISMATCH'
         throw error
