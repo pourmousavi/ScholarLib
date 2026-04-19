@@ -326,6 +326,7 @@ export const useLibraryStore = create((set, get) => ({
   collectionRegistry: mockCollectionRegistry,
   smartCollections: [],
   libraryVersion: null,
+  schemaRevision: null,
   lastModified: null,
 
   // UI state
@@ -387,6 +388,7 @@ export const useLibraryStore = create((set, get) => ({
       collectionRegistry,
       smartCollections,
       libraryVersion: library.version,
+      schemaRevision: library.schema_revision ?? null,
       lastModified: library.last_modified,
       expandedFolders: savedExpanded,
       selectedFolderId: firstRootId,
@@ -408,6 +410,7 @@ export const useLibraryStore = create((set, get) => ({
       collectionRegistry: {},
       smartCollections: [],
       libraryVersion: null,
+      schemaRevision: null,
       lastModified: null,
       selectedFolderId: null,
       selectedDocId: null,

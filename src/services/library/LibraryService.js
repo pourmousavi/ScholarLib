@@ -135,7 +135,9 @@ export const LibraryService = {
   },
 
   async saveLibrary(adapter, library, { expectedRevision, modifiedBy } = {}) {
-    // Optimistic concurrency check
+    // Optimistic concurrency check — only enforced when the library
+    // object carries a schema_revision (i.e. the full library loaded via
+    // loadLibrary). Ad-hoc objects constructed by components skip the check.
     let current
     try {
       current = await adapter.readJSON(LIBRARY_PATH)
@@ -144,15 +146,19 @@ export const LibraryService = {
       current = null
     }
     const onDisk = current?.schema_revision ?? 0
-    const expected = expectedRevision ?? library.schema_revision ?? 0
-    if (current && onDisk !== expected) {
-      throw new LibraryConflictError(
-        `Library was modified by another session (disk: ${onDisk}, expected: ${expected})`,
-        { onDisk: current, local: library }
-      )
+    const hasRevision = expectedRevision != null || 'schema_revision' in library
+    if (current && hasRevision) {
+      const expected = expectedRevision ?? library.schema_revision ?? 0
+      if (onDisk !== expected) {
+        throw new LibraryConflictError(
+          `Library was modified by another session (disk: ${onDisk}, expected: ${expected})`,
+          { onDisk: current, local: library }
+        )
+      }
     }
 
-    library.schema_revision = (library.schema_revision ?? 0) + 1
+    // Always bump from the on-disk revision so all save paths stay consistent
+    library.schema_revision = onDisk + 1
     library.last_modified = new Date().toISOString()
     library.last_modified_by = modifiedBy || library.last_modified_by || 'local'
     await adapter.writeJSON(LIBRARY_PATH, library)
