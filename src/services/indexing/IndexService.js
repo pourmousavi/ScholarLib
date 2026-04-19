@@ -63,23 +63,67 @@ class IndexService {
         .sort((a, b) => a.chunk_offset - b.chunk_offset)
 
       if (sortedDocs.length > 0 && sortedDocs.some(d => d.embedding_dimensions)) {
-        // Per-doc dimension parsing
+        // Per-doc dimension parsing (mixed-dimension index)
+        // First, determine the correct fallback dimension for docs without embedding_dimensions.
+        // meta.embedding_dimensions may be stale/wrong, so validate it against the binary data.
+        const docsWithDims = sortedDocs.filter(d => d.embedding_dimensions)
+        const docsWithoutDims = sortedDocs.filter(d => !d.embedding_dimensions)
+
+        let fallbackDim = meta.embedding_dimensions || 768
+
+        // Validate: calculate expected binary size using the fallback dim
+        if (docsWithoutDims.length > 0) {
+          const knownFloats = docsWithDims.reduce((sum, d) => sum + d.chunk_count * d.embedding_dimensions, 0)
+          const unknownChunks = docsWithoutDims.reduce((sum, d) => sum + d.chunk_count, 0)
+          const remainingFloats = arr.length - knownFloats
+
+          if (unknownChunks > 0 && remainingFloats > 0) {
+            const detectedDim = Math.round(remainingFloats / unknownChunks)
+            // Only use detected dim if it's a known embedding dimension
+            const knownDimensions = [384, 768, 1024, 1536, 3072]
+            if (knownDimensions.includes(detectedDim) && detectedDim !== fallbackDim) {
+              console.warn(`[IndexService] Detected actual dimension ${detectedDim} for ${docsWithoutDims.length} legacy docs (meta says ${fallbackDim}). Using detected value.`)
+              fallbackDim = detectedDim
+            }
+          }
+        }
+
         let floatOffset = 0
+        let skippedChunks = 0
         for (const docMeta of sortedDocs) {
-          const dims = docMeta.embedding_dimensions || meta.embedding_dimensions || 768
+          const dims = docMeta.embedding_dimensions || fallbackDim
           for (let i = 0; i < docMeta.chunk_count; i++) {
             if (floatOffset + dims <= arr.length) {
               vectors.push(Array.from(arr.slice(floatOffset, floatOffset + dims)))
+            } else {
+              skippedChunks++
             }
             floatOffset += dims
           }
         }
+        if (skippedChunks > 0) {
+          console.error(`[IndexService] Binary parsing: ${skippedChunks} chunks skipped (binary too short). Expected ${floatOffset} floats, got ${arr.length}. Parsed ${vectors.length} vectors, expected ${meta.total_chunks}.`)
+        }
       } else {
         // Legacy: single global dimension
-        const dims = meta.embedding_dimensions || 768
+        // Auto-detect dimension from binary size and chunk count
+        let dims = meta.embedding_dimensions || 768
+        if (meta.total_chunks > 0) {
+          const detectedDim = Math.round(arr.length / meta.total_chunks)
+          const knownDimensions = [384, 768, 1024, 1536, 3072]
+          if (knownDimensions.includes(detectedDim) && detectedDim !== dims) {
+            console.warn(`[IndexService] Detected actual dimension ${detectedDim} from binary (meta says ${dims}). Using detected value.`)
+            dims = detectedDim
+          }
+        }
         for (let i = 0; i < arr.length; i += dims) {
           vectors.push(Array.from(arr.slice(i, i + dims)))
         }
+      }
+
+      // Validate parsed vectors match metadata expectations
+      if (vectors.length !== meta.total_chunks) {
+        console.warn(`[IndexService] Vector count mismatch: parsed ${vectors.length} vectors, metadata expects ${meta.total_chunks}. Binary length: ${arr.length} floats.`)
       }
 
       this.indexCache = { indexData: vectors, meta }
@@ -367,7 +411,21 @@ class IndexService {
     // Check for dimension mismatch — filter to compatible chunks instead of failing
     const queryDim = queryEmbedding.length
     if (indexData.length > 0 && relevantIndices.length > 0) {
-      const storedDim = indexData[relevantIndices[0]]?.length
+      // Check if any relevant indices point beyond the vectors array (index corruption)
+      const missingIndices = relevantIndices.filter(i => !indexData[i])
+      if (missingIndices.length > 0) {
+        console.error(`[IndexService] Index corruption: ${missingIndices.length}/${relevantIndices.length} chunk indices have no vectors. indexData.length=${indexData.length}, missing indices sample: [${missingIndices.slice(0, 5).join(', ')}]`)
+        // Clear cache to force re-read from storage on next attempt
+        this.indexCache = null
+        this.chunkTextCache = null
+        const error = new Error(
+          'Document index is corrupted — embedding data is missing. Please re-index this document.'
+        )
+        error.code = 'DIMENSION_MISMATCH'
+        throw error
+      }
+
+      const storedDim = indexData[relevantIndices[0]].length
       console.log('Embedding dimensions:', { query: queryDim, stored: storedDim })
 
       if (storedDim !== queryDim) {
@@ -383,7 +441,7 @@ class IndexService {
           const error = new Error(
             storedDim === 768 && queryDim === 384
               ? 'Ollama is not responding. Documents were indexed with Ollama but it\'s currently unavailable. Please ensure Ollama is running.'
-              : `Embedding dimension mismatch (${storedDim} vs ${queryDim}). Please re-index documents.`
+              : `Embedding dimension mismatch (stored: ${storedDim}, current: ${queryDim}). Please re-index this document.`
           )
           error.code = 'DIMENSION_MISMATCH'
           throw error

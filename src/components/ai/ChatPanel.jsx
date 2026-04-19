@@ -334,13 +334,8 @@ export default function ChatPanel() {
           }
         } catch (err) {
           console.error('RAG search failed:', err)
-          if (err.code === 'DIMENSION_MISMATCH') {
-            setError(err.message)
-            setStreaming(false)
-            return
-          }
-          // Show all search errors to the user instead of silently continuing
-          ragWarning = `Search failed: ${err.message || 'Unknown error'}. Responding without document context.`
+          // Show all search errors to the user as a visible warning
+          ragWarning = err.message || 'Search failed. Please try re-indexing the document.'
         }
       } else {
         console.log('RAG search skipped - adapter:', !!adapter, 'isDemoMode:', isDemoMode)
@@ -720,6 +715,13 @@ export default function ChatPanel() {
 
       {/* Messages */}
       <div className={styles.messages} ref={messagesRef}>
+        {error && messages.length > 0 && (
+          <div className={styles.inlineError}>
+            <span className={styles.errorIcon}>!</span>
+            <span className={styles.errorText}>{error}</span>
+            <button className={styles.errorAction} onClick={clearError}>Dismiss</button>
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className={styles.empty}>
             <span className={styles.emptyIcon}>AI</span>
