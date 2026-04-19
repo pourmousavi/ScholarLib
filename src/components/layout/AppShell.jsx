@@ -11,6 +11,7 @@ import { ChatHistoryModal } from '../ai'
 import { QuickHelpModal } from '../help'
 import { CitationExportModal } from '../citation'
 import EditMetadataModal from '../metadata/EditMetadataModal'
+import NewFolderModal from '../library/NewFolderModal'
 import styles from './AppShell.module.css'
 
 export default function AppShell() {
@@ -204,6 +205,9 @@ export default function AppShell() {
       )}
       {showModal === 'export-citations' && (
         <CitationExportModal onClose={() => setShowModal(null)} />
+      )}
+      {showModal === 'new-folder' && (
+        <NewFolderModal onClose={() => setShowModal(null)} />
       )}
     </>
   )
