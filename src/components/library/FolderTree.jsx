@@ -18,7 +18,7 @@ export default function FolderTree() {
 
   const rootFolders = folders
     .filter(f => f.parent_id === null)
-    .sort((a, b) => a.sort_order - b.sort_order)
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   const folderCount = folders.length
   const docCount = Object.keys(documents).length
@@ -120,7 +120,7 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
   const hasChildren = folder.children && folder.children.length > 0
 
   const childFolders = hasChildren
-    ? folders.filter(f => f.parent_id === folder.id).sort((a, b) => a.sort_order - b.sort_order)
+    ? folders.filter(f => f.parent_id === folder.id).sort((a, b) => a.name.localeCompare(b.name))
     : []
 
   const docCount = Object.values(documents).filter(d => d.folder_id === folder.id).length

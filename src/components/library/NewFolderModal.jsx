@@ -114,7 +114,7 @@ export default function NewFolderModal({ onClose }) {
     const addChildren = (parentIdVal, depth) => {
       folders
         .filter(f => f.parent_id === parentIdVal)
-        .sort((a, b) => a.sort_order - b.sort_order)
+        .sort((a, b) => a.name.localeCompare(b.name))
         .forEach(f => {
           options.push({ id: f.id, name: f.name, depth })
           addChildren(f.id, depth + 1)
