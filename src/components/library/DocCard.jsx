@@ -3,6 +3,7 @@ import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
 import { useIndexStore } from '../../store/indexStore'
+import { useAIStore } from '../../store/aiStore'
 import { useToast } from '../../hooks/useToast'
 import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
@@ -67,10 +68,24 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
     }
   }, [adapter, isDemoMode])
 
+  const embeddingProvider = useAIStore((s) => s.embeddingProvider)
+
   const isSelected = selectedDocId === doc.id
   const isUnread = !doc.user_data?.read
   const isStarred = doc.user_data?.starred
-  const status = doc.index_status?.status || 'none'
+
+  // Determine index status — distinguish "indexed with wrong model" from "indexed and ready"
+  const EMBEDDING_MODEL_NAMES = {
+    gemini: 'gemini-embedding-001',
+    openai: 'text-embedding-3-small',
+    ollama: 'nomic-embed-text',
+    browser: 'all-MiniLM-L6-v2'
+  }
+  const currentEmbeddingModel = EMBEDDING_MODEL_NAMES[embeddingProvider] || 'all-MiniLM-L6-v2'
+  const rawStatus = doc.index_status?.status || 'none'
+  const status = rawStatus === 'indexed' && doc.index_status?.embedding_model !== currentEmbeddingModel
+    ? 'mismatched'
+    : rawStatus
 
   const authors = doc.metadata?.authors || []
   const authorText = authors.length > 0

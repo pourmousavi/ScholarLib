@@ -184,6 +184,12 @@
   color: rgb(251, 146, 60);
 }
 
+.mismatchText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .bar.mismatch .message {
   color: var(--text-secondary);
   font-size: 11px;
@@ -191,4 +197,26 @@
 
 .bar.mismatch .message strong {
   color: rgb(251, 146, 60);
+}
+
+.legend {
+  display: flex;
+  gap: var(--space-3);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legendDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
 }

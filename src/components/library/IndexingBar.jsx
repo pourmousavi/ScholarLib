@@ -175,9 +175,16 @@ export default function IndexingBar({ pendingDocs, mismatchedDocs, onIndexAll, o
                 <line x1="12" y1="17" x2="12.01" y2="17"/>
               </svg>
             </span>
-            <span className={styles.message}>
-              <strong>{mismatchedCount}</strong> document{mismatchedCount !== 1 ? 's' : ''} indexed with a different embedding model — re-index for accurate AI search
-            </span>
+            <div className={styles.mismatchText}>
+              <span className={styles.message}>
+                <strong>{mismatchedCount}</strong> document{mismatchedCount !== 1 ? 's' : ''} indexed with a different embedding model — AI chat won't work until re-indexed
+              </span>
+              <span className={styles.legend}>
+                <span className={styles.legendItem}><span className={styles.legendDot} style={{ background: 'var(--success)' }} /> ready</span>
+                <span className={styles.legendItem}><span className={styles.legendDot} style={{ background: 'rgb(251, 146, 60)' }} /> wrong model</span>
+                <span className={styles.legendItem}><span className={styles.legendDot} style={{ background: 'var(--text-muted)' }} /> not indexed</span>
+              </span>
+            </div>
           </div>
           <button className={styles.indexAllBtn} onClick={onReindexMismatched}>
             Re-index {mismatchedCount === 1 ? 'Document' : 'All'}
