@@ -8,7 +8,7 @@ const ACTION_STYLES = {
 }
 
 export default function LitOrbitInsights({ importSource }) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
 
   const score = importSource?.litorbit_score
   const summary = importSource?.litorbit_summary
