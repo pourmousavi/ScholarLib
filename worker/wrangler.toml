@@ -25,4 +25,5 @@ id = "REPLACE_WITH_NEW_KV_ID"
 
 [vars]
 # Update with your actual domains
+# Add LitOrbit origin when deployed (e.g. https://litorbit.alipourmousavi.com)
 ALLOWED_ORIGINS = "https://alipourmousavi.com,http://localhost:5173"
