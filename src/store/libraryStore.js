@@ -424,7 +424,7 @@ export const useLibraryStore = create((set, get) => ({
   getLibrarySnapshot: () => {
     const { folders, documents, tagRegistry, collectionRegistry, smartCollections, schemaRevision } = get()
     return {
-      version: '1.2',
+      version: '1.3',
       schema_revision: schemaRevision ?? 0,
       folders,
       documents,

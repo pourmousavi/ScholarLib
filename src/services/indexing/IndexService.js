@@ -14,6 +14,14 @@ import { AnnotationService } from '../annotations'
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}pdf.worker.min.mjs`
 
+/**
+ * Strip YAML front-matter from a markdown string.
+ * Handles the standard --- delimited block at the start of the file.
+ */
+function stripFrontMatter(md) {
+  return md.replace(/^---[\s\S]*?---\n?/, '').trim()
+}
+
 class IndexService {
   constructor() {
     this.indexCache = null
@@ -164,13 +172,29 @@ class IndexService {
    */
   async indexDocument(docId, pdfURL, adapter, onProgress) {
     try {
-      // 1. Extract text from PDF
+      // 1. Extract text — from markdown source if available, otherwise from PDF
       onProgress?.({ stage: 'extracting', docId, progress: 0 })
-      const { text, pageTexts } = await textChunker.extractTextFromPDF(
-        pdfURL,
-        pdfjsLib,
-        (page, total) => onProgress?.({ stage: 'extracting', docId, progress: page / total })
-      )
+
+      const doc = useLibraryStore.getState().documents[docId]
+      let text, pageTexts
+
+      if (doc?.ai_chat_source_file?.endsWith('.md')) {
+        // Markdown source: download, strip front-matter, use body text
+        const mdBlob = await adapter.downloadFile(doc.ai_chat_source_file)
+        const mdText = await mdBlob.text()
+        text = stripFrontMatter(mdText)
+        pageTexts = [text]
+        onProgress?.({ stage: 'extracting', docId, progress: 1 })
+      } else {
+        // PDF source: existing extraction path
+        const extracted = await textChunker.extractTextFromPDF(
+          pdfURL,
+          pdfjsLib,
+          (page, total) => onProgress?.({ stage: 'extracting', docId, progress: page / total })
+        )
+        text = extracted.text
+        pageTexts = extracted.pageTexts
+      }
 
       // 2. Chunk text (include annotations in context)
       onProgress?.({ stage: 'chunking', docId, progress: 0 })
@@ -181,7 +205,7 @@ class IndexService {
       const chunks = textChunker.chunk(cleanedText, { annotations })
 
       if (chunks.length === 0) {
-        throw { code: 'NO_TEXT', message: 'No text could be extracted from PDF' }
+        throw { code: 'NO_TEXT', message: 'No text could be extracted from the document' }
       }
 
       // 3. Generate embeddings (uses batch API for cloud providers)

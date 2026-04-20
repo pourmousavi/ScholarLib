@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid'
 
 const LIBRARY_PATH = '_system/library.json'
 
-const CURRENT_VERSION = '1.2'
+const CURRENT_VERSION = '1.3'
 
 /**
  * Sanitize a filename for safe storage.
@@ -96,6 +96,17 @@ function migrateLibrary(library) {
     library.version = '1.2'
     library.schema_updated = new Date().toISOString().split('T')[0]
     console.log('Migrated library from v1.1 to v1.2 (added schema_revision)')
+    version = '1.2'
+  }
+
+  // v1.2 → v1.3: Add reference_type for news article support
+  if (version === '1.2') {
+    for (const doc of Object.values(library.documents || {})) {
+      doc.reference_type = doc.reference_type || 'paper'
+    }
+    library.version = '1.3'
+    library.schema_updated = new Date().toISOString().split('T')[0]
+    console.log('Migrated library from v1.2 to v1.3 (added reference_type for news support)')
   }
 
   return library
@@ -198,14 +209,28 @@ export const LibraryService = {
 
   async addDocument(adapter, library, docData, file) {
     const sanitizedFilename = docData.filename ? sanitizeFilename(docData.filename) : ''
+    const isNews = docData.reference_type === 'news_article'
+
+    // News files go under News/{slug}/, papers under PDFs/
+    const storagePath = sanitizedFilename
+      ? (isNews ? `News/${sanitizedFilename}` : `PDFs/${sanitizedFilename}`)
+      : ''
+
     const doc = {
       id: `d_${nanoid(10)}`,
       folder_id: docData.folder_id,
-      box_path: sanitizedFilename ? `PDFs/${sanitizedFilename}` : '',
+      reference_type: docData.reference_type || 'paper',
+      box_path: storagePath,
       box_file_id: null,
       filename: sanitizedFilename,
       added_at: new Date().toISOString(),
-      added_by: 'local',
+      added_by: docData.added_by || 'local',
+      // News-specific fields (null for papers)
+      source_name: docData.source_name || null,
+      published_at: docData.published_at || null,
+      url: docData.url || null,
+      ai_chat_source_file: docData.ai_chat_source_file || null,
+      files: docData.files || [],
       metadata: docData.metadata || {},
       user_data: {
         read: false,
@@ -368,14 +393,22 @@ export const LibraryService = {
       throw new Error(`Document not found: ${docId}`)
     }
 
-    const filePath = doc.box_path
+    // Collect all file paths to delete (primary + any additional files)
+    const filePaths = []
+    if (doc.box_path) filePaths.push(doc.box_path)
+    if (doc.ai_chat_source_file && doc.ai_chat_source_file !== doc.box_path) {
+      filePaths.push(doc.ai_chat_source_file)
+    }
+    for (const f of (doc.files || [])) {
+      if (f.box_path && !filePaths.includes(f.box_path)) filePaths.push(f.box_path)
+    }
 
     // Remove from library and save first — this is the authoritative operation
     delete library.documents[docId]
     await this.saveLibrary(adapter, library)
 
-    // Then try to delete the file from storage
-    if (filePath) {
+    // Then try to delete all files from storage
+    for (const filePath of filePaths) {
       try {
         await adapter.deleteFile(filePath)
       } catch (e) {
