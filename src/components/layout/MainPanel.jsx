@@ -40,7 +40,9 @@ export default function MainPanel({ isMobile = false }) {
   const { showToast } = useToast()
   const attachInputRef = useRef(null)
 
-  const noPdfAttached = selectedDoc && !selectedDoc.box_path
+  // News articles with .md source don't need a PDF
+  const isNewsWithContent = selectedDoc?.reference_type === 'news_article' && selectedDoc?.ai_chat_source_file
+  const noPdfAttached = selectedDoc && !selectedDoc.box_path && !isNewsWithContent
 
   const handleAttachPdf = useCallback(() => {
     if (isDemoMode || !adapter) return
@@ -123,7 +125,7 @@ export default function MainPanel({ isMobile = false }) {
   }, [selectedDoc, selectedDocId, adapter, updateDocument, showToast, isEnriching])
 
   const panels = [
-    { id: 'pdf', label: 'PDF' },
+    { id: 'pdf', label: selectedDoc?.reference_type === 'news_article' ? 'Article' : 'PDF' },
     { id: 'ai', label: 'AI Chat' },
     { id: 'notes', label: 'Notes' }
   ]
@@ -175,9 +177,14 @@ export default function MainPanel({ isMobile = false }) {
     const fetchPdfUrl = async () => {
       try {
         setPdfError(null)
-        // Use box_path to get streaming URL from storage adapter
+        // For news articles without PDF, the MarkdownViewer handles its own content loading
         const path = selectedDoc.box_path
         if (!path) {
+          // News articles with markdown source don't need a PDF URL
+          if (selectedDoc.ai_chat_source_file) {
+            setPdfUrl(null)
+            return
+          }
           setPdfError('Document has no file path')
           return
         }

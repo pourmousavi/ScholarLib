@@ -85,9 +85,12 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
     ? authors.map(a => a.last).join(', ')
     : 'Unknown authors'
 
-  const year = doc.metadata?.year || ''
-  const journal = doc.metadata?.journal || ''
-  const yearJournal = [year, journal].filter(Boolean).join(' · ')
+  const isNews = doc.reference_type === 'news_article'
+  const year = isNews
+    ? (doc.published_at ? new Date(doc.published_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '')
+    : (doc.metadata?.year || '')
+  const publisherOrJournal = isNews ? (doc.source_name || '') : (doc.metadata?.journal || '')
+  const yearJournal = [year, publisherOrJournal].filter(Boolean).join(' · ')
 
   const tags = doc.user_data?.tags || []
   const keywords = doc.metadata?.keywords || []
@@ -200,9 +203,9 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
 
     if (isReindexing || isIndexing || isDemoMode || !adapter) return
 
-    const path = doc.box_path
+    const path = doc.ai_chat_source_file || doc.box_path
     if (!path) {
-      showToast({ message: 'Attach a PDF first to enable AI indexing', type: 'error' })
+      showToast({ message: 'Attach a file first to enable AI indexing', type: 'error' })
       return
     }
 
@@ -520,14 +523,16 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
           <h3 className={`${styles.title} ${isUnread ? styles.unread : ''}`}>
             {title}
           </h3>
-          {hasPdf
-            ? <span className={styles.pdfIcon} title="PDF attached" aria-hidden="true">
-                <svg width="12" height="14" viewBox="0 0 12 14" fill="none" stroke="currentColor" strokeWidth="1.3">
-                  <path d="M7 1H2.5A1.5 1.5 0 001 2.5v9A1.5 1.5 0 002.5 13h7a1.5 1.5 0 001.5-1.5V4.5L7 1z"/>
-                  <polyline points="7 1 7 4.5 10.5 4.5"/>
-                </svg>
-              </span>
-            : <span className={styles.noPdfBadge} title="No PDF attached">metadata only</span>
+          {isNews
+            ? <span className={styles.newsBadge} title="News article">News</span>
+            : hasPdf
+              ? <span className={styles.pdfIcon} title="PDF attached" aria-hidden="true">
+                  <svg width="12" height="14" viewBox="0 0 12 14" fill="none" stroke="currentColor" strokeWidth="1.3">
+                    <path d="M7 1H2.5A1.5 1.5 0 001 2.5v9A1.5 1.5 0 002.5 13h7a1.5 1.5 0 001.5-1.5V4.5L7 1z"/>
+                    <polyline points="7 1 7 4.5 10.5 4.5"/>
+                  </svg>
+                </span>
+              : <span className={styles.noPdfBadge} title="No PDF attached">metadata only</span>
           }
           {isStarred && <span className={styles.star} aria-hidden="true"><StarFilledIcon /></span>}
         </div>

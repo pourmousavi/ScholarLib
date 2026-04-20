@@ -17,6 +17,8 @@ import styles from './DocList.module.css'
 
 const FILTERS = [
   { id: 'all', label: 'All' },
+  { id: 'papers', label: 'Papers' },
+  { id: 'news', label: 'News' },
   { id: 'unread', label: 'Unread' },
   { id: 'starred', label: 'Starred' },
   { id: 'pending', label: 'Pending' }
@@ -96,6 +98,10 @@ export default function DocList({ isMobile = false }) {
   // Apply additional filters (unread, starred, pending)
   let filteredDocs = allDocs.filter(doc => {
     switch (activeFilter) {
+      case 'papers':
+        return doc.reference_type !== 'news_article'
+      case 'news':
+        return doc.reference_type === 'news_article'
       case 'unread':
         return !doc.user_data?.read
       case 'starred':

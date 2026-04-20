@@ -74,6 +74,19 @@
   white-space: nowrap;
 }
 
+.newsBadge {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--warning, #b45309);
+  background: color-mix(in srgb, var(--warning, #b45309) 10%, transparent);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--warning, #b45309) 25%, transparent);
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
 .originBadge {
   display: inline-flex;
   align-items: center;
