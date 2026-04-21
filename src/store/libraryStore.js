@@ -400,6 +400,37 @@ export const useLibraryStore = create((set, get) => ({
     return { syncedTags: syncedTags.length }
   },
 
+  // Restore UI navigation state from persisted ui_state.json.
+  // Called after setLibraryData once the remote UI state is loaded.
+  // Validates that referenced folders/documents still exist before applying.
+  restoreUIState: (uiState) => {
+    if (!uiState) return
+    const { folders, documents, expandedFolders: currentExpanded } = get()
+    const folderIds = new Set(folders.map(f => f.id))
+    const updates = {}
+
+    // Restore selected folder if it still exists
+    if (uiState.selectedFolderId && folderIds.has(uiState.selectedFolderId)) {
+      updates.selectedFolderId = uiState.selectedFolderId
+
+      // Restore selected document only if its folder also matches
+      if (uiState.selectedDocId && documents[uiState.selectedDocId]) {
+        updates.selectedDocId = uiState.selectedDocId
+      }
+    }
+
+    // Merge persisted expanded folders (remote) with any already restored from localStorage
+    if (uiState.expandedFolders?.length > 0) {
+      const merged = new Set([...currentExpanded, ...uiState.expandedFolders.filter(id => folderIds.has(id))])
+      updates.expandedFolders = [...merged]
+      try { localStorage.setItem('sv_expanded_folders', JSON.stringify(updates.expandedFolders)) } catch {}
+    }
+
+    if (Object.keys(updates).length > 0) {
+      set(updates)
+    }
+  },
+
   // Clear library (for logout)
   clearLibrary: () => {
     try { localStorage.removeItem('sv_expanded_folders') } catch {}
@@ -461,8 +492,24 @@ export const useLibraryStore = create((set, get) => ({
     })
   },
 
-  setSelectedFolderId: (id) => set({ selectedFolderId: id, selectedDocId: null }),
-  setSelectedDocId: (id) => set({ selectedDocId: id }),
+  setSelectedFolderId: (id) => {
+    set({ selectedFolderId: id, selectedDocId: null })
+    // Cache to localStorage for fast same-device restore
+    try {
+      const cached = JSON.parse(localStorage.getItem('sv_ui_state') || '{}')
+      cached.selectedFolderId = id
+      cached.selectedDocId = null
+      localStorage.setItem('sv_ui_state', JSON.stringify(cached))
+    } catch {}
+  },
+  setSelectedDocId: (id) => {
+    set({ selectedDocId: id })
+    try {
+      const cached = JSON.parse(localStorage.getItem('sv_ui_state') || '{}')
+      cached.selectedDocId = id
+      localStorage.setItem('sv_ui_state', JSON.stringify(cached))
+    } catch {}
+  },
 
   toggleFolderExpanded: (id) => set((state) => {
     const expanded = state.expandedFolders.includes(id)

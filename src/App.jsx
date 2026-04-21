@@ -9,6 +9,7 @@ import { useStorageStore } from './store/storageStore'
 import { useLibraryStore } from './store/libraryStore'
 import { LibraryService } from './services/library/LibraryService'
 import { indexService } from './services/indexing/IndexService'
+import { UIStateService } from './services/ui/UIStateService'
 import { PortalProvider } from './contexts/PortalContext'
 
 function ToastProvider({ children }) {
@@ -39,6 +40,7 @@ function AppContent() {
   const provider = useStorageStore((s) => s.provider)
 
   const setLibraryData = useLibraryStore((s) => s.setLibraryData)
+  const restoreUIState = useLibraryStore((s) => s.restoreUIState)
   const useMockData = useLibraryStore((s) => s.useMockData)
   const libraryConflict = useLibraryStore((s) => s.libraryConflict)
   const clearConflict = useLibraryStore((s) => s.clearConflict)
@@ -109,7 +111,7 @@ function AppContent() {
     }
   }, [libraryConflict, clearConflict, adapter, setLibraryData, showToast])
 
-  // Load library when connected
+  // Load library when connected, then restore UI state
   useEffect(() => {
     const loadLibrary = async () => {
       if (!isConnected) return
@@ -141,6 +143,31 @@ function AppContent() {
         if (synced > 0) {
           console.log(`Synced ${synced} document(s) index status from index metadata`)
         }
+
+        // Restore UI navigation state (folder, document, expanded folders)
+        // URL ?folder=slug param takes priority over persisted state
+        const url = new URL(window.location.href)
+        const folderSlug = url.searchParams.get('folder')
+
+        if (folderSlug) {
+          // Resolve slug to folder ID from the loaded library
+          const { folders } = useLibraryStore.getState()
+          const folder = folders.find(f => f.slug === folderSlug)
+          if (folder) {
+            useLibraryStore.getState().setSelectedFolderId(folder.id)
+          }
+          // Clear the URL param after consuming it
+          url.searchParams.delete('folder')
+          window.history.replaceState({}, '', url.pathname + url.search)
+        } else {
+          // No URL override — restore from persisted UI state
+          try {
+            const uiState = await UIStateService.load(adapter)
+            restoreUIState(uiState)
+          } catch (e) {
+            console.warn('Failed to restore UI state:', e)
+          }
+        }
       } catch (error) {
         console.error('Failed to load library:', error)
         showToast({ message: 'Failed to load library', type: 'error' })
@@ -150,7 +177,33 @@ function AppContent() {
     }
 
     loadLibrary()
-  }, [isConnected, isDemoMode, adapter, setLibraryData, useMockData, showToast])
+  }, [isConnected, isDemoMode, adapter, setLibraryData, restoreUIState, useMockData, showToast])
+
+  // Debounced save of UI state to Box/Dropbox on navigation changes
+  const uiSaveTimerRef = useRef(null)
+  const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
+  const selectedDocId = useLibraryStore((s) => s.selectedDocId)
+  const expandedFolders = useLibraryStore((s) => s.expandedFolders)
+
+  useEffect(() => {
+    if (!adapter || isDemoMode || !isConnected) return
+
+    clearTimeout(uiSaveTimerRef.current)
+    uiSaveTimerRef.current = setTimeout(async () => {
+      try {
+        await UIStateService.save(adapter, {
+          selectedFolderId,
+          selectedDocId,
+          expandedFolders,
+        })
+      } catch (e) {
+        // Non-critical — don't show toast for UI state save failures
+        console.warn('Failed to save UI state:', e)
+      }
+    }, 3000)
+
+    return () => clearTimeout(uiSaveTimerRef.current)
+  }, [selectedFolderId, selectedDocId, expandedFolders, adapter, isDemoMode, isConnected])
 
   // Show loading during initialization
   if (isInitializing) {
