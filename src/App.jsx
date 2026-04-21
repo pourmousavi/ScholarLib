@@ -10,6 +10,8 @@ import { useLibraryStore } from './store/libraryStore'
 import { LibraryService } from './services/library/LibraryService'
 import { indexService } from './services/indexing/IndexService'
 import { UIStateService } from './services/ui/UIStateService'
+import { settingsService } from './services/settings/SettingsService'
+import { useAIStore } from './store/aiStore'
 import { PortalProvider } from './contexts/PortalContext'
 
 function ToastProvider({ children }) {
@@ -142,6 +144,15 @@ function AppContent() {
         const { synced } = await indexService.syncIndexStatus(adapter)
         if (synced > 0) {
           console.log(`Synced ${synced} document(s) index status from index metadata`)
+        }
+
+        // Sync cross-platform settings (embedding provider, user profile, display prefs) from Box
+        try {
+          await settingsService.syncFromRemote(adapter, {
+            setEmbeddingProvider: useAIStore.getState().setEmbeddingProvider,
+          })
+        } catch (e) {
+          console.warn('Failed to sync settings from remote:', e)
         }
 
         // Restore UI navigation state (folder, document, expanded folders)

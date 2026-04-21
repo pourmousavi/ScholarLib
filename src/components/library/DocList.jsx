@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useIndexStore } from '../../store/indexStore'
-import { useAIStore } from '../../store/aiStore'
 import { useUIStore } from '../../store/uiStore'
 import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
@@ -46,8 +45,6 @@ export default function DocList({ isMobile = false }) {
   const adapter = useStorageStore((s) => s.adapter)
   const isConnected = useStorageStore((s) => s.isConnected)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
-
-  const embeddingProvider = useAIStore((s) => s.embeddingProvider)
 
   const toggleDocList = useUIStore((s) => s.toggleDocList)
   const closeAllOverlays = useUIStore((s) => s.closeAllOverlays)
@@ -142,27 +139,12 @@ export default function DocList({ isMobile = false }) {
     current = current.parent_id ? folders.find(f => f.id === current.parent_id) : null
   }
 
-  // Embedding model name for the current provider
-  const EMBEDDING_MODEL_NAMES = {
-    gemini: 'gemini-embedding-001',
-    openai: 'text-embedding-3-small',
-    ollama: 'nomic-embed-text',
-    browser: 'all-MiniLM-L6-v2'
-  }
-  const currentEmbeddingModel = EMBEDDING_MODEL_NAMES[embeddingProvider] || 'all-MiniLM-L6-v2'
-
   // Get pending documents for this folder
   const getPendingDocs = () => allDocs.filter(
     d => !d.index_status?.status ||
          d.index_status?.status === 'pending' ||
          d.index_status?.status === 'processing' ||
          d.index_status?.status === 'failed'
-  )
-
-  // Get documents indexed with a different embedding model (or unknown model)
-  const getMismatchedDocs = () => allDocs.filter(
-    d => d.index_status?.status === 'indexed' &&
-         d.index_status.embedding_model !== currentEmbeddingModel
   )
 
   // Index a single document
@@ -463,9 +445,7 @@ export default function DocList({ isMobile = false }) {
       {/* Indexing bar */}
       <IndexingBar
         pendingDocs={getPendingDocs()}
-        mismatchedDocs={getMismatchedDocs()}
         onIndexAll={handleIndexAll}
-        onReindexMismatched={() => handleIndexAll(getMismatchedDocs())}
       />
     </div>
   )

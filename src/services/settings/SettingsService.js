@@ -23,6 +23,9 @@ class SettingsService {
         },
         grobid_endpoint: 'huggingface', // 'huggingface' or 'scienceminer'
         crossref_email: '',
+        embedding_provider: 'browser', // browser | ollama | gemini | openai
+        user_name: '',
+        user_email: '',
         appearance: {
           theme: 'dark', // dark | light
           show_doc_counts: true,
@@ -31,7 +34,8 @@ class SettingsService {
         },
         doc_card: {
           show_tags: true,
-          show_keywords: true
+          show_keywords: true,
+          show_collections: true
         },
         export: {
           default_format: 'markdown',
@@ -90,6 +94,26 @@ class SettingsService {
 
     // Merge global settings
     existing.global = { ...existing.global, ...globalSettings }
+
+    // Always sync cross-platform settings from localStorage into global
+    const embProv = localStorage.getItem('sv_embedding_provider')
+    if (embProv) existing.global.embedding_provider = embProv
+
+    const userName = localStorage.getItem('sv_user_name')
+    if (userName !== null) existing.global.user_name = userName
+
+    const userEmail = localStorage.getItem('sv_user_email')
+    if (userEmail !== null) existing.global.user_email = userEmail
+
+    // Sync doc card display prefs
+    const showTags = localStorage.getItem('sv_show_tags')
+    if (showTags !== null) existing.global.doc_card = { ...existing.global.doc_card, show_tags: showTags === 'true' }
+
+    const showKeywords = localStorage.getItem('sv_show_keywords')
+    if (showKeywords !== null) existing.global.doc_card = { ...existing.global.doc_card, show_keywords: showKeywords === 'true' }
+
+    const showCollections = localStorage.getItem('sv_show_collections')
+    if (showCollections !== null) existing.global.doc_card = { ...existing.global.doc_card, show_collections: showCollections === 'true' }
 
     // Update device record
     const currentDevice = this._getCurrentDeviceSettings()
@@ -262,6 +286,51 @@ class SettingsService {
       return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     }
     return name[0].toUpperCase()
+  }
+
+  /**
+   * Apply cross-platform settings from Box to localStorage and stores.
+   * Called once at app startup after library loads.
+   * @param {object} adapter - Storage adapter
+   * @param {{ setEmbeddingProvider: Function }} aiStore - AI store actions
+   */
+  async syncFromRemote(adapter, { setEmbeddingProvider } = {}) {
+    if (!adapter) return
+
+    let remote
+    try {
+      remote = await adapter.readJSON('_system/settings.json')
+    } catch {
+      return // No remote settings yet
+    }
+
+    const g = remote.global
+    if (!g) return
+
+    // Embedding provider
+    if (g.embedding_provider && setEmbeddingProvider) {
+      setEmbeddingProvider(g.embedding_provider)
+    }
+
+    // User profile
+    if (g.user_name !== undefined) localStorage.setItem('sv_user_name', g.user_name)
+    if (g.user_email !== undefined) localStorage.setItem('sv_user_email', g.user_email)
+
+    // Doc card display prefs
+    if (g.doc_card) {
+      if (g.doc_card.show_tags !== undefined) localStorage.setItem('sv_show_tags', String(g.doc_card.show_tags))
+      if (g.doc_card.show_keywords !== undefined) localStorage.setItem('sv_show_keywords', String(g.doc_card.show_keywords))
+      if (g.doc_card.show_collections !== undefined) localStorage.setItem('sv_show_collections', String(g.doc_card.show_collections))
+    }
+
+    // Export options
+    if (g.export) {
+      const exportOptions = {
+        includeCitations: g.export.chat_include_citations ?? true,
+        includeTimestamps: g.export.chat_include_timestamps ?? false
+      }
+      localStorage.setItem('sv_chat_export_options', JSON.stringify(exportOptions))
+    }
   }
 
   // ============================================
