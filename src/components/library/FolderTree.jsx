@@ -1,4 +1,4 @@
-import { useState, memo, useCallback } from 'react'
+import { useState, memo, useCallback, useEffect, useRef } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
@@ -68,6 +68,7 @@ export default function FolderTree() {
 
 const FolderNode = memo(function FolderNode({ folder, depth }) {
   const [contextMenu, setContextMenu] = useState(null)
+  const itemRef = useRef(null)
 
   const folders = useLibraryStore((s) => s.folders)
   const documents = useLibraryStore((s) => s.documents)
@@ -112,6 +113,16 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
   const isSelected = selectedFolderId === folder.id
   const isExpanded = expandedFolders.includes(folder.id)
   const hasChildren = folder.children && folder.children.length > 0
+
+  // Scroll the restored/selected folder into view so a nested selection
+  // isn't hidden below the fold after refresh. scrollIntoView with
+  // block: 'nearest' is a no-op when already visible, so user clicks
+  // on visible items don't jump the view.
+  useEffect(() => {
+    if (isSelected && itemRef.current) {
+      itemRef.current.scrollIntoView({ block: 'nearest' })
+    }
+  }, [isSelected])
 
   const childFolders = hasChildren
     ? folders.filter(f => f.parent_id === folder.id).sort((a, b) => a.name.localeCompare(b.name))
@@ -374,6 +385,7 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
         aria-level={depth + 1}
       >
         <div
+          ref={itemRef}
           className={`${styles.item} ${isSelected ? styles.selected : ''}`}
           style={{ paddingLeft: 12 + depth * 14 }}
           onClick={handleClick}

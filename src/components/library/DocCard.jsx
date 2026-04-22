@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, memo, useCallback } from 'react'
+import { useState, useRef, useMemo, memo, useCallback, useEffect } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
@@ -21,6 +21,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   const [showAddToCollectionModal, setShowAddToCollectionModal] = useState(false)
   const attachInputRef = useRef(null)
   const replaceInputRef = useRef(null)
+  const cardRef = useRef(null)
 
   // Display settings
   const showTags = settingsService.getShowTags()
@@ -63,6 +64,15 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   const isSelected = selectedDocId === doc.id
   const isUnread = !doc.user_data?.read
   const isStarred = doc.user_data?.starred
+
+  // Scroll the restored/selected doc card into view so it isn't hidden
+  // below the fold after refresh. 'nearest' is a no-op when already
+  // visible, so clicking a visible card doesn't jump the list.
+  useEffect(() => {
+    if (isSelected && cardRef.current) {
+      cardRef.current.scrollIntoView({ block: 'nearest' })
+    }
+  }, [isSelected])
 
   const status = doc.index_status?.status || 'none'
 
@@ -486,6 +496,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   return (
     <>
       <article
+        ref={cardRef}
         className={`${styles.card} ${isSelected ? styles.selected : ''} ${isSelectedForBulk ? styles.bulkSelected : ''}`}
         onClick={handleClick}
         onContextMenu={selectionMode ? undefined : handleContextMenu}
