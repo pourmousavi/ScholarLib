@@ -51,6 +51,11 @@ function AppContent() {
   // Track if we've already processed the OAuth callback
   const oauthProcessed = useRef(false)
 
+  // Gate for the debounced UI-state save: only start saving after the initial
+  // restore has run. Otherwise the save can fire with the fallback folder
+  // selection during the load phase and clobber the persisted state on disk.
+  const uiStateRestoredRef = useRef(false)
+
   // Combined initialization and OAuth callback handling
   useEffect(() => {
     const initializeApp = async () => {
@@ -128,6 +133,7 @@ function AppContent() {
       if (!adapter) return
 
       setIsLoadingLibrary(true)
+      uiStateRestoredRef.current = false
       try {
         const library = await LibraryService.loadLibrary(adapter)
         const result = setLibraryData(library)
@@ -179,6 +185,7 @@ function AppContent() {
             console.warn('Failed to restore UI state:', e)
           }
         }
+        uiStateRestoredRef.current = true
       } catch (error) {
         console.error('Failed to load library:', error)
         showToast({ message: 'Failed to load library', type: 'error' })
@@ -198,6 +205,9 @@ function AppContent() {
 
   useEffect(() => {
     if (!adapter || isDemoMode || !isConnected) return
+    // Don't save until the initial restore has run, or we'll overwrite the
+    // persisted selection with the fallback value set by setLibraryData.
+    if (!uiStateRestoredRef.current) return
 
     clearTimeout(uiSaveTimerRef.current)
     uiSaveTimerRef.current = setTimeout(async () => {

@@ -253,6 +253,9 @@ export default function DocList({ isMobile = false }) {
 
       // Update local store
       addDocument(doc)
+      // saveLibrary mutates library.schema_revision to the new on-disk value;
+      // sync it so the next save (e.g. auto-indexing) doesn't hit LibraryConflictError.
+      useLibraryStore.getState().setSchemaRevision(library.schema_revision)
 
       showToast({ message: `Added "${metadata.title || file.name}"`, type: 'success' })
       setShowUpload(false)

@@ -34,7 +34,30 @@
       "WebFetch(domain:danielarnould.github.io)",
       "WebFetch(domain:www.embedpdf.com)",
       "WebFetch(domain:embedpdf.com)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(npm run deploy:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx vite:*)",
+      "Bash(git fetch:*)",
+      "Bash(npm list:*)",
+      "Bash(done)",
+      "Bash(for plugin:*)",
+      "Bash(do echo:*)",
+      "Read(//Users/a1226603/Documents/ScholarLib/ScholarLib/node_modules/@embedpdf/plugin-$plugin/dist/**)",
+      "Bash(npm ls:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''description'''',''''''''\\)\\)\")",
+      "Bash(npm pack:*)",
+      "Bash(tar -xzf /tmp/embedpdf-core-2.14.0.tgz -C /tmp)",
+      "Read(//tmp/package/dist/react/**)",
+      "Bash(for accurate AI search\" with a Re-index All button.:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npm test:*)",
+      "Bash(git status:*)",
+      "Bash(git pull:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git branch:*)",
+      "Bash(find /Users/a1226603/Documents/ScholarLib/ScholarLib/src -type f \\\\\\(-name *.js -o -name *.jsx \\\\\\))"
     ]
   }
 }

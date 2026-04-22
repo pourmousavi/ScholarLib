@@ -352,6 +352,7 @@ class IndexService {
       // Persist to storage (include all library fields)
       const library = useLibraryStore.getState().getLibrarySnapshot()
       await LibraryService.saveLibrary(adapter, library)
+      useLibraryStore.getState().setSchemaRevision(library.schema_revision)
 
       onProgress?.({ stage: 'complete', docId, progress: 1 })
 
@@ -373,6 +374,7 @@ class IndexService {
       try {
         const library = useLibraryStore.getState().getLibrarySnapshot()
         await LibraryService.saveLibrary(adapter, library)
+        useLibraryStore.getState().setSchemaRevision(library.schema_revision)
       } catch (saveError) {
         console.error('Failed to save library after indexing error:', saveError)
       }
