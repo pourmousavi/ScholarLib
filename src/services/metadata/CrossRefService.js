@@ -57,8 +57,10 @@ export const CrossRefService = {
                  work.issued?.['date-parts']?.[0]?.[0] ||
                  null
 
-    // Extract keywords from subject field (CrossRef provides these for many papers)
-    const keywords = (work.subject || []).slice(0, 10)
+    // Note: CrossRef's `subject` field is journal-level classification
+    // (e.g., "General Engineering"), not the paper's own keyword section.
+    // We only want author-provided keywords — sourced from the PDF itself.
+    const keywords = []
 
     return {
       title: work.title?.[0] || '',

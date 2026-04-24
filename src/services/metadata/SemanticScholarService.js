@@ -64,11 +64,10 @@ export const SemanticScholarService = {
       return { last, first, orcid: null }
     })
 
-    // Extract keywords from fieldsOfStudy
-    const keywords = (paper.fieldsOfStudy || [])
-      .map(f => typeof f === 'string' ? f : f.category)
-      .filter(Boolean)
-      .slice(0, 10)
+    // Note: Semantic Scholar's `fieldsOfStudy` are broad discipline
+    // classifications (e.g., "Computer Science"), not the paper's keyword
+    // section. We only want author-provided keywords from the PDF itself.
+    const keywords = []
 
     return {
       title: paper.title || '',

@@ -21,6 +21,11 @@ export const MetadataExtractor = {
    * @param {object} settings - User settings for metadata sources (optional)
    */
   async extractMetadata(pdfText, filename, aiService = null, pdfBuffer = null, settings = null) {
+    const result = await this._extractMetadataRaw(pdfText, filename, aiService, pdfBuffer, settings)
+    return this.finalizeKeywords(result, pdfText)
+  },
+
+  async _extractMetadataRaw(pdfText, filename, aiService = null, pdfBuffer = null, settings = null) {
     const firstPages = pdfText.slice(0, 10000) // First ~10 pages worth of text
     const errors = [] // Collect errors for debugging
 
@@ -244,6 +249,66 @@ export const MetadataExtractor = {
   },
 
   /**
+   * Post-process extracted metadata: if keywords are empty, try to parse
+   * them from an explicit "Keywords:" / "Key words:" / "Index Terms:" section
+   * in the PDF text. Always dedupe (case-insensitive) and cap at 6.
+   */
+  finalizeKeywords(result, pdfText) {
+    if (!result) return result
+    let keywords = Array.isArray(result.keywords) ? result.keywords : []
+
+    if (keywords.length === 0 && pdfText) {
+      keywords = this.extractKeywordsFromText(pdfText)
+    }
+
+    // Trim, drop empties, dedupe case-insensitively, cap at 6
+    const seen = new Set()
+    const cleaned = []
+    for (const raw of keywords) {
+      if (typeof raw !== 'string') continue
+      const trimmed = raw.trim().replace(/[.;,]+$/, '')
+      if (!trimmed) continue
+      const key = trimmed.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      cleaned.push(trimmed)
+      if (cleaned.length >= 6) break
+    }
+
+    result.keywords = cleaned
+    return result
+  },
+
+  /**
+   * Scan PDF text for an explicit author-provided keyword section.
+   * Handles: "Keywords:", "Key words:", "Keywords—", "Index Terms:" (IEEE).
+   * Returns at most 6 terms; returns [] if no section is found.
+   */
+  extractKeywordsFromText(pdfText) {
+    if (!pdfText) return []
+    // Only scan the first ~8000 chars — keyword sections appear near the abstract
+    const headerText = pdfText.slice(0, 8000)
+
+    // Match label followed by the list of terms, stopping at the next section
+    // marker (double newline, "1.", "I.", "Introduction", etc.)
+    const pattern = /\b(?:Keywords?|Key\s+words?|Index\s+Terms?)\s*[:\-—–]\s*([\s\S]{1,400}?)(?:\n\s*\n|\.\s*(?:1\.|I\.|[A-Z]\.\s)|\b(?:Introduction|I\.\s+INTRODUCTION|1\.\s+Introduction)\b)/i
+    const match = headerText.match(pattern)
+    if (!match) return []
+
+    const raw = match[1]
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    // Keywords are typically separated by commas or semicolons.
+    // IEEE Index Terms uses "—" between label and list, commas between terms.
+    return raw
+      .split(/[,;]|·/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && s.length < 80)
+      .slice(0, 6)
+  },
+
+  /**
    * Merge metadata from two sources, preferring higher confidence values
    */
   mergeMetadata(primary, secondary, source) {
@@ -269,12 +334,12 @@ export const MetadataExtractor = {
       merged.url = `https://doi.org/${merged.doi}`
     }
 
-    // Merge keywords
+    // Merge keywords (paper's own keyword section only, deduped, capped at 6)
     const allKeywords = new Set([
       ...(primary.keywords || []),
       ...(secondary.keywords || [])
     ])
-    merged.keywords = Array.from(allKeywords).slice(0, 10)
+    merged.keywords = Array.from(allKeywords).slice(0, 6)
 
     merged.extraction_source = source
     return merged

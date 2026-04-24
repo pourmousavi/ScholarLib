@@ -60,6 +60,8 @@ Now extract metadata from this paper. Return ONLY a valid JSON object with these
   "keywords": ["keyword1", "keyword2", "keyword3"]
 }
 
+IMPORTANT — keywords rule: only populate "keywords" with terms copied verbatim from an explicit "Keywords:", "Key words:", or "Index Terms:" section in the paper. Do NOT invent, infer, or summarize keywords from the title or abstract. If no such section is present in the text, return an empty array: "keywords": []. Return at most 6 keywords.
+
 Paper text:
 `
 
@@ -199,7 +201,7 @@ export const AIExtractor = {
     const keywordsMatch = text.match(/"keywords"\s*:\s*\[([\s\S]*?)\]/i)
     if (keywordsMatch) {
       const kwMatches = keywordsMatch[1].matchAll(/"([^"]+)"/g)
-      result.keywords = Array.from(kwMatches).map(m => m[1]).slice(0, 10)
+      result.keywords = Array.from(kwMatches).map(m => m[1]).slice(0, 6)
     }
 
     return Object.keys(result).length > 0 ? result : null
@@ -263,7 +265,7 @@ export const AIExtractor = {
       pages: data.pages || '',
       doi,
       abstract: data.abstract || '',
-      keywords: Array.isArray(data.keywords) ? data.keywords : [],
+      keywords: Array.isArray(data.keywords) ? data.keywords.slice(0, 6) : [],
       type: 'journal-article',
       url: doi ? `https://doi.org/${doi}` : '',
       extraction_source: 'ai',

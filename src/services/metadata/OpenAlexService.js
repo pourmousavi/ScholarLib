@@ -160,13 +160,6 @@ export const OpenAlexService = {
       enriched.url = `https://doi.org/${openAlexData.doi}`
     }
 
-    // Merge keywords from OpenAlex concepts
-    if (openAlexData.keywords && openAlexData.keywords.length > 0) {
-      const existingKeywords = new Set((enriched.keywords || []).map(k => k.toLowerCase()))
-      const newKeywords = openAlexData.keywords.filter(k => !existingKeywords.has(k.toLowerCase()))
-      enriched.keywords = [...(enriched.keywords || []), ...newKeywords].slice(0, 15)
-    }
-
     // Update extraction source
     const currentSource = enriched.extraction_source || 'unknown'
     enriched.extraction_source = currentSource.includes('openalex')
@@ -298,11 +291,10 @@ export const OpenAlexService = {
       abstract = this.reconstructAbstract(work.abstract_inverted_index)
     }
 
-    // Extract keywords/concepts
-    const keywords = (work.concepts || [])
-      .filter(c => c.score > 0.3)
-      .slice(0, 10)
-      .map(c => c.display_name)
+    // Note: OpenAlex `concepts` are auto-classified ML topic labels
+    // (e.g., "Artificial intelligence"), not the paper's keyword section.
+    // We only want author-provided keywords from the PDF itself.
+    const keywords = []
 
     return {
       title: work.title || work.display_name || '',

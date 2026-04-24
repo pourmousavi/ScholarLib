@@ -286,7 +286,8 @@ export const GROBIDService = {
       }
     }
 
-    // Extract keywords
+    // Extract keywords from the paper's own <keywords> section (TEI XML).
+    // Cap at KEYWORD_LIMIT so we only keep the author's primary terms.
     const keywords = []
     const keywordsEl = doc.getElementsByTagName('keywords')[0]
     if (keywordsEl) {
@@ -294,6 +295,7 @@ export const GROBIDService = {
       for (const term of terms) {
         const kw = term.textContent?.trim()
         if (kw) keywords.push(kw)
+        if (keywords.length >= 6) break
       }
     }
 
