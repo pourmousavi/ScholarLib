@@ -28,8 +28,21 @@ export default function Modal({ onClose, width = 600, title, children }) {
     }
   }, [onClose])
 
+  const mouseDownOnOverlayRef = useRef(false)
+
+  const handleOverlayMouseDown = (e) => {
+    // Track whether this click-drag started on the overlay itself.
+    // If the user mousedowns inside an input (to start text selection) and
+    // drags out to release on the overlay, the click event fires on the
+    // overlay (the common ancestor) — we must NOT treat that as a dismiss.
+    mouseDownOnOverlayRef.current = e.target === e.currentTarget
+  }
+
   const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) {
+    const shouldClose =
+      e.target === e.currentTarget && mouseDownOnOverlayRef.current
+    mouseDownOnOverlayRef.current = false
+    if (shouldClose) {
       onClose()
     }
   }
@@ -65,6 +78,7 @@ export default function Modal({ onClose, width = 600, title, children }) {
   return (
     <div
       className={styles.overlay}
+      onMouseDown={handleOverlayMouseDown}
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
