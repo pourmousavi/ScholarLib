@@ -94,6 +94,9 @@ export default function EditMetadataModal({ onClose }) {
       const pdfBlob = await adapter.downloadFile(doc.box_path)
       const pdfBuffer = await pdfBlob.arrayBuffer()
 
+      // pdf.js detaches the ArrayBuffer it receives, so keep a copy for GROBID
+      const pdfBufferCopy = pdfBuffer.slice(0)
+
       // Extract text from PDF
       const pdfjsLib = await import('pdfjs-dist')
       pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}pdf.worker.min.mjs`
@@ -120,7 +123,7 @@ export default function EditMetadataModal({ onClose }) {
         pdfText,
         doc.filename,
         aiServiceForExtraction,
-        pdfBuffer,
+        pdfBufferCopy,
         settings
       )
 
