@@ -154,8 +154,7 @@ export default function MainPanel({ isMobile = false }) {
         readMarkTimerRef.current = setTimeout(async () => {
           try {
             // Re-read store state at save time to capture any interim changes
-            const library = useLibraryStore.getState().getLibrarySnapshot()
-            await LibraryService.saveLibrary(adapter, library)
+            await useLibraryStore.getState().saveLibrary(adapter)
           } catch (e) {
             console.error('Failed to save read status:', e)
           }

@@ -54,8 +54,7 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   const saveLibrary = useCallback(async () => {
     if (isDemoMode || !adapter) return
     try {
-      const library = useLibraryStore.getState().getLibrarySnapshot()
-      await LibraryService.saveLibrary(adapter, library)
+      await useLibraryStore.getState().saveLibrary(adapter)
     } catch (e) {
       console.error('Failed to save library:', e)
     }

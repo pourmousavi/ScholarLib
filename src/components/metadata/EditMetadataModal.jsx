@@ -5,7 +5,6 @@ import { Modal, Btn, Input, Tag, TagInput, Spinner } from '../ui'
 import { MetadataExtractor } from '../../services/metadata/MetadataExtractor'
 import { aiService } from '../../services/ai/AIService'
 import { settingsService } from '../../services/settings/SettingsService'
-import { LibraryService } from '../../services/library/LibraryService'
 import { useToast } from '../../hooks/useToast'
 import styles from './MetadataModal.module.css'
 
@@ -161,10 +160,9 @@ export default function EditMetadataModal({ onClose }) {
         user_data: updatedDoc.user_data
       })
 
-      // Save to storage (getLibrarySnapshot reads from store which already has the updated doc)
+      // Save to storage (store snapshot already has the updated doc)
       if (!isDemoMode && adapter) {
-        const library = useLibraryStore.getState().getLibrarySnapshot()
-        await LibraryService.saveLibrary(adapter, library)
+        await useLibraryStore.getState().saveLibrary(adapter)
       }
 
       showToast({ message: 'Metadata saved', type: 'success' })

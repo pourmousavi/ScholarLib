@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { tagService } from '../services/tags/TagService'
 import { smartCollectionService } from '../services/tags/SmartCollectionService'
 import { collectionService } from '../services/tags/CollectionService'
-import { LibraryConflictError } from '../services/library/LibraryService'
+import { LibraryService, LibraryConflictError } from '../services/library/LibraryService'
 
 // Mock folder data for development/offline mode
 const mockFolders = [
@@ -477,6 +477,17 @@ export const useLibraryStore = create((set, get) => ({
   clearConflict: () => set({ libraryConflict: false }),
 
   setSchemaRevision: (rev) => set({ schemaRevision: rev }),
+
+  // Snapshot + persist + sync revision in one step. LibraryService.saveLibrary
+  // mutates library.schema_revision to the new on-disk value; this method
+  // pushes that back into the store so the next save doesn't trip the
+  // optimistic-concurrency check with a stale revision.
+  saveLibrary: async (adapter, options) => {
+    const library = get().getLibrarySnapshot()
+    await LibraryService.saveLibrary(adapter, library, options)
+    set({ schemaRevision: library.schema_revision })
+    return library
+  },
 
   // Use mock data (for development without storage)
   useMockData: () => {

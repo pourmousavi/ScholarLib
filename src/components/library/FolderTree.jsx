@@ -4,7 +4,6 @@ import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
 import { useIndexStore } from '../../store/indexStore'
 import { useToast } from '../../hooks/useToast'
-import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
 import { ContextMenu, ShareIcon, LinkIcon, UsersIcon, RenameIcon, UnshareIcon, FolderMinusIcon, ExportIcon, RefreshIcon } from '../ui'
 import styles from './FolderTree.module.css'
@@ -103,8 +102,7 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
   const saveLibrary = useCallback(async () => {
     if (isDemoMode || !adapter) return
     try {
-      const library = useLibraryStore.getState().getLibrarySnapshot()
-      await LibraryService.saveLibrary(adapter, library)
+      await useLibraryStore.getState().saveLibrary(adapter)
     } catch (e) {
       console.error('Failed to save library:', e)
     }

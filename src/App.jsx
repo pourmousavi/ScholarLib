@@ -141,8 +141,7 @@ function AppContent() {
         // If orphan tags were synced, save the updated registry
         if (result?.syncedTags > 0) {
           console.log(`Synced ${result.syncedTags} orphan tag(s) into registry, saving...`)
-          const library = useLibraryStore.getState().getLibrarySnapshot()
-          await LibraryService.saveLibrary(adapter, library)
+          await useLibraryStore.getState().saveLibrary(adapter)
         }
 
         // Sync index status with actual index metadata

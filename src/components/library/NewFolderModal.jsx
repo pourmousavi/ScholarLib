@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useToast } from '../../hooks/useToast'
-import { LibraryService } from '../../services/library/LibraryService'
 import Modal from '../ui/Modal'
 import styles from './NewFolderModal.module.css'
 
@@ -87,8 +86,7 @@ export default function NewFolderModal({ onClose }) {
 
       // Persist to storage
       if (!isDemoMode && adapter) {
-        const library = useLibraryStore.getState().getLibrarySnapshot()
-        await LibraryService.saveLibrary(adapter, library)
+        await useLibraryStore.getState().saveLibrary(adapter)
       }
 
       setSelectedFolderId(folderId)

@@ -4,7 +4,6 @@ import Btn from '../ui/Btn'
 import TagColorPicker from './TagColorPicker'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
-import { LibraryService } from '../../services/library/LibraryService'
 import styles from './TagEditModal.module.css'
 
 export default function TagEditModal({ slug, onClose }) {
@@ -20,8 +19,7 @@ export default function TagEditModal({ slug, onClose }) {
   const saveLibrary = useCallback(async () => {
     if (isDemoMode || !adapter) return
     try {
-      const library = useLibraryStore.getState().getLibrarySnapshot()
-      await LibraryService.saveLibrary(adapter, library)
+      await useLibraryStore.getState().saveLibrary(adapter)
     } catch (e) {
       console.error('Failed to save library:', e)
     }

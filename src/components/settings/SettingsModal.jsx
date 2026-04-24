@@ -5,7 +5,6 @@ import { useStorageStore } from '../../store/storageStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useIndexStore } from '../../store/indexStore'
 import { settingsService } from '../../services/settings/SettingsService'
-import { LibraryService } from '../../services/library/LibraryService'
 import { indexService } from '../../services/indexing/IndexService'
 import { ollamaService } from '../../services/ai/OllamaService'
 import { webllmService } from '../../services/ai/WebLLMService'
@@ -552,8 +551,7 @@ export default function SettingsModal({ onClose }) {
       }
 
       // Save to storage
-      const library = useLibraryStore.getState().getLibrarySnapshot()
-      await LibraryService.saveLibrary(adapter, library)
+      await useLibraryStore.getState().saveLibrary(adapter)
 
       showToast({ message: `Removed ${orphanedIds.length} orphaned document(s)`, type: 'success' })
     }
@@ -572,8 +570,7 @@ export default function SettingsModal({ onClose }) {
 
       // Save to storage
       if (!isDemoMode && adapter) {
-        const library = useLibraryStore.getState().getLibrarySnapshot()
-        await LibraryService.saveLibrary(adapter, library)
+        await useLibraryStore.getState().saveLibrary(adapter)
       }
 
       showToast({
@@ -592,8 +589,7 @@ export default function SettingsModal({ onClose }) {
 
       // Save to storage
       if (!isDemoMode && adapter) {
-        const library = useLibraryStore.getState().getLibrarySnapshot()
-        await LibraryService.saveLibrary(adapter, library)
+        await useLibraryStore.getState().saveLibrary(adapter)
       }
 
       showToast({
@@ -618,8 +614,7 @@ export default function SettingsModal({ onClose }) {
 
       // Save to storage
       if (!isDemoMode && adapter) {
-        const library = useLibraryStore.getState().getLibrarySnapshot()
-        await LibraryService.saveLibrary(adapter, library)
+        await useLibraryStore.getState().saveLibrary(adapter)
       }
 
       let message = `Deleted ${result.foldersDeleted} folder(s), ${result.documentsDeleted} document(s)`
@@ -646,8 +641,7 @@ export default function SettingsModal({ onClose }) {
 
       // Save to storage
       if (!isDemoMode && adapter) {
-        const library = useLibraryStore.getState().getLibrarySnapshot()
-        await LibraryService.saveLibrary(adapter, library)
+        await useLibraryStore.getState().saveLibrary(adapter)
       }
 
       let message = 'Library reset complete'

@@ -7,7 +7,6 @@ import * as pdfjsLib from 'pdfjs-dist'
 import { textChunker } from './TextChunker'
 import { embeddingService } from './EmbeddingService'
 import { useLibraryStore } from '../../store/libraryStore'
-import { LibraryService } from '../library/LibraryService'
 import { collectionService } from '../tags/CollectionService'
 import { AnnotationService } from '../annotations'
 
@@ -350,9 +349,7 @@ class IndexService {
       updateDocument(docId, { index_status: indexStatus })
 
       // Persist to storage (include all library fields)
-      const library = useLibraryStore.getState().getLibrarySnapshot()
-      await LibraryService.saveLibrary(adapter, library)
-      useLibraryStore.getState().setSchemaRevision(library.schema_revision)
+      await useLibraryStore.getState().saveLibrary(adapter)
 
       onProgress?.({ stage: 'complete', docId, progress: 1 })
 
@@ -372,9 +369,7 @@ class IndexService {
 
       // Persist to storage (include all library fields)
       try {
-        const library = useLibraryStore.getState().getLibrarySnapshot()
-        await LibraryService.saveLibrary(adapter, library)
-        useLibraryStore.getState().setSchemaRevision(library.schema_revision)
+        await useLibraryStore.getState().saveLibrary(adapter)
       } catch (saveError) {
         console.error('Failed to save library after indexing error:', saveError)
       }
@@ -762,8 +757,7 @@ class IndexService {
       }
 
       // Save library (include all fields)
-      const library = useLibraryStore.getState().getLibrarySnapshot()
-      await LibraryService.saveLibrary(adapter, library)
+      await useLibraryStore.getState().saveLibrary(adapter)
 
       console.log('Index cleared successfully')
       return true
@@ -829,8 +823,7 @@ class IndexService {
 
       // Save updated library if changes were made (include all fields)
       if (needsSave) {
-        const library = useLibraryStore.getState().getLibrarySnapshot()
-        await LibraryService.saveLibrary(adapter, library)
+        await useLibraryStore.getState().saveLibrary(adapter)
         console.log(`Synced ${syncedCount} document(s) index status`)
       }
 

@@ -3,7 +3,6 @@ import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
 import { tagService } from '../../services/tags/TagService'
-import { LibraryService } from '../../services/library/LibraryService'
 import TagEditModal from '../tags/TagEditModal'
 import TagMergeModal from '../tags/TagMergeModal'
 import TagShareModal from '../sharing/TagShareModal'
@@ -44,8 +43,7 @@ export default function TagsList() {
   const saveLibrary = useCallback(async () => {
     if (isDemoMode || !adapter) return
     try {
-      const library = useLibraryStore.getState().getLibrarySnapshot()
-      await LibraryService.saveLibrary(adapter, library)
+      await useLibraryStore.getState().saveLibrary(adapter)
     } catch (e) {
       console.error('Failed to save library:', e)
     }

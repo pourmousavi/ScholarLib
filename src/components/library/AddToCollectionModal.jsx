@@ -3,7 +3,6 @@ import Modal from '../ui/Modal'
 import Btn from '../ui/Btn'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
-import { LibraryService } from '../../services/library/LibraryService'
 import { collectionService } from '../../services/tags/CollectionService'
 import styles from './AddToCollectionModal.module.css'
 
@@ -36,8 +35,7 @@ export default function AddToCollectionModal({ docId, onClose }) {
   const saveLibrary = useCallback(async () => {
     if (isDemoMode || !adapter) return
     try {
-      const library = useLibraryStore.getState().getLibrarySnapshot()
-      await LibraryService.saveLibrary(adapter, library)
+      await useLibraryStore.getState().saveLibrary(adapter)
     } catch (e) {
       console.error('Failed to save library:', e)
     }

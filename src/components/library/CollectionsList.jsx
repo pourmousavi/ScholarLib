@@ -3,7 +3,6 @@ import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
 import { collectionService } from '../../services/tags/CollectionService'
-import { LibraryService } from '../../services/library/LibraryService'
 import CollectionEditModal from '../tags/CollectionEditModal'
 import CollectionMergeModal from '../tags/CollectionMergeModal'
 import CollectionShareModal from '../sharing/CollectionShareModal'
@@ -44,8 +43,7 @@ export default function CollectionsList() {
   const saveLibrary = useCallback(async () => {
     if (isDemoMode || !adapter) return
     try {
-      const library = useLibraryStore.getState().getLibrarySnapshot()
-      await LibraryService.saveLibrary(adapter, library)
+      await useLibraryStore.getState().saveLibrary(adapter)
     } catch (e) {
       console.error('Failed to save library:', e)
     }

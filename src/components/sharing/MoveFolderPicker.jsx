@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useStorageStore } from '../../store/storageStore'
-import { LibraryService } from '../../services/library/LibraryService'
 import { useToast } from '../../hooks/useToast'
 import Modal from '../ui/Modal'
 import styles from './MoveFolderPicker.module.css'
@@ -41,8 +40,7 @@ export default function MoveFolderPicker({ onClose }) {
 
       // Save to storage
       if (!isDemoMode && adapter) {
-        const library = useLibraryStore.getState().getLibrarySnapshot()
-        await LibraryService.saveLibrary(adapter, library)
+        await useLibraryStore.getState().saveLibrary(adapter)
       }
 
       const targetFolder = folders.find(f => f.id === selectedTargetId)
