@@ -259,13 +259,13 @@ export default function MetadataModal({
                 <span className={styles.hint}>Machine-extracted keywords from the paper</span>
               </div>
 
-              {/* User Tags (for organization) */}
+              {/* User Tags (from global registry) */}
               <div className={styles.field}>
-                <label className={styles.label}>Tags (for organization)</label>
+                <label className={styles.label}>Tags</label>
                 <TagInput
                   tags={userTags}
                   onChange={setUserTags}
-                  placeholder="Add organizational tags..."
+                  placeholder="Select or add a tag..."
                 />
                 <span className={styles.hint}>Your personal tags for organizing this document</span>
               </div>

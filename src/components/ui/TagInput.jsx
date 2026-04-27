@@ -31,10 +31,18 @@ export default function TagInput({
   const tagRegistry = useLibraryStore(s => s.tagRegistry)
   const createTag = useLibraryStore(s => s.createTag)
 
-  // Get suggestions based on input
-  const suggestions = tagService.searchTags(tagRegistry, input)
+  // Get suggestions: when empty, show full registry alphabetically (browse).
+  // When typing, fall back to fuzzy search.
+  const trimmed = input.trim()
+  const baseSuggestions = trimmed
+    ? tagService.searchTags(tagRegistry, input)
+    : Object.entries(tagRegistry)
+        .map(([slug, tag]) => ({ slug, ...tag }))
+        .sort((a, b) => a.displayName.localeCompare(b.displayName))
+
+  const suggestions = baseSuggestions
     .filter(t => !tags.includes(t.slug)) // Exclude already-added tags
-    .slice(0, 6)
+    .slice(0, trimmed ? 8 : 50)
 
   // Get display names for current tags
   const getDisplayName = (slug) => {
@@ -151,7 +159,7 @@ export default function TagInput({
           value={input}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => input && setShowSuggestions(true)}
+          onFocus={() => setShowSuggestions(true)}
           placeholder={tags.length === 0 ? placeholder : ''}
           disabled={disabled || tags.length >= maxTags}
           autoFocus={autoFocus}
