@@ -7,7 +7,7 @@ import { useToast } from '../../hooks/useToast'
 import { needsEnrichment } from '../../utils/enrichment'
 import { enrichFromDOI } from '../../services/metadata/EnrichmentService'
 import { settingsService } from '../../services/settings/SettingsService'
-import { PaperExtractor, ProposalBuilder } from '../../services/wiki'
+import { PaperExtractor, ProposalBuilder, WikiService } from '../../services/wiki'
 import ViewerSwitch from '../viewer/ViewerSwitch'
 import SplitViewPanel from './SplitViewPanel'
 import { NotesPanel } from '../notes'
@@ -228,6 +228,7 @@ export default function MainPanel({ isMobile = false }) {
         collection_registry: state.collectionRegistry,
         smart_collections: state.smartCollections,
       }
+      await WikiService.regenerateSidecars(adapter)
       const extraction = await new PaperExtractor().extractPaper(selectedDocId, library, adapter)
       const proposalId = await new ProposalBuilder({ adapter }).buildProposal(extraction, library)
       showToast({ message: `Wiki proposal created: ${proposalId}`, type: 'success' })

@@ -25,6 +25,15 @@ export async function writeJSONWithRevision(adapter, path, data) {
   return adapter.writeTextIfRevision(path, text, expectedRevision)
 }
 
+export async function writeJSONCreateOnly(adapter, path, data) {
+  const text = JSON.stringify(data, null, 2)
+  if (typeof adapter.writeTextIfRevision !== 'function') {
+    await adapter.writeJSON(path, data)
+    return null
+  }
+  return adapter.writeTextIfRevision(path, text, null)
+}
+
 export async function ensureFolders(adapter, paths) {
   for (const path of paths) {
     await adapter.createFolder(path)

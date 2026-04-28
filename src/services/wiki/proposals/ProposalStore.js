@@ -1,6 +1,6 @@
 import { ulid } from 'ulid'
 import { WikiPaths } from '../WikiPaths'
-import { readJSONOrNull, writeJSONWithRevision } from '../WikiStorage'
+import { readJSONOrNull, writeJSONCreateOnly, writeJSONWithRevision } from '../WikiStorage'
 
 export class ProposalStore {
   constructor(adapter) {
@@ -13,7 +13,7 @@ export class ProposalStore {
 
   async save(proposal) {
     await this.adapter.createFolder(WikiPaths.proposalsRoot)
-    await writeJSONWithRevision(this.adapter, WikiPaths.proposal(proposal.proposal_id), proposal)
+    await writeJSONCreateOnly(this.adapter, WikiPaths.proposal(proposal.proposal_id), proposal)
     return proposal.proposal_id
   }
 
