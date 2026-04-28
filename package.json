@@ -8,7 +8,9 @@
     "./services/storage/box": "./src/services/storage/BoxAdapter.js",
     "./services/storage/dropbox": "./src/services/storage/DropboxAdapter.js",
     "./services/storage/factory": "./src/services/storage/StorageFactory.js",
-    "./services/storage/errors": "./src/services/storage/StorageAdapter.js"
+    "./services/storage/memory": "./src/services/storage/MemoryAdapter.js",
+    "./services/storage/errors": "./src/services/storage/StorageAdapter.js",
+    "./services/wiki": "./src/services/wiki/index.js"
   },
   "scripts": {
     "dev": "vite",
@@ -41,7 +43,9 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "turndown": "^7.2.2",
+    "ulid": "^3.0.2",
     "usearch": "^2.21.4",
+    "yaml": "^2.8.3",
     "zustand": "^5.0.2"
   },
   "devDependencies": {

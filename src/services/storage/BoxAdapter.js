@@ -352,6 +352,18 @@ export class BoxAdapter {
     return JSON.parse(response.data)
   }
 
+  async readTextWithMetadata(path) {
+    const fileId = await this._getFileId(path)
+    const [contentResponse, metadata] = await Promise.all([
+      this.axiosInstance.get(`/files/${fileId}/content`, { responseType: 'text' }),
+      this.getMetadata(path),
+    ])
+    return {
+      text: contentResponse.data,
+      metadata,
+    }
+  }
+
   async writeJSON(path, data) {
     const content = JSON.stringify(data, null, 2)
     const blob = new Blob([content], { type: 'application/json' })
@@ -376,6 +388,43 @@ export class BoxAdapter {
       } else {
         throw e
       }
+    }
+  }
+
+  async writeTextIfRevision(path, text, expectedRevision) {
+    const blob = new Blob([text], { type: 'text/plain' })
+
+    if (expectedRevision === null || expectedRevision === undefined) {
+      try {
+        await this._getFileId(path)
+        throw new StorageError(STORAGE_ERRORS.REVISION_CONFLICT, `File already exists: ${path}`)
+      } catch (error) {
+        if (error.code !== STORAGE_ERRORS.NOT_FOUND) throw error
+      }
+      const id = await this.uploadFile(path, blob)
+      return await this.getMetadataById(id)
+    }
+
+    const fileId = await this._getFileId(path)
+    await this.refreshTokenIfNeeded()
+    try {
+      const response = await axios.post(
+        `${BOX_UPLOAD_BASE}/files/${fileId}/content`,
+        blob,
+        {
+          headers: {
+            Authorization: `Bearer ${this._getAccessToken()}`,
+            'Content-Type': 'application/octet-stream',
+            'If-Match': expectedRevision,
+          },
+        }
+      )
+      return this._normalizeMetadata(response.data.entries[0])
+    } catch (error) {
+      if (error.response?.status === 412 || error.response?.status === 409) {
+        throw new StorageError(STORAGE_ERRORS.REVISION_CONFLICT, `Revision mismatch: ${path}`)
+      }
+      throw error
     }
   }
 
@@ -425,6 +474,30 @@ export class BoxAdapter {
     await this.axiosInstance.delete(`/files/${fileId}`)
   }
 
+  async getMetadata(path) {
+    const fileId = await this._getFileId(path)
+    return this.getMetadataById(fileId)
+  }
+
+  async getMetadataById(fileId) {
+    const response = await this.axiosInstance.get(`/files/${fileId}`, {
+      params: { fields: 'id,name,type,size,modified_at,etag,sha1' },
+    })
+    return this._normalizeMetadata(response.data)
+  }
+
+  _normalizeMetadata(item) {
+    return {
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      size: item.size,
+      modified: item.modified_at,
+      revision: item.etag || item.sha1 || item.id,
+      sha1: item.sha1,
+    }
+  }
+
   async getFileStreamURL(fileId) {
     // Box returns a redirect to a pre-signed S3 URL
     const response = await this.axiosInstance.get(`/files/${fileId}/content`, {
@@ -436,7 +509,7 @@ export class BoxAdapter {
 
   async listFolder(path) {
     const folderId = await this._getPathFolderId(path)
-    const entries = await this._listAllFolderItems(folderId, 'id,name,type,size,modified_at')
+    const entries = await this._listAllFolderItems(folderId, 'id,name,type,size,modified_at,etag,sha1')
 
     return entries.map((item) => ({
       id: item.id,
@@ -444,6 +517,7 @@ export class BoxAdapter {
       type: item.type,
       size: item.size,
       modified: item.modified_at,
+      revision: item.etag || item.sha1 || item.id,
     }))
   }
 

@@ -407,6 +407,37 @@
   gap: var(--space-2);
 }
 
+.wikiResult {
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.wikiResult strong {
+  display: block;
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.wikiResultRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.wikiResultRow span:last-child {
+  color: var(--text-tertiary);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
 .privacyNote {
   padding: var(--space-4);
   background: var(--success-bg);

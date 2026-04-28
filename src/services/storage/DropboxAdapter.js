@@ -136,7 +136,11 @@ export class DropboxAdapter {
       // Handle 400 with path not found (Dropbox sometimes returns this for missing files)
       if (response.status === 400 || response.status === 409) {
         const errorTag = error.error?.['.tag']
-        if (errorTag === 'path' || error.error_summary?.includes('not_found')) {
+        const pathTag = error.error?.path?.['.tag'] || error.error?.reason?.['.tag']
+        if (error.error_summary?.includes('conflict') || pathTag === 'conflict') {
+          throw new StorageError(STORAGE_ERRORS.REVISION_CONFLICT, 'Revision conflict')
+        }
+        if ((errorTag === 'path' && pathTag === 'not_found') || error.error_summary?.includes('not_found')) {
           throw new StorageError(STORAGE_ERRORS.NOT_FOUND, 'File not found')
         }
       }
@@ -313,6 +317,18 @@ export class DropboxAdapter {
     return JSON.parse(text)
   }
 
+  async readTextWithMetadata(path) {
+    const fullPath = this._getFullPath(path)
+    const [blob, metadata] = await Promise.all([
+      this._apiCall('/files/download', { path: fullPath }, true),
+      this.getMetadata(path),
+    ])
+    return {
+      text: await blob.text(),
+      metadata,
+    }
+  }
+
   async writeJSON(path, data) {
     const fullPath = this._getFullPath(path)
     const content = JSON.stringify(data, null, 2)
@@ -323,6 +339,28 @@ export class DropboxAdapter {
       { path: fullPath, mode: { '.tag': 'overwrite' }, _content: blob },
       true
     )
+  }
+
+  async writeTextIfRevision(path, text, expectedRevision) {
+    const fullPath = this._getFullPath(path)
+    const blob = new Blob([text], { type: 'text/plain' })
+    const mode = expectedRevision === null || expectedRevision === undefined
+      ? { '.tag': 'add' }
+      : { '.tag': 'update', update: expectedRevision }
+
+    try {
+      const result = await this._apiCall(
+        '/files/upload',
+        { path: fullPath, mode, _content: blob },
+        true
+      )
+      return this._normalizeMetadata(result)
+    } catch (error) {
+      if (error.code === STORAGE_ERRORS.NETWORK_ERROR && /conflict/i.test(error.message || '')) {
+        throw new StorageError(STORAGE_ERRORS.REVISION_CONFLICT, `Revision mismatch: ${path}`)
+      }
+      throw error
+    }
   }
 
   async downloadFile(path) {
@@ -354,6 +392,24 @@ export class DropboxAdapter {
     await this._apiCall('/files/delete_v2', { path: fullPath })
   }
 
+  async getMetadata(path) {
+    const fullPath = this._getFullPath(path)
+    const result = await this._apiCall('/files/get_metadata', { path: fullPath })
+    return this._normalizeMetadata(result)
+  }
+
+  _normalizeMetadata(item) {
+    return {
+      id: item.id || item.path_display,
+      path: item.path_display,
+      name: item.name,
+      type: item['.tag'] === 'folder' ? 'folder' : 'file',
+      size: item.size,
+      modified: item.server_modified,
+      revision: item.rev || null,
+    }
+  }
+
   async getFileStreamURL(fileIdOrPath) {
     // Dropbox uses paths, but we store path in box_path field
     // For compatibility, accept both path and ID
@@ -373,13 +429,7 @@ export class DropboxAdapter {
       allEntries.push(...result.entries)
     }
 
-    return allEntries.map((item) => ({
-      id: item.id,
-      name: item.name,
-      type: item['.tag'] === 'folder' ? 'folder' : 'file',
-      size: item.size,
-      modified: item.server_modified,
-    }))
+    return allEntries.map((item) => this._normalizeMetadata(item))
   }
 
   async createFolder(path) {

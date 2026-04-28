@@ -5,6 +5,7 @@ import { useStorageStore } from '../../store/storageStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useIndexStore } from '../../store/indexStore'
 import { settingsService } from '../../services/settings/SettingsService'
+import { WikiService } from '../../services/wiki'
 import { indexService } from '../../services/indexing/IndexService'
 import { ollamaService } from '../../services/ai/OllamaService'
 import { webllmService } from '../../services/ai/WebLLMService'
@@ -59,6 +60,12 @@ const SectionIcons = {
       <path d="M12 3v12m0 0l-4-4m4 4l4-4"/>
       <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
     </svg>
+  ),
+  wiki: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5z"/>
+      <path d="M8 7h7M8 11h8M8 15h5"/>
+    </svg>
   )
 }
 
@@ -68,7 +75,8 @@ const SECTIONS = [
   { id: 'metadata', label: 'Metadata' },
   { id: 'account', label: 'Account' },
   { id: 'appearance', label: 'Appearance' },
-  { id: 'export', label: 'Export & Privacy' }
+  { id: 'export', label: 'Export & Privacy' },
+  { id: 'wiki', label: 'Wiki' }
 ]
 
 export default function SettingsModal({ onClose }) {
@@ -110,6 +118,12 @@ export default function SettingsModal({ onClose }) {
   // Display settings state
   const [showTags, setShowTagsState] = useState(settingsService.getShowTags())
   const [showKeywords, setShowKeywordsState] = useState(settingsService.getShowKeywords())
+
+  // Wiki state
+  const [wikiStatus, setWikiStatus] = useState(null)
+  const [wikiCapability, setWikiCapability] = useState(null)
+  const [wikiIntegrity, setWikiIntegrity] = useState(null)
+  const [wikiActionLoading, setWikiActionLoading] = useState(null)
 
   // Migration state
   const [showMigrationWizard, setShowMigrationWizard] = useState(false)
@@ -410,11 +424,32 @@ export default function SettingsModal({ onClose }) {
       const parts = path.split('.')
       let obj = updated.global
       for (let i = 0; i < parts.length - 1; i++) {
+        if (!obj[parts[i]]) obj[parts[i]] = {}
         obj = obj[parts[i]]
       }
       obj[parts[parts.length - 1]] = value
       return updated
     })
+  }
+
+  const runWikiAction = async (action, fn) => {
+    if (isDemoMode || !adapter) {
+      showToast({ message: 'Wiki actions require connected storage', type: 'warning' })
+      return
+    }
+
+    setWikiActionLoading(action)
+    try {
+      const result = await fn()
+      setWikiStatus(await WikiService.getStatus(adapter))
+      showToast({ message: 'Wiki action completed', type: 'success' })
+      return result
+    } catch (error) {
+      console.error(`Wiki ${action} failed:`, error)
+      showToast({ message: error.message || 'Wiki action failed', type: 'error' })
+    } finally {
+      setWikiActionLoading(null)
+    }
   }
 
   const handleSave = async () => {
@@ -2097,6 +2132,142 @@ export default function SettingsModal({ onClose }) {
     </div>
   )
 
+  const renderWikiSection = () => {
+    const enabled = settings?.global?.wiki?.enabled === true
+    const issueCount = wikiIntegrity?.issues?.length || 0
+
+    return (
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>Wiki</h3>
+
+        <div className={styles.field}>
+          <label className={styles.toggle}>
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(e) => updateGlobalSetting('wiki.enabled', e.target.checked)}
+            />
+            <span>Enable wiki storage</span>
+          </label>
+          <span className={styles.fieldHint}>
+            When disabled, ScholarLib does not perform wiki startup checks, reads, writes, regeneration, integrity checks, or recovery.
+          </span>
+        </div>
+
+        <div className={styles.storageInfo}>
+          <div className={styles.storageRow}>
+            <span className={styles.storageLabel}>State</span>
+            <span className={styles.storageValue}>
+              {wikiStatus?.state?.safety_mode ? 'Safety mode' : enabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+          <div className={styles.storageRow}>
+            <span className={styles.storageLabel}>Pages</span>
+            <span className={styles.storageValue}>{wikiStatus?.counts?.pages ?? 'Not checked'}</span>
+          </div>
+          <div className={styles.storageRow}>
+            <span className={styles.storageLabel}>Aliases</span>
+            <span className={styles.storageValue}>{wikiStatus?.counts?.aliases ?? 'Not checked'}</span>
+          </div>
+          <div className={styles.storageRow}>
+            <span className={styles.storageLabel}>Alias conflicts</span>
+            <span className={styles.storageValue}>{wikiStatus?.counts?.alias_conflicts ?? 'Not checked'}</span>
+          </div>
+        </div>
+
+        {wikiCapability && (
+          <div className={styles.wikiResult}>
+            <strong>Capability check: {wikiCapability.ok ? 'Passed' : 'Failed'}</strong>
+            {wikiCapability.checks.map((check) => (
+              <div key={check.name} className={styles.wikiResultRow}>
+                <span>{check.name}</span>
+                <span>{check.ok ? 'OK' : check.message}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {wikiIntegrity && (
+          <div className={styles.wikiResult}>
+            <strong>Integrity check: {wikiIntegrity.ok ? 'Passed' : `${issueCount} issue${issueCount === 1 ? '' : 's'}`}</strong>
+            {wikiIntegrity.issues.slice(0, 6).map((issue, index) => (
+              <div key={`${issue.code}-${index}`} className={styles.wikiResultRow}>
+                <span>{issue.code}</span>
+                <span>{issue.page_id || issue.alias || issue.severity}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {wikiStatus?.latest_committed_ops?.length > 0 && (
+          <div className={styles.wikiResult}>
+            <strong>Latest committed ops</strong>
+            {wikiStatus.latest_committed_ops.map((op) => (
+              <div key={op.id} className={styles.wikiResultRow}>
+                <span>{op.type || op.id}</span>
+                <span>{op.committed_at || op.id}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className={styles.actions}>
+          <button
+            className={styles.secondaryBtn}
+            disabled={!!wikiActionLoading}
+            onClick={() => runWikiAction('status', async () => {
+              const status = await WikiService.getStatus(adapter)
+              setWikiStatus(status)
+              return status
+            })}
+          >
+            Open Status
+          </button>
+          <button
+            className={styles.secondaryBtn}
+            disabled={!!wikiActionLoading || !enabled}
+            onClick={() => runWikiAction('capability', async () => {
+              const result = await WikiService.checkCapabilities(adapter)
+              setWikiCapability(result)
+              return result
+            })}
+          >
+            Check Capability
+          </button>
+          <button
+            className={styles.secondaryBtn}
+            disabled={!!wikiActionLoading || !enabled}
+            onClick={() => runWikiAction('regenerate', () => WikiService.regenerateSidecars(adapter))}
+          >
+            Regenerate Sidecars
+          </button>
+          <button
+            className={styles.secondaryBtn}
+            disabled={!!wikiActionLoading || !enabled}
+            onClick={() => runWikiAction('integrity', async () => {
+              const result = await WikiService.checkIntegrity(adapter)
+              setWikiIntegrity(result)
+              return result
+            })}
+          >
+            Check Integrity
+          </button>
+          <button
+            className={styles.secondaryBtn}
+            disabled={!!wikiActionLoading || !enabled}
+            onClick={() => runWikiAction('recovery', () => WikiService.recover(adapter))}
+          >
+            Recover Operations
+          </button>
+        </div>
+
+        {wikiActionLoading && (
+          <p className={styles.hint}>Running {wikiActionLoading}...</p>
+        )}
+      </div>
+    )
+  }
+
   const renderSection = () => {
     switch (activeSection) {
       case 'ai': return renderAISection()
@@ -2105,6 +2276,7 @@ export default function SettingsModal({ onClose }) {
       case 'account': return renderAccountSection()
       case 'appearance': return renderAppearanceSection()
       case 'export': return renderExportSection()
+      case 'wiki': return renderWikiSection()
       default: return null
     }
   }

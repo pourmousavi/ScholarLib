@@ -10,6 +10,7 @@
  * - STORAGE_PERMISSION_DENIED: Access denied
  * - STORAGE_RATE_LIMITED: Too many requests
  * - STORAGE_NETWORK_ERROR: Network failure
+ * - STORAGE_REVISION_CONFLICT: Conditional write failed because the file changed
  */
 
 /**
@@ -72,6 +73,23 @@
  * @param {string} path - Relative path within ScholarLib folder
  * @returns {Promise<string>} Folder ID
  *
+ * @property {function(string): Promise<{text: string, metadata: Object}>} readTextWithMetadata
+ * Read a text file and return storage metadata including revision.
+ * @param {string} path - Relative path within ScholarLib folder
+ * @returns {Promise<{text: string, metadata: Object}>}
+ *
+ * @property {function(string, string, string|null): Promise<Object>} writeTextIfRevision
+ * Write text only if the current revision matches expectedRevision.
+ * @param {string} path - Relative path within ScholarLib folder
+ * @param {string} text - Text content to write
+ * @param {string|null} expectedRevision - Current revision, or null for create-only
+ * @returns {Promise<Object>} Updated file metadata
+ *
+ * @property {function(string): Promise<Object>} getMetadata
+ * Get storage metadata for a file or folder.
+ * @param {string} path - Relative path within ScholarLib folder
+ * @returns {Promise<Object>}
+ *
  * @property {function(): string} getProviderName
  * Get the storage provider name.
  * @returns {string} 'box' or 'dropbox'
@@ -92,4 +110,5 @@ export const STORAGE_ERRORS = {
   PERMISSION_DENIED: 'STORAGE_PERMISSION_DENIED',
   RATE_LIMITED: 'STORAGE_RATE_LIMITED',
   NETWORK_ERROR: 'STORAGE_NETWORK_ERROR',
+  REVISION_CONFLICT: 'STORAGE_REVISION_CONFLICT',
 }

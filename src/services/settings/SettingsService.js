@@ -5,6 +5,42 @@
  * Device-specific settings stored in localStorage
  */
 class SettingsService {
+  _mergeDefaults(settings) {
+    const defaults = this.defaults()
+    return {
+      ...defaults,
+      ...settings,
+      global: {
+        ...defaults.global,
+        ...(settings?.global || {}),
+        metadata_sources: {
+          ...defaults.global.metadata_sources,
+          ...(settings?.global?.metadata_sources || {})
+        },
+        appearance: {
+          ...defaults.global.appearance,
+          ...(settings?.global?.appearance || {})
+        },
+        doc_card: {
+          ...defaults.global.doc_card,
+          ...(settings?.global?.doc_card || {})
+        },
+        export: {
+          ...defaults.global.export,
+          ...(settings?.global?.export || {})
+        },
+        wiki: {
+          ...defaults.global.wiki,
+          ...(settings?.global?.wiki || {})
+        }
+      },
+      devices: {
+        ...defaults.devices,
+        ...(settings?.devices || {})
+      }
+    }
+  }
+
   /**
    * Default settings structure
    */
@@ -41,6 +77,9 @@ class SettingsService {
           default_format: 'markdown',
           chat_include_citations: true,
           chat_include_timestamps: false
+        },
+        wiki: {
+          enabled: false
         }
       },
       devices: {}
@@ -57,7 +96,7 @@ class SettingsService {
 
     if (adapter) {
       try {
-        remote = await adapter.readJSON('_system/settings.json')
+        remote = this._mergeDefaults(await adapter.readJSON('_system/settings.json'))
       } catch {
         // Use defaults if file doesn't exist
       }
@@ -87,7 +126,7 @@ class SettingsService {
 
     let existing = this.defaults()
     try {
-      existing = await adapter.readJSON('_system/settings.json')
+      existing = this._mergeDefaults(await adapter.readJSON('_system/settings.json'))
     } catch {
       // Use defaults if file doesn't exist
     }
@@ -299,7 +338,7 @@ class SettingsService {
 
     let remote
     try {
-      remote = await adapter.readJSON('_system/settings.json')
+      remote = this._mergeDefaults(await adapter.readJSON('_system/settings.json'))
     } catch {
       return // No remote settings yet
     }

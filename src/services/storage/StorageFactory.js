@@ -1,9 +1,11 @@
 import { BoxAdapter } from './BoxAdapter'
 import { DropboxAdapter } from './DropboxAdapter'
+import { MemoryAdapter } from './MemoryAdapter'
 
 export function createStorageAdapter(provider) {
   if (provider === 'box') return new BoxAdapter()
   if (provider === 'dropbox') return new DropboxAdapter()
+  if (provider === 'memory') return new MemoryAdapter()
   throw new Error(`Unknown storage provider: ${provider}`)
 }
 
