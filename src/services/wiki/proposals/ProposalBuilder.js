@@ -104,6 +104,7 @@ export class ProposalBuilder {
         doi: sourceDoc.metadata?.doi || draftFrontmatter.doi || null,
       },
       extraction_metadata: extraction.extraction_metadata,
+      bootstrap_context: extraction.bootstrap_context || null,
       page_changes: [paperChange],
       candidate_records: {
         question_candidates: extraction.open_question_candidates || [],

@@ -6,6 +6,7 @@ import { ProviderRouter } from '../ProviderRouter'
 import { WikiSchemaService } from '../WikiSchemaService'
 import { hashMarkdown } from '../WikiHash'
 import { PdfTextExtractor } from './PdfTextExtractor'
+import { BootstrapContext } from '../bootstrap/BootstrapContext'
 
 export class WikiExtractionValidationError extends Error {
   constructor(message, details = {}) {
@@ -130,7 +131,7 @@ export class PaperExtractor {
     this.llmClient = llmClient || createDefaultWikiLLMClient()
   }
 
-  async extractPaper(scholarlibDocId, library, adapter) {
+  async extractPaper(scholarlibDocId, library, adapter, options = {}) {
     const doc = library.documents?.[scholarlibDocId]
     if (!doc) throw new Error(`Document not found: ${scholarlibDocId}`)
     if (!doc.box_path) throw new Error(`Document has no PDF path: ${scholarlibDocId}`)
@@ -139,6 +140,7 @@ export class PaperExtractor {
     const pdf = await this.pdfTextExtractor.extractPdf(adapter, doc.box_path)
     const sensitivity = getDocumentSensitivity(doc)
     const pageText = this._fitContext(pdf.pages)
+    const bootstrapContext = options.bootstrapContext || null
 
     let route = await this.providerRouter.route('extract_paper', {
       ...sensitivity,
@@ -153,7 +155,7 @@ export class PaperExtractor {
       }
     }
 
-    const messages = this._buildPrompt({ schema, doc, pageText, pdf })
+    const messages = this._buildPrompt({ schema, doc, pageText, pdf, bootstrapContext })
     let parsed
     let validationError = null
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -192,6 +194,15 @@ export class PaperExtractor {
       extraction_confidence: pdf.extraction_confidence,
       ocr_warnings: pdf.ocr_warnings,
     }
+    if (bootstrapContext) {
+      parsed.bootstrap_context = {
+        is_own_paper: bootstrapContext.is_own_paper,
+        theme: bootstrapContext.theme,
+        bootstrap_position: bootstrapContext.bootstrap_position,
+        adjacent_paper_ids: (bootstrapContext.adjacent_papers || []).map((row) => row.paper_page_id),
+        theme_concept_page_ids: (bootstrapContext.theme_concept_pages || []).map((row) => row.page_id),
+      }
+    }
     return parsed
   }
 
@@ -229,14 +240,14 @@ export class PaperExtractor {
     return pages.map((page) => `PAGE ${page.index + 1} [${page.page_text_hash}]\n${page.text.slice(0, 6000)}`).join('\n\n')
   }
 
-  _buildPrompt({ schema, doc, pageText, pdf }) {
-    return [
-      { role: 'system', content: 'You extract ScholarLib wiki paper proposals. Return only valid JSON. Do not include markdown fences, prose, comments, or trailing text.' },
-      {
-        role: 'user',
-        content: [
-          `Schema:\n${schema}`,
-          `Return this exact JSON object shape:
+  _buildPrompt({ schema, doc, pageText, pdf, bootstrapContext }) {
+    const directive = BootstrapContext.directiveFor(bootstrapContext)
+    const bootstrapBlock = bootstrapContext
+      ? this._renderBootstrapBlock(bootstrapContext, directive)
+      : null
+    const userParts = [
+      `Schema:\n${schema}`,
+      `Return this exact JSON object shape:
 {
   "draft_frontmatter": { "title": "...", "aliases": [], "doi": null },
   "draft_body": "markdown body using only ID wikilinks or no wikilinks",
@@ -252,12 +263,40 @@ export class PaperExtractor {
   "contradiction_signals": [],
   "extraction_metadata": { "tokens_out": 0 }
 }`,
-          `Metadata:\n${JSON.stringify(doc.metadata || {}, null, 2)}`,
-          `Extraction confidence: ${pdf.extraction_confidence}`,
-          `Paper text:\n${pageText}`,
-        ].join('\n\n'),
-      },
+      `Metadata:\n${JSON.stringify(doc.metadata || {}, null, 2)}`,
+      `Extraction confidence: ${pdf.extraction_confidence}`,
     ]
+    if (bootstrapBlock) userParts.push(bootstrapBlock)
+    userParts.push(`Paper text:\n${pageText}`)
+    return [
+      { role: 'system', content: 'You extract ScholarLib wiki paper proposals. Return only valid JSON. Do not include markdown fences, prose, comments, or trailing text.' },
+      { role: 'user', content: userParts.join('\n\n') },
+    ]
+  }
+
+  _renderBootstrapBlock(context, directive) {
+    const adjacent = (context.adjacent_papers || []).map((row) =>
+      `- ${row.paper_page_id} · ${row.title}: ${row.key_claims_summary || '(no body summary available)'}`
+    )
+    const concepts = (context.theme_concept_pages || []).map((row) =>
+      `- ${row.page_id} · ${row.title} (${row.current_claims_count} existing claims)`
+    )
+    const lines = [
+      'Phase 3 bootstrap context:',
+      `- bootstrap_position: ${context.bootstrap_position}`,
+      `- theme: ${context.theme || '(none)'}`,
+      `- is_own_paper: ${context.is_own_paper}`,
+    ]
+    if (directive) lines.push(`Directive: ${directive}`)
+    if (adjacent.length) {
+      lines.push('Adjacent already-ingested papers in this theme:')
+      lines.push(...adjacent)
+    }
+    if (concepts.length) {
+      lines.push('Existing concept pages in this theme:')
+      lines.push(...concepts)
+    }
+    return lines.join('\n')
   }
 
   async _normalizeClaim(claim, pdf, sensitivity) {

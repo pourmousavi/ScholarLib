@@ -10,6 +10,14 @@ export const QUALITY_THRESHOLDS = {
   manual_cleanup_rate: { kind: 'max', value: 0.1 },
 }
 
+export const PHASE3_QUALITY_THRESHOLDS = {
+  high_impact_claim_rejection_rate: { kind: 'max', value: 0.15 },
+  average_review_minutes: { kind: 'max', value: 4 },
+  schema_breaking_migrations: { kind: 'max', value: 0 },
+  concept_page_usefulness_average: { kind: 'min', value: 3.5 },
+  manual_cleanup_rate: { kind: 'max', value: 0.05 },
+}
+
 export const METRIC_LABELS = {
   high_impact_claim_rejection_rate: 'High-impact claim rejection rate',
   average_review_minutes: 'Average review time (minutes)',
@@ -68,6 +76,7 @@ export function aggregateMetrics({
   manualCleanupCount = 0,
   schemaMigrations = [],
   trendWindow = 5,
+  thresholds = QUALITY_THRESHOLDS,
 }) {
   const sorted = [...checklists].sort((a, b) => String(a.ingested_at).localeCompare(String(b.ingested_at)))
   const claimsTotal = sorted.reduce((sum, checklist) => sum + computeClaimMetrics(checklist).total, 0)
@@ -120,7 +129,7 @@ export function aggregateMetrics({
     },
   }
 
-  for (const [key, threshold] of Object.entries(QUALITY_THRESHOLDS)) {
+  for (const [key, threshold] of Object.entries(thresholds)) {
     metrics[key] = {
       ...metrics[key],
       threshold,

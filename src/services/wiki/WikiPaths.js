@@ -1,7 +1,9 @@
 const WIKI_ROOT = '_wiki'
 const WIKI_SYSTEM_ROOT = `${WIKI_ROOT}/_system`
 const WIKI_PHASE1_ROOT = `${WIKI_ROOT}/_phase1`
+const WIKI_PHASE3_ROOT = `${WIKI_ROOT}/_phase3`
 const WIKI_BACKUPS_ROOT = `${WIKI_ROOT}/_backups`
+const WIKI_LINT_REPORTS_ROOT = `${WIKI_ROOT}/lint-reports`
 
 function cleanSegment(value) {
   return String(value || '')
@@ -112,5 +114,18 @@ export const WikiPaths = {
   backupsRoot: WIKI_BACKUPS_ROOT,
   backupRoot(label) {
     return `${WIKI_BACKUPS_ROOT}/${cleanSegment(label)}`
+  },
+
+  // Phase 3 controlled bootstrap.
+  phase3Root: WIKI_PHASE3_ROOT,
+  phase3BootstrapPlan: `${WIKI_PHASE3_ROOT}/bootstrap_plan.json`,
+  phase3SchemaRevisionFlag: `${WIKI_PHASE3_ROOT}/schema_revision_taken.json`,
+  phase3LintStateFile: `${WIKI_PHASE3_ROOT}/lint_state.json`,
+  phase3Report: `${WIKI_PHASE3_ROOT}/PHASE_3_REPORT.md`,
+
+  // Lint reports.
+  lintReportsRoot: WIKI_LINT_REPORTS_ROOT,
+  lintReport(date) {
+    return `${WIKI_LINT_REPORTS_ROOT}/${cleanSegment(date)}.md`
   },
 }

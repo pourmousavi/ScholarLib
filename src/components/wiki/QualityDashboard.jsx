@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   METRIC_LABELS,
+  PHASE3_QUALITY_THRESHOLDS,
   QUALITY_THRESHOLDS,
   aggregateMetrics,
   detectThresholdViolations,
@@ -47,10 +48,22 @@ export default function QualityDashboard({
   onAbandonPhase1,
   onLogOverride,
   onGenerateReport,
+  phase = 'phase1',
+  perThemeCoverage = null,
+  crossPaperCoherence = null,
+  bootstrapProgress = null,
+  costProjection = null,
+  schemaRevisionAvailable = false,
+  schemaRevisionTaken = false,
+  onTakeMidBootstrapSchemaRevision,
+  onSkipMidBootstrapSchemaRevision,
+  onGeneratePhase3Report,
 }) {
+  const isPhase3 = phase === 'phase3'
+  const thresholds = isPhase3 ? PHASE3_QUALITY_THRESHOLDS : QUALITY_THRESHOLDS
   const aggregate = useMemo(
-    () => aggregateMetrics({ checklists, usefulnessRatings, manualCleanupCount, schemaMigrations }),
-    [checklists, usefulnessRatings, manualCleanupCount, schemaMigrations]
+    () => aggregateMetrics({ checklists, usefulnessRatings, manualCleanupCount, schemaMigrations, thresholds }),
+    [checklists, usefulnessRatings, manualCleanupCount, schemaMigrations, thresholds]
   )
   const cost = useMemo(() => summariseCosts(checklists), [checklists])
   const violations = useMemo(() => detectThresholdViolations(aggregate.metrics), [aggregate.metrics])
@@ -80,18 +93,55 @@ export default function QualityDashboard({
     <div className={styles.dashboard}>
       <header className={styles.dashboardHeader}>
         <div>
-          <h2>Phase 1 quality dashboard</h2>
-          <p>{paperCount} of 10 papers ingested · {violations.length} threshold violation{violations.length === 1 ? '' : 's'}</p>
+          <h2>{isPhase3 ? 'Phase 3 quality dashboard' : 'Phase 1 quality dashboard'}</h2>
+          <p>
+            {isPhase3 ? `${paperCount} bootstrap papers ingested` : `${paperCount} of 10 papers ingested`}
+            {' · '}
+            {violations.length} threshold violation{violations.length === 1 ? '' : 's'}
+          </p>
         </div>
-        {onGenerateReport && (
-          <button type="button" className={styles.secondaryBtn} onClick={() => onGenerateReport()}>
-            Generate Phase 1 report
-          </button>
-        )}
+        <div className={styles.dashboardActions}>
+          {onGenerateReport && !isPhase3 && (
+            <button type="button" className={styles.secondaryBtn} onClick={() => onGenerateReport()}>
+              Generate Phase 1 report
+            </button>
+          )}
+          {isPhase3 && onGeneratePhase3Report && (
+            <button type="button" className={styles.secondaryBtn} onClick={() => onGeneratePhase3Report()}>
+              Generate Phase 3 report
+            </button>
+          )}
+        </div>
       </header>
 
+      {isPhase3 && schemaRevisionAvailable && !schemaRevisionTaken && (
+        <div className={styles.phase3MigrationBanner} role="status" aria-label="mid-bootstrap schema revision">
+          <h3>Mid-bootstrap schema revision check</h3>
+          <p>15 own-papers ingested. This is the last opportunity to migrate the schema before Phase 5.</p>
+          <ul>
+            <li>Run revision now to fix consistent schema problems observed so far.</li>
+            <li>Skip to lock schema_version for the remainder of the bootstrap.</li>
+          </ul>
+          <div className={styles.bootstrapRowActions}>
+            <button type="button" className={styles.primaryBtn} onClick={() => onTakeMidBootstrapSchemaRevision?.()}>
+              Run revision
+            </button>
+            <button type="button" className={styles.secondaryBtn} onClick={() => onSkipMidBootstrapSchemaRevision?.()}>
+              Skip — schema is good
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isPhase3 && costProjection?.over_budget && (
+        <div className={styles.phase3CostWarning} role="alert">
+          Projected cost ${costProjection.projected_total_usd.toFixed(2)} exceeds Phase 3 upper bound (${costProjection.projection_upper_bound_usd}).
+          Consider switching more tasks to Ollama-only.
+        </div>
+      )}
+
       <section className={styles.metricGrid}>
-        {Object.entries(QUALITY_THRESHOLDS).map(([key, threshold]) => {
+        {Object.entries(thresholds).map(([key, threshold]) => {
           const entry = aggregate.metrics[key] || { value: null, trend: null, sample_size: 0, status: 'pending' }
           return (
             <article key={key} className={`${styles.metricCard} ${styles[`status_${entry.status}`] || ''}`}>
@@ -158,15 +208,90 @@ export default function QualityDashboard({
       </section>
 
       <section className={styles.costSummary}>
-        <h3>Phase 1 spend</h3>
+        <h3>{isPhase3 ? 'Phase 3 spend' : 'Phase 1 spend'}</h3>
         <ul>
           <li>Total: {formatCurrency(cost.total)}</li>
           <li>Extract: {formatCurrency(cost.extract)}</li>
           <li>Verify claims: {formatCurrency(cost.verify_claims)}</li>
           <li>Apply: {formatCurrency(cost.apply)}</li>
           <li>Projected steady state (10 papers): {formatCurrency(cost.projected_steady_state_usd)}</li>
+          {isPhase3 && costProjection && (
+            <>
+              <li>Average per paper: {formatCurrency(costProjection.average_per_paper_usd)}</li>
+              <li>Projected total: {formatCurrency(costProjection.projected_total_usd)}</li>
+              <li>Projection bounds: {formatCurrency(costProjection.projection_lower_bound_usd)} – {formatCurrency(costProjection.projection_upper_bound_usd)}</li>
+            </>
+          )}
         </ul>
       </section>
+
+      {isPhase3 && bootstrapProgress && (
+        <section aria-label="bootstrap-progress">
+          <h3>Bootstrap progress</h3>
+          <ul>
+            <li>
+              Own-papers: <strong>{bootstrapProgress.own_papers.ingested}</strong> ingested · {bootstrapProgress.own_papers.queued} queued · {bootstrapProgress.own_papers.in_progress} in progress · {bootstrapProgress.own_papers.deferred} deferred · target {bootstrapProgress.targets?.own_papers?.max ?? 30}
+            </li>
+            <li>
+              External anchors: <strong>{bootstrapProgress.external_anchors.ingested}</strong> ingested · {bootstrapProgress.external_anchors.queued} queued · {bootstrapProgress.external_anchors.in_progress} in progress · {bootstrapProgress.external_anchors.deferred} deferred · target {bootstrapProgress.targets?.external_anchors?.max ?? 15}
+            </li>
+          </ul>
+        </section>
+      )}
+
+      {isPhase3 && perThemeCoverage && perThemeCoverage.length > 0 && (
+        <section aria-label="per-theme-coverage">
+          <h3>Per-theme coverage</h3>
+          <table className={styles.phase3ThemeTable}>
+            <thead>
+              <tr>
+                <th>Theme</th>
+                <th>Papers ingested</th>
+                <th>Concept pages</th>
+                <th>Well-supported (≥3 papers)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {perThemeCoverage.map((entry) => (
+                <tr key={entry.theme}>
+                  <td>{entry.theme}</td>
+                  <td>{entry.papers_ingested}</td>
+                  <td>{entry.concept_pages}</td>
+                  <td>{entry.well_supported_concept_pages}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {isPhase3 && crossPaperCoherence && crossPaperCoherence.entries?.length > 0 && (
+        <section aria-label="cross-paper-coherence">
+          <h3>Cross-paper coherence (top concepts)</h3>
+          <p>
+            Average supporting papers: {crossPaperCoherence.average_supporting_papers.toFixed(1)} ·
+            stddev claim count: {crossPaperCoherence.stddev_claim_count.toFixed(2)}
+          </p>
+          <table className={styles.phase3ThemeTable}>
+            <thead>
+              <tr>
+                <th>Concept</th>
+                <th>Supporting papers</th>
+                <th>Claims</th>
+              </tr>
+            </thead>
+            <tbody>
+              {crossPaperCoherence.entries.map((entry) => (
+                <tr key={entry.page_id}>
+                  <td>{entry.title}</td>
+                  <td>{entry.supporting_papers}</td>
+                  <td>{entry.claims_count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       {blocked && (
         <div role="dialog" aria-label="Quality threshold pause" className={styles.dashboardPause}>

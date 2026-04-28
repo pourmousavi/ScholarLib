@@ -56,3 +56,23 @@ export {
   clearMigrationRegistry,
 } from './migrations/SchemaMigrationRunner'
 export { migration_1_0_to_1_1 } from './migrations/migration_1_0_to_1_1'
+export {
+  BootstrapPlanService,
+  BOOTSTRAP_SECTIONS,
+  STATUS_VALUES as BOOTSTRAP_STATUSES,
+  DEFAULT_TARGETS as BOOTSTRAP_DEFAULT_TARGETS,
+  createEmptyPlan as createEmptyBootstrapPlan,
+} from './bootstrap/BootstrapPlanService'
+export { BootstrapContext, BOOTSTRAP_POSITIONS } from './bootstrap/BootstrapContext'
+export {
+  computePerThemeCoverage,
+  computeCrossPaperCoherence,
+  computeBootstrapProgress,
+  computeCostProjection,
+  aggregatePhase3Metrics,
+  PHASE3_PROGRESS_THRESHOLD,
+} from './phase3/Phase3Metrics'
+export { LintService, LINT_RULES, LINT_DEFAULT_OPTIONS, buildLintMarkdownReport, buildWikiSnapshot } from './lint/LintService'
+export { LintScheduler, LINT_SCHEDULER_DEFAULT_OPTIONS } from './lint/LintScheduler'
+export { BootstrapReporter, checkPhase5Gates, PHASE5_GATE_IDS } from './bootstrap/BootstrapReporter'
+export { PHASE3_QUALITY_THRESHOLDS } from './phase1/QualityMetrics'
