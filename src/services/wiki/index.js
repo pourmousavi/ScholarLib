@@ -12,6 +12,13 @@ export { PdfTextExtractor } from './extraction/PdfTextExtractor'
 export { ProposalBuilder } from './proposals/ProposalBuilder'
 export { ProposalStore } from './proposals/ProposalStore'
 export { ProposalApplier } from './proposals/ProposalApplier'
+export { ProposalReviewSubmitter } from './proposals/ProposalReviewSubmitter'
+export {
+  ReviewDebtCalculator,
+  TIER_WEIGHTS_MINUTES,
+  DEFAULT_THRESHOLD_MINUTES,
+} from './proposals/ReviewDebtCalculator'
+export { PageDiffer } from './diff/PageDiffer'
 export { PositionDraftService } from './positions/PositionDraftService'
 export { PositionDraftGenerator, PositionDraftGenerationError } from './positions/PositionDraftGenerator'
 export {

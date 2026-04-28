@@ -37,10 +37,13 @@ export class ProposalApplier {
     }
     await this._validate(changes)
 
+    const extraMetadata = approval.operation_metadata && typeof approval.operation_metadata === 'object'
+      ? approval.operation_metadata
+      : {}
     const operation = OperationLogService.createPendingOperation({
       type: 'wiki_ingestion',
       pageWrites: changes.map((change) => ({ page_id: change.page_id, path: change.target_path })),
-      metadata: { proposal_id: proposalId },
+      metadata: { proposal_id: proposalId, ...extraMetadata },
     })
     operation.id = ulid()
     await OperationLogService.writePending(this.adapter, operation)
