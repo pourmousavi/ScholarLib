@@ -8,13 +8,12 @@ import { useStorageStore } from '../../store/storageStore'
 import { useUIStore } from '../../store/uiStore'
 import { useAnnotationStore } from '../../store/annotationStore'
 import { aiService } from '../../services/ai/AIService'
+import { chatOrchestrator } from '../../services/ai/ChatOrchestrator'
 import { ollamaService } from '../../services/ai/OllamaService'
 import { claudeService } from '../../services/ai/ClaudeService'
 import { openaiService } from '../../services/ai/OpenAIService'
 import { geminiService } from '../../services/ai/GeminiService'
-import { indexService } from '../../services/indexing/IndexService'
 import { chatHistoryService } from '../../services/ai/ChatHistoryService'
-import { LibraryService } from '../../services/library/LibraryService'
 import { getDeviceType, getDeviceName, getRecommendedProviders } from '../../utils/deviceDetection'
 import { Btn, HistoryIcon, PlusIcon } from '../ui'
 import ScopeSelector from './ScopeSelector'
@@ -300,73 +299,46 @@ export default function ChatPanel() {
     setStreamingContent('')
 
     try {
-      // Search for relevant chunks (RAG)
-      let retrievedChunks = []
-      let ragWarning = null
-      if (adapter && !isDemoMode) {
-        try {
-          // Check if document is indexed first
-          if (scope.type === 'document' && selectedDocId) {
-            const isIndexed = await indexService.isIndexed(selectedDocId, adapter)
-            console.log('Document indexed check:', { docId: selectedDocId, isIndexed })
-            if (!isIndexed) {
-              ragWarning = 'This document has not been indexed yet. Click "Index for AI" to enable document-aware answers.'
-            }
-          }
-
-          if (!ragWarning) {
-            const searchScope = {
-              type: scope.type,
-              docId: selectedDocId,
-              folderId: selectedFolderId
-            }
-            console.log('Search scope:', searchScope)
-
-            // Use fewer chunks for WebLLM (smaller context window)
-            const topK = provider === 'webllm' ? 3 : 6
-            retrievedChunks = await indexService.search(trimmedInput, searchScope, adapter, topK)
-            console.log('RAG search results:', retrievedChunks.length, 'chunks found')
-
-            // Warn if no chunks found for a document that should be indexed
-            if (retrievedChunks.length === 0 && scope.type === 'document' && selectedDocId) {
-              ragWarning = 'No matching content found in this document. The index may be corrupted — try re-indexing the document.'
-            }
-          }
-        } catch (err) {
-          console.error('RAG search failed:', err)
-          // Show all search errors to the user as a visible warning
-          ragWarning = err.message || 'Search failed. Please try re-indexing the document.'
+      let chatRequest
+      try {
+        chatRequest = await chatOrchestrator.chat(trimmedInput, messages, scope, {
+          adapter,
+          isDemoMode,
+          provider,
+          model: selectedModel || model,
+          selectedDocId,
+          selectedFolderId,
+          conversationId: convId,
+        })
+      } catch (err) {
+        if (err.code === 'CHAT_REFUSED' || err.code === 'CHAT_SENSITIVITY_REFUSED' || err.code === 'CHAT_COST_CAP_EXCEEDED') {
+          addMessage({ role: 'assistant', content: err.message })
+          setStreaming(false)
+          return
         }
-      } else {
-        console.log('RAG search skipped - adapter:', !!adapter, 'isDemoMode:', isDemoMode)
-      }
 
-      // Show RAG warning as a system message so the user knows what happened
-      if (ragWarning) {
+        const ragWarning = err.message || 'Search failed. Please try re-indexing the document.'
         addMessage({ role: 'assistant', content: `⚠️ ${ragWarning}` })
         if (scope.type === 'document' && selectedDocId) {
-          // For document scope with no context, don't call the LLM — it can't help
+          setStreaming(false)
+          return
+        }
+        throw err
+      }
+
+      if (chatRequest.rag.warning) {
+        addMessage({ role: 'assistant', content: `⚠️ ${chatRequest.rag.warning}` })
+        if (scope.type === 'document' && selectedDocId) {
           setStreaming(false)
           return
         }
       }
 
-      // Build messages array with system prompt including retrieved context
-      // Use smaller context for WebLLM (limited context window)
-      const maxContextChars = provider === 'webllm' ? 6000 : 12000
-      const systemPrompt = aiService.buildSystemPrompt(scope, retrievedChunks, maxContextChars)
-      const chatMessages = [
-        { role: 'system', content: systemPrompt },
-        ...messages.map(m => ({ role: m.role, content: m.content })),
-        { role: 'user', content: trimmedInput }
-      ]
-
       // Add placeholder for assistant message
       addMessage({ role: 'assistant', content: '' })
 
       let fullContent = ''
-      const options = selectedModel ? { model: selectedModel } : {}
-      for await (const chunk of aiService.streamChat(chatMessages, options)) {
+      for await (const chunk of chatRequest.stream) {
         fullContent += chunk
         appendStreamingContent(chunk)
         updateLastMessage(fullContent)
@@ -379,7 +351,11 @@ export default function ChatPanel() {
 
       // Save assistant message to history
       if (convId && !isDemoMode && adapter) {
-        await chatHistoryService.addMessage(adapter, convId, { role: 'assistant', content: fullContent })
+        await chatHistoryService.addMessage(adapter, convId, {
+          role: 'assistant',
+          content: fullContent,
+          provenance: chatRequest.provenance,
+        })
 
         // Auto-title after first AI response
         if (messages.length === 0) {

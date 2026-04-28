@@ -15,6 +15,8 @@ const DEFAULT_CAPS = {
   monthly_cost_cap_usd: 50,
   single_operation_cap_usd: 2,
   grant_namespace_cloud_cap_usd: 0,
+  chat_session_cap_usd: 10,
+  chat_session_warning_threshold: 0.8,
 }
 
 const PRICING_PER_MILLION = {
@@ -97,6 +99,43 @@ export class CostEstimator {
     return { ok: true, cost_usd: cost, running }
   }
 
+  async checkChatPreflight({ provider, model, tokensIn = 0, tokensOut = 0, namespace = 'chat', sessionId = null, enforce = true }) {
+    const base = await this.checkPreflight({ provider, model, tokensIn, tokensOut, namespace })
+    const cost = base.cost_usd
+    const running = base.running
+    const session = await this.getChatSessionCost(sessionId)
+    const sessionCap = this.caps.chat_session_cap_usd
+    const projectedSessionCost = session.used_usd + cost
+    const sessionWarningAt = sessionCap * this.caps.chat_session_warning_threshold
+
+    const result = {
+      ...base,
+      ok: base.ok && projectedSessionCost <= sessionCap,
+      reason: base.reason,
+      cost_usd: cost,
+      tokens_in: tokensIn,
+      tokens_out: tokensOut,
+      running,
+      session: {
+        id: sessionId,
+        used_usd: session.used_usd,
+        projected_usd: projectedSessionCost,
+        cap_usd: sessionCap,
+        warning: projectedSessionCost >= sessionWarningAt && projectedSessionCost < sessionCap,
+      },
+    }
+
+    if (!result.reason && projectedSessionCost > sessionCap) {
+      result.reason = 'chat_session_cap_exceeded'
+    }
+
+    if (enforce && !result.ok) {
+      throw new CostCapExceededError(`Wiki cost cap exceeded: ${result.reason}`, result)
+    }
+
+    return result
+  }
+
   async assertPreflight(args) {
     const result = await this.checkPreflight(args)
     if (!result.ok) {
@@ -125,6 +164,32 @@ export class CostEstimator {
     await writeJSONWithRevision(this.adapter, WikiPaths.committedCost(id, createdAt), { ...record, committed_at: new Date().toISOString() })
     try { await this.adapter.deleteFile(WikiPaths.pendingCost(id, createdAt)) } catch { /* already gone */ }
     return record
+  }
+
+  async recordChatCall({ provider, model, tokensIn = 0, tokensOut = 0, sessionId = null, metadata = {} }) {
+    return this.recordCall({
+      provider,
+      model,
+      task: 'chat',
+      tokensIn,
+      tokensOut,
+      namespace: 'chat',
+      metadata: { ...metadata, session_id: sessionId },
+    })
+  }
+
+  async getChatSessionCost(sessionId) {
+    if (!sessionId || !this.adapter) return { used_usd: 0, records: [] }
+    const records = await this._readCommittedRecords()
+    const sessionRecords = records.filter((record) =>
+      record.task === 'chat' &&
+      record.metadata?.session_id === sessionId &&
+      isWithin30Days(record.created_at)
+    )
+    return {
+      used_usd: sessionRecords.reduce((sum, record) => sum + (record.cost_usd || 0), 0),
+      records: sessionRecords,
+    }
   }
 
   async rebuildIndex() {
