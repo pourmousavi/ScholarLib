@@ -76,3 +76,7 @@ export { LintService, LINT_RULES, LINT_DEFAULT_OPTIONS, buildLintMarkdownReport,
 export { LintScheduler, LINT_SCHEDULER_DEFAULT_OPTIONS } from './lint/LintScheduler'
 export { BootstrapReporter, checkPhase5Gates, PHASE5_GATE_IDS } from './bootstrap/BootstrapReporter'
 export { PHASE3_QUALITY_THRESHOLDS } from './phase1/QualityMetrics'
+export { IntentClassifier } from './chat/IntentClassifier'
+export { WikiRetrieval } from './chat/WikiRetrieval'
+export { CandidateStore } from './chat/CandidateStore'
+export { BenchmarkSession, BENCHMARK_PATHS } from './benchmark/BenchmarkSession'

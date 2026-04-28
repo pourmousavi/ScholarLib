@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import ReactMarkdown from 'react-markdown'
 import { usePortalContainer } from '../../contexts/PortalContext'
 import { useAIStore } from '../../store/aiStore'
 import { useLibraryStore } from '../../store/libraryStore'
@@ -17,6 +16,7 @@ import { chatHistoryService } from '../../services/ai/ChatHistoryService'
 import { getDeviceType, getDeviceName, getRecommendedProviders } from '../../utils/deviceDetection'
 import { Btn, HistoryIcon, PlusIcon } from '../ui'
 import ScopeSelector from './ScopeSelector'
+import MessageRenderer from './MessageRenderer'
 import styles from './ChatPanel.module.css'
 
 const QUICK_PROMPTS = [
@@ -36,6 +36,7 @@ export default function ChatPanel() {
   const [modelDropdownStyle, setModelDropdownStyle] = useState({})
   const [isIndexingDoc, setIsIndexingDoc] = useState(false)
   const [indexingProgress, setIndexingProgress] = useState('')
+  const [manualRoute, setManualRoute] = useState('auto')
 
   const messagesRef = useRef(null)
   const inputRef = useRef(null)
@@ -143,6 +144,7 @@ export default function ChatPanel() {
 
   const isCloudProvider = provider === 'claude' || provider === 'openai' || provider === 'gemini'
   const availableModels = aiService.getAvailableModels()
+  const isWikiEnabled = typeof localStorage !== 'undefined' && localStorage.getItem('sv_wiki_enabled') === 'true'
 
   // Check provider availability on mount and provider change
   useEffect(() => {
@@ -309,6 +311,8 @@ export default function ChatPanel() {
           selectedDocId,
           selectedFolderId,
           conversationId: convId,
+          wikiEnabled: isWikiEnabled,
+          manual_route: manualRoute === 'auto' ? null : manualRoute,
         })
       } catch (err) {
         if (err.code === 'CHAT_REFUSED' || err.code === 'CHAT_SENSITIVITY_REFUSED' || err.code === 'CHAT_COST_CAP_EXCEEDED') {
@@ -393,6 +397,13 @@ export default function ChatPanel() {
   const handleQuickPrompt = (prompt) => {
     setInput(prompt)
     inputRef.current?.focus()
+  }
+
+  const questionForMessage = (index) => {
+    for (let i = index - 1; i >= 0; i--) {
+      if (messages[i]?.role === 'user') return messages[i].content
+    }
+    return ''
   }
 
   // Handle WebLLM download
@@ -742,28 +753,19 @@ export default function ChatPanel() {
             )}
           </div>
         ) : (
-          messages.map((msg) => (
+          messages.map((msg, index) => (
             <div key={msg.id} className={`${styles.message} ${styles[msg.role]}`}>
               <div className={`${styles.avatar} ${styles[msg.role]}`}>
                 {msg.role === 'assistant' ? '✦' : userInitial}
               </div>
               <div className={styles.content}>
                 <div className={styles.bubble}>
-                  {msg.content ? (
-                    msg.role === 'assistant' ? (
-                      <div className={styles.markdown}>
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      msg.content
-                    )
-                  ) : (isStreaming && msg.role === 'assistant' ? (
-                    <div className={styles.thinking}>
-                      <span className={styles.dot} />
-                      <span className={styles.dot} />
-                      <span className={styles.dot} />
-                    </div>
-                  ) : '')}
+                  <MessageRenderer
+                    message={msg}
+                    isStreaming={isStreaming}
+                    adapter={adapter}
+                    question={questionForMessage(index)}
+                  />
                 </div>
               </div>
             </div>
@@ -788,6 +790,24 @@ export default function ChatPanel() {
 
       {/* Input area */}
       <div className={styles.inputArea}>
+        {isWikiEnabled && (
+          <div className={styles.routeSelectorRow}>
+            <label className={styles.routeLabel} htmlFor="chat-route-mode">Route</label>
+            <select
+              id="chat-route-mode"
+              className={styles.routeSelect}
+              value={manualRoute}
+              onChange={(e) => setManualRoute(e.target.value)}
+              disabled={isStreaming}
+            >
+              <option value="auto">Auto</option>
+              <option value="wiki_only">Wiki only</option>
+              <option value="rag_only">RAG only</option>
+              <option value="both">Both</option>
+              <option value="improved_rag">Improved-RAG</option>
+            </select>
+          </div>
+        )}
         {/* Model selector and cost estimate for cloud providers */}
         {isCloudProvider && (
           <div className={styles.inputMeta}>

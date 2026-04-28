@@ -1,6 +1,7 @@
 const WIKI_ROOT = '_wiki'
 const WIKI_SYSTEM_ROOT = `${WIKI_ROOT}/_system`
 const WIKI_PHASE1_ROOT = `${WIKI_ROOT}/_phase1`
+const WIKI_PHASE5_ROOT = `${WIKI_ROOT}/_phase5`
 const WIKI_PHASE3_ROOT = `${WIKI_ROOT}/_phase3`
 const WIKI_BACKUPS_ROOT = `${WIKI_ROOT}/_backups`
 const WIKI_LINT_REPORTS_ROOT = `${WIKI_ROOT}/lint-reports`
@@ -32,6 +33,9 @@ export const WikiPaths = {
   costRoot: `${WIKI_ROOT}/_cost`,
   costIndex: `${WIKI_SYSTEM_ROOT}/cost-index.json`,
   positionDraftsRoot: `${WIKI_ROOT}/position/_drafts`,
+  chatCandidatesRoot: `${WIKI_ROOT}/_inbox/chat-candidates`,
+  archivedChatCandidatesRoot: `${WIKI_ROOT}/_inbox/_archived/chat-candidates`,
+  chatRoutingDefaults: `${WIKI_SYSTEM_ROOT}/chat_routing_defaults.json`,
 
   typeRoot(type) {
     if (type === 'position_draft') return this.positionDraftsRoot
@@ -122,6 +126,19 @@ export const WikiPaths = {
   phase3SchemaRevisionFlag: `${WIKI_PHASE3_ROOT}/schema_revision_taken.json`,
   phase3LintStateFile: `${WIKI_PHASE3_ROOT}/lint_state.json`,
   phase3Report: `${WIKI_PHASE3_ROOT}/PHASE_3_REPORT.md`,
+
+  // Phase 5 chat benchmark.
+  phase5Root: WIKI_PHASE5_ROOT,
+  phase5BenchmarkQuestions: `${WIKI_PHASE5_ROOT}/benchmark_questions.json`,
+  phase5BenchmarkReport: `${WIKI_PHASE5_ROOT}/PHASE_5_BENCHMARK_REPORT.md`,
+
+  chatCandidate(date, slug) {
+    return `${this.chatCandidatesRoot}/${cleanSegment(date)}/${cleanSegment(slug)}.json`
+  },
+
+  archivedChatCandidate(date, slug) {
+    return `${this.archivedChatCandidatesRoot}/${cleanSegment(date)}/${cleanSegment(slug)}.json`
+  },
 
   // Lint reports.
   lintReportsRoot: WIKI_LINT_REPORTS_ROOT,

@@ -240,6 +240,46 @@
   margin-bottom: 0;
 }
 
+.provenanceRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  min-height: 22px;
+}
+
+.provenanceBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  background: var(--bg-sidebar);
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  line-height: 1;
+}
+
+:global(.saveCandidateButton) {
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+:global(.saveCandidateButton:disabled) {
+  cursor: default;
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+}
+
 .markdown h1, .markdown h2, .markdown h3, .markdown h4 {
   font-family: 'DM Sans', sans-serif;
   font-weight: 600;
@@ -458,6 +498,29 @@
   max-width: 100%;
   box-sizing: border-box;
   overflow: hidden;
+}
+
+.routeSelectorRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.routeLabel {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.routeSelect {
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 11px;
 }
 
 .inputWrapper {
