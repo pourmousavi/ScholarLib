@@ -1,0 +1,115 @@
+.inbox,
+.review {
+  height: 100%;
+  overflow: auto;
+  padding: var(--space-5);
+  color: var(--text-primary);
+  background: var(--bg-base);
+}
+
+.header,
+.reviewHeader,
+.changeHeader,
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.header h2,
+.reviewHeader h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.header p,
+.reviewHeader p,
+.reason {
+  margin: var(--space-1) 0 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.empty,
+.proposalItem,
+.change,
+.unsupported {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+
+.proposalList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.proposalItem {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.primaryBtn,
+.secondaryBtn {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.primaryBtn {
+  border: 0;
+  background: var(--accent-gradient);
+  color: #0f1117;
+}
+
+.secondaryBtn {
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.diff {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.diff pre,
+.diff textarea {
+  width: 100%;
+  min-height: 180px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+
+.tier {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+}
+
+.low { color: var(--success); background: var(--success-bg); }
+.medium { color: var(--warning); background: var(--warning-bg); }
+.high { color: var(--error); background: var(--error-bg); }
+
+.evidence {
+  margin-top: var(--space-3);
+  color: var(--text-secondary);
+  font-size: 12px;
+}

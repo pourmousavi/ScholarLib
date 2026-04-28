@@ -4,8 +4,13 @@ import { hashJson } from './WikiHash'
 import { writeJSONWithRevision } from './WikiStorage'
 import { WikiStateService } from './WikiStateService'
 
-function aliasKey(alias) {
-  return String(alias || '').trim().toLowerCase()
+export function normalizeAliasKey(alias) {
+  return String(alias || '')
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s_-]+/gu, ' ')
+    .replace(/[\s_-]+/g, ' ')
+    .trim()
 }
 
 export class SidecarService {
@@ -29,12 +34,12 @@ export class SidecarService {
       pageRows.push(row)
 
       for (const alias of [row.title, ...row.aliases]) {
-        const key = aliasKey(alias)
+        const key = normalizeAliasKey(alias)
         if (!key) continue
-        if (aliases[key] && aliases[key] !== page.id) {
-          conflicts.push({ alias, page_ids: [aliases[key], page.id] })
+        if (aliases[key] && aliases[key].page_id !== page.id) {
+          conflicts.push({ alias, page_ids: [aliases[key].page_id, page.id] })
         } else {
-          aliases[key] = page.id
+          aliases[key] = { page_id: page.id, source: alias === row.title ? 'title' : 'alias', display: alias }
         }
       }
     }
@@ -55,6 +60,13 @@ export class SidecarService {
       aliases,
       conflicts,
       hash: await hashJson({ aliases, conflicts }),
+    }
+
+    if (conflicts.length > 0) {
+      const error = new Error('Wiki alias collision detected')
+      error.code = 'WIKI_ALIAS_COLLISION'
+      error.conflicts = conflicts
+      throw error
     }
 
     await writeJSONWithRevision(adapter, WikiPaths.pagesSidecar, pagesSidecar)

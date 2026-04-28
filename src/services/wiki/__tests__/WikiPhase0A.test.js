@@ -59,7 +59,7 @@ describe('ScholarLib wiki Phase 0A', () => {
 
     const sidecars = await SidecarService.regenerate(adapter)
     expect(sidecars.pages.count).toBe(1)
-    expect(sidecars.aliases.aliases.cells).toBe(page.id)
+    expect(sidecars.aliases.aliases.cells.page_id).toBe(page.id)
 
     const integrity = await IntegrityService.check(adapter)
     expect(integrity.ok).toBe(true)

@@ -34,7 +34,8 @@ export class IntegrityService {
       }
     }
 
-    for (const [alias, pageId] of Object.entries(aliasesSidecar?.aliases || {})) {
+    for (const [alias, entry] of Object.entries(aliasesSidecar?.aliases || {})) {
+      const pageId = typeof entry === 'string' ? entry : entry.page_id
       if (!actualIds.has(pageId)) {
         issues.push({ severity: 'warning', code: 'ALIAS_TARGET_NOT_FOUND', alias, page_id: pageId })
       }

@@ -110,8 +110,10 @@ class SettingsService {
       ai_provider: deviceSettings.provider,
       ai_model: deviceSettings.model,
       claude_key_set: !!localStorage.getItem('sv_claude_key'),
-      openai_key_set: !!localStorage.getItem('sv_openai_key')
+      openai_key_set: !!localStorage.getItem('sv_openai_key'),
+      wiki_enabled: remote.global?.wiki?.enabled === true
     }
+    localStorage.setItem('sv_wiki_enabled', String(local.wiki_enabled))
 
     return { remote, local, deviceId }
   }
@@ -164,6 +166,7 @@ class SettingsService {
     }
 
     await adapter.writeJSON('_system/settings.json', existing)
+    localStorage.setItem('sv_wiki_enabled', String(existing.global?.wiki?.enabled === true))
   }
 
   /**
@@ -370,6 +373,10 @@ class SettingsService {
       }
       localStorage.setItem('sv_chat_export_options', JSON.stringify(exportOptions))
     }
+
+    if (g.wiki?.enabled !== undefined) {
+      localStorage.setItem('sv_wiki_enabled', String(g.wiki.enabled === true))
+    }
   }
 
   // ============================================
@@ -425,6 +432,10 @@ class SettingsService {
    */
   setShowCollections(show) {
     localStorage.setItem('sv_show_collections', show.toString())
+  }
+
+  getWikiEnabled() {
+    return localStorage.getItem('sv_wiki_enabled') === 'true'
   }
 }
 

@@ -35,6 +35,7 @@ export default function Sidebar({ isMobile = false }) {
   const treeContainerRef = useRef(null)
 
   const setShowModal = useUIStore((s) => s.setShowModal)
+  const setActivePanel = useUIStore((s) => s.setActivePanel)
   const showDocListMobile = useUIStore((s) => s.showDocListMobile)
   const closeAllOverlays = useUIStore((s) => s.closeAllOverlays)
   const { canInstall, install } = usePWAInstall()
@@ -219,6 +220,7 @@ export default function Sidebar({ isMobile = false }) {
   }
 
   const providerInfo = getProviderInfo()
+  const wikiEnabled = settingsService.getWikiEnabled()
 
   // Resizable divider handlers for three-section layout
   const handleDividerMouseDown = useCallback((divider) => (e) => {
@@ -381,6 +383,19 @@ export default function Sidebar({ isMobile = false }) {
 
       {/* Footer */}
       <div className={styles.footer}>
+        {wikiEnabled && (
+          <button
+            className={styles.installBtn}
+            onClick={() => setActivePanel('wiki')}
+            title="Open Wiki"
+          >
+            <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5z"/>
+              <path d="M8 7h7M8 11h8M8 15h5"/>
+            </svg>
+            Wiki
+          </button>
+        )}
         {canInstall && (
           <button
             className={styles.installBtn}

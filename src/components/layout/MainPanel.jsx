@@ -6,16 +6,20 @@ import { LibraryService } from '../../services/library/LibraryService'
 import { useToast } from '../../hooks/useToast'
 import { needsEnrichment } from '../../utils/enrichment'
 import { enrichFromDOI } from '../../services/metadata/EnrichmentService'
+import { settingsService } from '../../services/settings/SettingsService'
+import { PaperExtractor, ProposalBuilder } from '../../services/wiki'
 import ViewerSwitch from '../viewer/ViewerSwitch'
 import SplitViewPanel from './SplitViewPanel'
 import { NotesPanel } from '../notes'
 import { ChatPanel } from '../ai'
 import LitOrbitInsights from '../library/LitOrbitInsights'
+import { Inbox as WikiInbox } from '../wiki'
 import styles from './MainPanel.module.css'
 
 export default function MainPanel({ isMobile = false }) {
   const [pdfUrl, setPdfUrl] = useState(null)
   const [pdfError, setPdfError] = useState(null)
+  const [isWikiIngesting, setIsWikiIngesting] = useState(false)
 
   const activePanel = useUIStore((s) => s.activePanel)
   const setActivePanel = useUIStore((s) => s.setActivePanel)
@@ -211,8 +215,37 @@ export default function MainPanel({ isMobile = false }) {
     setShowModal('share')
   }
 
+  const handleIngestWikiPaper = async () => {
+    if (!selectedDocId || !adapter || isDemoMode || isWikiIngesting) return
+    setIsWikiIngesting(true)
+    try {
+      const state = useLibraryStore.getState()
+      const library = {
+        version: '1.3',
+        folders: state.folders,
+        documents: state.documents,
+        tag_registry: state.tagRegistry,
+        collection_registry: state.collectionRegistry,
+        smart_collections: state.smartCollections,
+      }
+      const extraction = await new PaperExtractor().extractPaper(selectedDocId, library, adapter)
+      const proposalId = await new ProposalBuilder({ adapter }).buildProposal(extraction, library)
+      showToast({ message: `Wiki proposal created: ${proposalId}`, type: 'success' })
+      setActivePanel('wiki')
+    } catch (error) {
+      console.error('Wiki ingestion failed:', error)
+      showToast({ message: error.message || 'Wiki ingestion failed', type: 'error' })
+    } finally {
+      setIsWikiIngesting(false)
+    }
+  }
+
   return (
     <div className={styles.panel}>
+      {activePanel === 'wiki' ? (
+        <WikiInbox />
+      ) : (
+        <>
       {/* Top bar */}
       <div className={styles.topBar}>
         <div className={styles.left}>
@@ -263,6 +296,23 @@ export default function MainPanel({ isMobile = false }) {
               <path d="M16 3.13a4 4 0 010 7.75"/>
             </svg>
           </button>
+          {settingsService.getWikiEnabled() && selectedDoc && (
+            <button
+              className={styles.shareBtn}
+              onClick={handleIngestWikiPaper}
+              disabled={!selectedDoc?.box_path || isWikiIngesting}
+              title="Ingest this paper into Wiki"
+            >
+              {isWikiIngesting ? (
+                <span style={{ fontSize: 11 }}>...</span>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5z"/>
+                  <path d="M8 7h7M8 11h8M8 15h5"/>
+                </svg>
+              )}
+            </button>
+          )}
         </div>
         {/* Hide top tabs on mobile - bottom nav handles panel switching */}
         {!isMobile && !splitViewEnabled && (
@@ -335,6 +385,8 @@ export default function MainPanel({ isMobile = false }) {
         onChange={handleAttachFileSelected}
         style={{ display: 'none' }}
       />
+        </>
+      )}
     </div>
   )
 }

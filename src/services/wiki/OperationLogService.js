@@ -9,6 +9,10 @@ function opTimestamp() {
   return new Date().toISOString()
 }
 
+function dateFromOperation(operation) {
+  return operation?.created_at ? new Date(operation.created_at) : new Date()
+}
+
 export class OperationLogService {
   static createPendingOperation({ type, pageWrites = [], metadata = {} }) {
     const id = ulid()
@@ -23,7 +27,7 @@ export class OperationLogService {
   }
 
   static async writePending(adapter, operation) {
-    await writeJSONWithRevision(adapter, WikiPaths.pendingOp(operation.id), operation)
+    await writeJSONWithRevision(adapter, WikiPaths.pendingOp(operation.id, dateFromOperation(operation)), operation)
     return operation
   }
 
@@ -34,8 +38,8 @@ export class OperationLogService {
       state: 'committed',
       committed_at: opTimestamp(),
     }
-    await writeJSONWithRevision(adapter, WikiPaths.committedOp(operation.id), committed)
-    await this._deleteIfExists(adapter, WikiPaths.pendingOp(operation.id))
+    await writeJSONWithRevision(adapter, WikiPaths.committedOp(operation.id, dateFromOperation(operation)), committed)
+    await this._deleteIfExists(adapter, WikiPaths.pendingOp(operation.id, dateFromOperation(operation)))
     return committed
   }
 
@@ -80,11 +84,11 @@ export class OperationLogService {
   }
 
   static async listPending(adapter) {
-    return this._listOps(adapter, WikiPaths.opsPendingRoot)
+    return this._listOps(adapter, '.pending.json')
   }
 
   static async listCommitted(adapter, limit = 10) {
-    const ops = await this._listOps(adapter, WikiPaths.opsCommittedRoot)
+    const ops = await this._listOps(adapter, '.committed.json')
     return ops
       .sort((a, b) => String(b.committed_at || '').localeCompare(String(a.committed_at || '')))
       .slice(0, limit)
@@ -97,28 +101,41 @@ export class OperationLogService {
       archived_at: opTimestamp(),
       archive_reason: reason,
     }
-    await writeJSONWithRevision(adapter, WikiPaths.archivedOp(operation.id), archived)
-    await this._deleteIfExists(adapter, WikiPaths.pendingOp(operation.id))
+    await writeJSONWithRevision(adapter, WikiPaths.committedOp(operation.id, dateFromOperation(operation)).replace('.committed.json', '.archived.json'), archived)
+    await this._deleteIfExists(adapter, WikiPaths.pendingOp(operation.id, dateFromOperation(operation)))
     return archived
   }
 
-  static async _listOps(adapter, root) {
+  static async _listOps(adapter, suffix) {
+    const files = await this._listFilesRecursive(adapter, WikiPaths.opsRoot)
+    const ops = []
+    for (const entry of files.filter((item) => item.path.endsWith(suffix))) {
+      try {
+        ops.push(await adapter.readJSON(entry.path))
+      } catch {
+        // Corrupt operation files are reported by integrity checks.
+      }
+    }
+    return ops
+  }
+
+  static async _listFilesRecursive(adapter, root) {
     let entries
     try {
       entries = await adapter.listFolder(root)
     } catch {
       return []
     }
-
-    const ops = []
-    for (const entry of entries.filter((item) => item.type === 'file' && item.name.endsWith('.json'))) {
-      try {
-        ops.push(await adapter.readJSON(`${root}/${entry.name}`))
-      } catch {
-        // Corrupt operation files are reported by integrity checks.
+    const files = []
+    for (const entry of entries) {
+      const path = `${root}/${entry.name}`
+      if (entry.type === 'folder') {
+        files.push(...await this._listFilesRecursive(adapter, path))
+      } else {
+        files.push({ ...entry, path })
       }
     }
-    return ops
+    return files
   }
 
   static async _deleteIfExists(adapter, path) {

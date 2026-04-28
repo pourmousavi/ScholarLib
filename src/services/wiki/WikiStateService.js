@@ -1,5 +1,6 @@
 import { WikiPaths } from './WikiPaths'
 import { ensureFolders, readJSONOrNull, writeJSONWithRevision } from './WikiStorage'
+import { WikiSchemaService } from './WikiSchemaService'
 
 const DEFAULT_STATE = {
   version: '0A',
@@ -21,12 +22,20 @@ export class WikiStateService {
   static async initialize(adapter) {
     await ensureFolders(adapter, [
       WikiPaths.root,
-      WikiPaths.pagesRoot,
+      `${WikiPaths.root}/paper`,
+      `${WikiPaths.root}/concept`,
+      `${WikiPaths.root}/method`,
+      `${WikiPaths.root}/dataset`,
+      `${WikiPaths.root}/person`,
+      `${WikiPaths.root}/position`,
+      WikiPaths.positionDraftsRoot,
       WikiPaths.systemRoot,
-      WikiPaths.opsPendingRoot,
-      WikiPaths.opsCommittedRoot,
-      WikiPaths.opsArchivedRoot,
+      WikiPaths.proposalsRoot,
+      WikiPaths.proposalsArchivedRoot,
+      WikiPaths.opMonthRoot(),
+      WikiPaths.costMonthRoot(),
     ])
+    await WikiSchemaService.ensure(adapter)
 
     const existing = await this.load(adapter)
     if (existing.initialized_at) return existing
