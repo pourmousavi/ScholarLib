@@ -52,6 +52,8 @@ export class PaperExtractor {
     this.providerRouter = providerRouter || new ProviderRouter()
     this.llmClient = llmClient || {
       chat: (messages, model) => ollamaService.chat(messages, model),
+      isAvailable: (force) => ollamaService.isAvailable(force),
+      getLastError: () => ollamaService.getLastError(),
     }
   }
 
@@ -70,6 +72,14 @@ export class PaperExtractor {
       estimatedTokensIn: estimateTokens(pageText),
       estimatedTokensOut: 4000,
     })
+
+    if (route.provider === 'ollama' && this.llmClient?.isAvailable) {
+      const available = await this.llmClient.isAvailable(true)
+      if (!available) {
+        const reason = this.llmClient.getLastError?.() || 'Ollama is unavailable'
+        throw { code: 'OLLAMA_UNAVAILABLE', message: reason }
+      }
+    }
 
     const messages = this._buildPrompt({ schema, doc, pageText, pdf })
     let parsed

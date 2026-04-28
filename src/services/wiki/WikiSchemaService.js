@@ -32,6 +32,7 @@ export class WikiSchemaService {
   }
 
   static async read(adapter) {
+    await this.ensure(adapter)
     try {
       return (await adapter.readTextWithMetadata(WikiPaths.schema)).text
     } catch (error) {

@@ -182,15 +182,26 @@ class OllamaService {
    * @returns {Promise<string>}
    */
   async chat(messages, model = 'llama3.2') {
-    const res = await fetch(`${this.baseURL}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false
+    let res
+    try {
+      res = await fetch(`${this.baseURL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages,
+          stream: false
+        })
       })
-    })
+    } catch (err) {
+      if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'this app origin'
+        const message = `Cannot reach Ollama from ${origin}. Start Ollama with CORS enabled, for example: OLLAMA_ORIGINS="${origin}" ollama serve`
+        this.lastError = message
+        throw { code: 'OLLAMA_CORS_OR_NETWORK', message }
+      }
+      throw err
+    }
 
     if (!res.ok) {
       throw { code: 'OLLAMA_ERROR', message: 'Ollama request failed' }
