@@ -1,5 +1,7 @@
 const WIKI_ROOT = '_wiki'
 const WIKI_SYSTEM_ROOT = `${WIKI_ROOT}/_system`
+const WIKI_PHASE1_ROOT = `${WIKI_ROOT}/_phase1`
+const WIKI_BACKUPS_ROOT = `${WIKI_ROOT}/_backups`
 
 function cleanSegment(value) {
   return String(value || '')
@@ -75,5 +77,40 @@ export const WikiPaths = {
 
   committedCost(costId, date = new Date()) {
     return `${this.costMonthRoot(date)}/cost_${cleanSegment(costId)}.committed.json`
+  },
+
+  // Phase 1 scaffolding (archived after Phase 3 per design v2.1 §10).
+  phase1Root: WIKI_PHASE1_ROOT,
+  phase1ChecklistsRoot: `${WIKI_PHASE1_ROOT}/checklists`,
+  phase1UsefulnessRoot: `${WIKI_PHASE1_ROOT}/usefulness`,
+  phase1PositionDraftsReviewRoot: `${WIKI_PHASE1_ROOT}/position_drafts_review`,
+  phase1Report: `${WIKI_PHASE1_ROOT}/PHASE_1_REPORT.md`,
+  phase1OverridesRoot: `${WIKI_PHASE1_ROOT}/overrides`,
+
+  phase1Checklist(paperId) {
+    return `${this.phase1ChecklistsRoot}/${cleanSegment(paperId)}.json`
+  },
+
+  phase1Usefulness(timestamp) {
+    return `${this.phase1UsefulnessRoot}/${cleanSegment(timestamp)}.json`
+  },
+
+  phase1PositionDraftReview(draftId) {
+    return `${this.phase1PositionDraftsReviewRoot}/${cleanSegment(draftId)}.json`
+  },
+
+  phase1Override(overrideId) {
+    return `${this.phase1OverridesRoot}/${cleanSegment(overrideId)}.json`
+  },
+
+  // Migration system (Phase 1 §4).
+  migrationsRoot: `${WIKI_SYSTEM_ROOT}/migrations`,
+  migration(migrationId) {
+    return `${this.migrationsRoot}/${cleanSegment(migrationId)}.json`
+  },
+
+  backupsRoot: WIKI_BACKUPS_ROOT,
+  backupRoot(label) {
+    return `${WIKI_BACKUPS_ROOT}/${cleanSegment(label)}`
   },
 }

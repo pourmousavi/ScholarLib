@@ -113,3 +113,319 @@
   color: var(--text-secondary);
   font-size: 12px;
 }
+
+.dangerBtn {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--error);
+  background: var(--error-bg);
+  color: var(--error);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.iconBtn {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.checklist,
+.dashboard {
+  height: 100%;
+  overflow: auto;
+  padding: var(--space-5);
+  background: var(--bg-base);
+  color: var(--text-primary);
+}
+
+.checklistHeader,
+.dashboardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.checklistHeader h2,
+.dashboardHeader h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.checklistHeader p,
+.dashboardHeader p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.checklistList {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-4) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.checklistStep {
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+
+.checklistStepHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.checklistStepName {
+  font-weight: 600;
+}
+
+.checklistStatus {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.status_running { color: var(--accent); }
+.status_success { color: var(--success); }
+.status_failed { color: var(--error); }
+.status_pending { color: var(--text-tertiary); }
+
+.checklistStepMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.checklistErrors {
+  margin-top: var(--space-2);
+  padding-left: var(--space-4);
+  color: var(--error);
+  font-size: 12px;
+}
+
+.checklistObservations {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+
+.checklistObservations textarea {
+  width: 100%;
+  min-height: 80px;
+  margin: var(--space-2) 0;
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.checklistIssues {
+  border: 0;
+  padding: 0;
+  margin: var(--space-3) 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-1);
+  font-size: 12px;
+}
+
+.checklistIssues legend {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.checklistReingestion {
+  display: block;
+  margin: var(--space-2) 0 var(--space-3);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.metricGrid {
+  margin-top: var(--space-4);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+
+.metricCard {
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+
+.metricCard header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.metricCard h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.metricValue {
+  margin: var(--space-3) 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.metricCard dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-3);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.metricCard dt { margin: 0; }
+.metricCard dd { margin: 0; }
+
+.metricBadge {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+}
+
+.metricBadge.status_green { background: var(--success-bg); color: var(--success); }
+.metricBadge.status_amber { background: var(--warning-bg); color: var(--warning); }
+.metricBadge.status_red { background: var(--error-bg); color: var(--error); }
+.metricBadge.status_pending { background: var(--bg-elevated); color: var(--text-tertiary); }
+
+.historyTable {
+  margin-top: var(--space-3);
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.historyTable th,
+.historyTable td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+}
+
+.costSummary ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.dashboardPause {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-sm);
+  background: var(--error-bg);
+  color: var(--text-primary);
+}
+
+.dashboardPauseActions {
+  margin-top: var(--space-3);
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.dashboardOverride {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.dashboardOverride textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.usefulness {
+  margin: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  max-width: 420px;
+  font-size: 12px;
+}
+
+.usefulness header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.usefulness h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.usefulness textarea {
+  width: 100%;
+  min-height: 60px;
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.usefulnessRating {
+  display: flex;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.usefulnessStar {
+  background: transparent;
+  border: 0;
+  font-size: 18px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.usefulnessStarActive {
+  color: var(--warning);
+}
+
+.usefulnessActions {
+  margin-top: var(--space-2);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

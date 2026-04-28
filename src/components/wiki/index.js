@@ -1,3 +1,6 @@
 export { default as Inbox } from './Inbox'
 export { default as PageReader } from './PageReader'
 export { default as ProposalReviewMinimal } from './ProposalReviewMinimal'
+export { default as IngestionChecklist } from './IngestionChecklist'
+export { default as QualityDashboard } from './QualityDashboard'
+export { default as UsefulnessPrompt } from './UsefulnessPrompt'
