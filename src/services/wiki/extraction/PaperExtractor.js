@@ -1,4 +1,7 @@
 import { ollamaService } from '../../ai/OllamaService'
+import { claudeService } from '../../ai/ClaudeService'
+import { openaiService } from '../../ai/OpenAIService'
+import { geminiService } from '../../ai/GeminiService'
 import { ProviderRouter } from '../ProviderRouter'
 import { WikiPaths } from '../WikiPaths'
 import { WikiSchemaService } from '../WikiSchemaService'
@@ -50,11 +53,7 @@ export class PaperExtractor {
   constructor({ pdfTextExtractor, providerRouter, llmClient } = {}) {
     this.pdfTextExtractor = pdfTextExtractor || new PdfTextExtractor()
     this.providerRouter = providerRouter || new ProviderRouter()
-    this.llmClient = llmClient || {
-      chat: (messages, model) => ollamaService.chat(messages, model),
-      isAvailable: (force) => ollamaService.isAvailable(force),
-      getLastError: () => ollamaService.getLastError(),
-    }
+    this.llmClient = llmClient || createDefaultWikiLLMClient()
   }
 
   async extractPaper(scholarlibDocId, library, adapter) {
@@ -67,7 +66,7 @@ export class PaperExtractor {
     const sensitivity = getDocumentSensitivity(doc)
     const pageText = this._fitContext(pdf.pages)
 
-    const route = await this.providerRouter.route('extract_paper', {
+    let route = await this.providerRouter.route('extract_paper', {
       ...sensitivity,
       estimatedTokensIn: estimateTokens(pageText),
       estimatedTokensOut: 4000,
@@ -76,8 +75,7 @@ export class PaperExtractor {
     if (route.provider === 'ollama' && this.llmClient?.isAvailable) {
       const available = await this.llmClient.isAvailable(true)
       if (!available) {
-        const reason = this.llmClient.getLastError?.() || 'Ollama is unavailable'
-        throw { code: 'OLLAMA_UNAVAILABLE', message: reason }
+        route = await this._fallbackRouteAfterLocalFailure({ sensitivity, pageText })
       }
     }
 
@@ -88,7 +86,8 @@ export class PaperExtractor {
       const response = await this.llmClient.chat(
         attempt === 0 ? messages : [...messages, { role: 'user', content: `Previous JSON failed validation: ${validationError.message}. Return corrected JSON only.` }],
         route.model,
-        route.callOptions
+        route.callOptions,
+        route.provider
       )
       parsed = parseModelJson(response)
       try {
@@ -120,6 +119,34 @@ export class PaperExtractor {
       ocr_warnings: pdf.ocr_warnings,
     }
     return parsed
+  }
+
+  async _fallbackRouteAfterLocalFailure({ sensitivity, pageText }) {
+    const reason = this.llmClient.getLastError?.() || 'Ollama is unavailable'
+    if (sensitivity.sensitivity === 'confidential') {
+      throw {
+        code: 'OLLAMA_UNAVAILABLE',
+        message: `${reason}. This document is confidential, so ScholarLib will not fall back to a cloud provider.`,
+      }
+    }
+    if (!sensitivity.allowedProviders.includes('claude')) {
+      throw {
+        code: 'OLLAMA_UNAVAILABLE',
+        message: `${reason}. Cloud fallback is not allowed for this document namespace.`,
+      }
+    }
+    if (!this.llmClient.isConfigured?.('claude')) {
+      throw {
+        code: 'WIKI_CLOUD_FALLBACK_NOT_CONFIGURED',
+        message: `${reason}. Configure a Claude API key in Settings to let public wiki ingestion fall back when local Ollama is unavailable.`,
+      }
+    }
+    return this.providerRouter.route('extract_paper', {
+      ...sensitivity,
+      forceCloudFallback: true,
+      estimatedTokensIn: estimateTokens(pageText),
+      estimatedTokensOut: 4000,
+    })
   }
 
   _fitContext(pages) {
@@ -168,3 +195,23 @@ export class PaperExtractor {
 }
 
 export { getDocumentSensitivity, validateExtractionShape }
+
+function createDefaultWikiLLMClient() {
+  return {
+    chat(messages, model, callOptions, provider = 'ollama') {
+      if (provider === 'claude') return claudeService.chat(messages, model)
+      if (provider === 'openai') return openaiService.chat(messages, model)
+      if (provider === 'gemini') return geminiService.chat(messages, model)
+      return ollamaService.chat(messages, model)
+    },
+    isAvailable: (force) => ollamaService.isAvailable(force),
+    getLastError: () => ollamaService.getLastError(),
+    isConfigured(provider) {
+      if (provider === 'claude') return claudeService.isConfigured()
+      if (provider === 'openai') return openaiService.isConfigured()
+      if (provider === 'gemini') return geminiService.isConfigured()
+      if (provider === 'ollama') return true
+      return false
+    },
+  }
+}

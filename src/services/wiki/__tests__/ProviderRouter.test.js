@@ -49,6 +49,16 @@ describe('wiki ProviderRouter and cost estimator', () => {
     expect(route).toMatchObject({ provider: 'claude', model: 'haiku-configured' })
   })
 
+  it('routes public extraction to Haiku when cloud fallback is forced', async () => {
+    const router = new ProviderRouter({
+      capabilityCheck: { synthesis_grade_local: true, models: [{ name: 'llama3.1:8b' }] },
+      costEstimator: new CostEstimator(),
+    })
+    const route = await router.route('extract_paper', { sensitivity: 'public', forceCloudFallback: true })
+    expect(route.provider).toBe('claude')
+    expect(route.model).toBe('claude-haiku-4-5-20251001')
+  })
+
   it('blocks cost preflight over single and monthly caps', async () => {
     const under = new CostEstimator({ caps: { single_operation_cap_usd: 1, monthly_cost_cap_usd: 2 } })
     expect((await under.checkPreflight({ provider: 'claude', model: 'claude-sonnet', tokensIn: 1000, tokensOut: 1000 })).ok).toBe(true)

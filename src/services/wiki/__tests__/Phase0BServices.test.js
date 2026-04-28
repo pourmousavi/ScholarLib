@@ -8,6 +8,8 @@ import { ProposalStore } from '../proposals/ProposalStore'
 import { PositionDraftService } from '../positions/PositionDraftService'
 import { WikiService } from '../WikiService'
 import { WikiPaths } from '../WikiPaths'
+import { ProviderRouter } from '../ProviderRouter'
+import { CostEstimator } from '../CostEstimator'
 
 const library = {
   documents: {
@@ -58,6 +60,62 @@ describe('wiki Phase 0B services', () => {
     }, adapter)
     expect(result.claims[0].supported_by[0].page_text_hash).toBe('page-hash')
     expect(result.claims[0].supported_by[0].quote_snippet).toBeNull()
+  })
+
+  it('falls back to configured Claude for public extraction when Ollama is unavailable', async () => {
+    const adapter = new MemoryAdapter()
+    await WikiService.initialize(adapter)
+    const llmClient = {
+      isAvailable: vi.fn().mockResolvedValue(false),
+      getLastError: () => 'Cannot reach Ollama - check CORS settings',
+      isConfigured: (provider) => provider === 'claude',
+      chat: vi.fn().mockResolvedValue(JSON.stringify(extraction)),
+    }
+    const extractor = new PaperExtractor({
+      pdfTextExtractor: {
+        extractPdf: async () => ({
+          pages: [{ index: 0, text: 'calendar aging evidence text', page_text_hash: 'page-hash' }],
+          extraction_version: 'test',
+          extraction_confidence: 0.95,
+          ocr_warnings: [],
+        }),
+      },
+      providerRouter: new ProviderRouter({
+        capabilityCheck: { synthesis_grade_local: true, models: [{ name: 'llama3.1:8b' }] },
+        costEstimator: new CostEstimator(),
+      }),
+      llmClient,
+    })
+    await extractor.extractPaper('d1', library, adapter)
+    expect(llmClient.chat.mock.calls[0][3]).toBe('claude')
+  })
+
+  it('does not cloud-fallback for confidential extraction when Ollama is unavailable', async () => {
+    const adapter = new MemoryAdapter()
+    await WikiService.initialize(adapter)
+    const extractor = new PaperExtractor({
+      pdfTextExtractor: {
+        extractPdf: async () => ({
+          pages: [{ index: 0, text: 'calendar aging evidence text', page_text_hash: 'page-hash' }],
+          extraction_version: 'test',
+          extraction_confidence: 0.95,
+          ocr_warnings: [],
+        }),
+      },
+      providerRouter: new ProviderRouter({
+        capabilityCheck: { synthesis_grade_local: true, models: [{ name: 'llama3.1:8b' }] },
+        costEstimator: new CostEstimator(),
+      }),
+      llmClient: {
+        isAvailable: vi.fn().mockResolvedValue(false),
+        getLastError: () => 'Cannot reach Ollama',
+        isConfigured: () => true,
+        chat: vi.fn(),
+      },
+    })
+    await expect(extractor.extractPaper('d1', {
+      documents: { d1: { ...library.documents.d1, wiki: { sensitivity: 'confidential', allowed_providers: ['ollama'] } } },
+    }, adapter)).rejects.toMatchObject({ code: 'OLLAMA_UNAVAILABLE' })
   })
 
   it('applies deterministic risk-tier precedence', () => {

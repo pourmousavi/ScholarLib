@@ -4,9 +4,9 @@ import { CostEstimator } from './CostEstimator'
 const DEFAULT_MODELS = {
   ollamaSmall: 'llama3.2:1b',
   ollamaMedium: 'llama3.1:8b',
-  claudeHaiku: 'claude-haiku',
-  claudeSonnet: 'claude-sonnet',
-  claudeOpus: 'claude-opus',
+  claudeHaiku: 'claude-haiku-4-5-20251001',
+  claudeSonnet: 'claude-sonnet-4-20250514',
+  claudeOpus: 'claude-opus-4-20250514',
 }
 
 export class ProviderRouter {
@@ -20,7 +20,7 @@ export class ProviderRouter {
 
   async route(task, context = {}) {
     const capability = await this._capability()
-    const selected = this._select(task, capability)
+    const selected = this._select(task, capability, context)
     const sensitivity = context.sensitivity || 'public'
     const allowedProviders = context.allowedProviders || context.allowed_providers || ['ollama', 'claude', 'openai', 'gemini']
     this.sensitivityGate.check(sensitivity, allowedProviders, selected.provider)
@@ -47,7 +47,7 @@ export class ProviderRouter {
     }
   }
 
-  _select(task, capability) {
+  _select(task, capability, context = {}) {
     const models = { ...DEFAULT_MODELS, ...(this.settings?.models || {}) }
     const lintProvider = this.settings?.wiki?.lint_provider || 'ollama'
     const synthesisProvider = this.settings?.wiki?.synthesis_provider || 'claude'
@@ -57,7 +57,7 @@ export class ProviderRouter {
         return { provider: 'ollama', model: this._smallestOllama(capability) || models.ollamaSmall }
       case 'extract_paper':
       case 'update_concept':
-        if (capability.synthesis_grade_local !== false) {
+        if (!context.forceCloudFallback && capability.synthesis_grade_local !== false) {
           return { provider: 'ollama', model: this._mediumOllama(capability) || models.ollamaMedium }
         }
         return { provider: 'claude', model: models.claudeHaiku }
