@@ -90,6 +90,36 @@ describe('wiki Phase 0B services', () => {
     expect(llmClient.chat.mock.calls[0][3]).toBe('claude')
   })
 
+  it('normalizes model output when draft_body is returned as an object', async () => {
+    const adapter = new MemoryAdapter()
+    await WikiService.initialize(adapter)
+    const extractor = new PaperExtractor({
+      pdfTextExtractor: {
+        extractPdf: async () => ({
+          pages: [{ index: 0, text: 'calendar aging evidence text', page_text_hash: 'page-hash' }],
+          extraction_version: 'test',
+          extraction_confidence: 0.95,
+          ocr_warnings: [],
+        }),
+      },
+      providerRouter: { route: vi.fn().mockResolvedValue({ provider: 'ollama', model: 'local', callOptions: {} }) },
+      llmClient: {
+        chat: vi.fn().mockResolvedValue(JSON.stringify({
+          ...extraction,
+          draft_body: {
+            summary: 'The paper studies calendar aging.',
+            sections: [{ title: 'Findings', body: 'Temperature increases degradation.' }],
+          },
+          claims: [{ text: 'Temperature increases degradation.', evidence: [{ pdf_page: 1, char_start: 0, char_end: 20 }] }],
+        })),
+      },
+    })
+    const result = await extractor.extractPaper('d1', library, adapter)
+    expect(result.draft_body).toContain('The paper studies calendar aging.')
+    expect(result.draft_body).toContain('## Findings')
+    expect(result.claims[0]).toMatchObject({ claim_text: 'Temperature increases degradation.', confidence: 'medium' })
+  })
+
   it('does not cloud-fallback for confidential extraction when Ollama is unavailable', async () => {
     const adapter = new MemoryAdapter()
     await WikiService.initialize(adapter)

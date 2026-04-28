@@ -3,7 +3,6 @@ import { claudeService } from '../../ai/ClaudeService'
 import { openaiService } from '../../ai/OpenAIService'
 import { geminiService } from '../../ai/GeminiService'
 import { ProviderRouter } from '../ProviderRouter'
-import { WikiPaths } from '../WikiPaths'
 import { WikiSchemaService } from '../WikiSchemaService'
 import { hashMarkdown } from '../WikiHash'
 import { PdfTextExtractor } from './PdfTextExtractor'
@@ -38,6 +37,79 @@ function parseModelJson(raw) {
     if (start >= 0 && end > start) return JSON.parse(text.slice(start, end + 1))
     throw new WikiExtractionValidationError('Model did not return valid JSON', { preview: text.slice(0, 500) })
   }
+}
+
+function coerceArray(value) {
+  if (Array.isArray(value)) return value
+  if (value === null || value === undefined) return []
+  return [value]
+}
+
+function normalizeConfidence(value) {
+  return ['low', 'medium', 'high'].includes(value) ? value : 'medium'
+}
+
+function stringifyDraftSection(value) {
+  if (typeof value === 'string') return value.trim()
+  if (value === null || value === undefined) return ''
+  if (Array.isArray(value)) return value.map(stringifyDraftSection).filter(Boolean).join('\n\n')
+  if (typeof value !== 'object') return String(value)
+
+  const title = value.title || value.heading || value.name
+  const body = value.body ?? value.content ?? value.text ?? value.summary ?? value.abstract
+  const rendered = stringifyDraftSection(body)
+  if (title && rendered) return `## ${title}\n\n${rendered}`
+  if (rendered) return rendered
+  return `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``
+}
+
+function normalizeDraftBody(value, doc = {}) {
+  if (typeof value === 'string') return value.trim()
+  if (Array.isArray(value)) return value.map((item) => normalizeDraftBody(item, doc)).filter(Boolean).join('\n\n')
+  if (value && typeof value === 'object') {
+    const parts = []
+    const title = value.title || doc.metadata?.title
+    if (title) parts.push(`# ${title}`)
+    for (const key of ['summary', 'abstract', 'body', 'markdown', 'content']) {
+      if (typeof value[key] === 'string' && value[key].trim()) parts.push(value[key].trim())
+    }
+    for (const section of coerceArray(value.sections)) {
+      const rendered = stringifyDraftSection(section)
+      if (rendered) parts.push(rendered)
+    }
+    if (parts.length) return parts.join('\n\n')
+    return `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``
+  }
+  return `# ${doc.metadata?.title || 'Untitled paper'}\n\nNo structured summary was returned by the model.`
+}
+
+function normalizeClaimShape(claim) {
+  if (!claim || typeof claim !== 'object') return null
+  const claimText = claim.claim_text ?? claim.text ?? claim.claim ?? claim.statement
+  if (!claimText) return null
+  return {
+    ...claim,
+    claim_text: String(claimText),
+    confidence: normalizeConfidence(claim.confidence),
+    supported_by: coerceArray(claim.supported_by ?? claim.evidence ?? claim.locators).filter((locator) => locator && typeof locator === 'object'),
+  }
+}
+
+function normalizeExtractionShape(value, doc = {}) {
+  if (!value || typeof value !== 'object') throw new WikiExtractionValidationError('Extraction output must be an object')
+  const source = value.paper && typeof value.paper === 'object' && !value.draft_body ? { ...value, ...value.paper } : value
+  const requiredArrays = ['methods_used', 'datasets_used', 'concepts_touched', 'open_question_candidates', 'contradiction_signals']
+  const normalized = {
+    ...source,
+    draft_frontmatter: source.draft_frontmatter && typeof source.draft_frontmatter === 'object' ? { ...source.draft_frontmatter } : {},
+    draft_body: normalizeDraftBody(source.draft_body ?? source.body ?? source.markdown ?? source.summary ?? source.abstract, doc),
+    claims: coerceArray(source.claims).map(normalizeClaimShape).filter(Boolean),
+    extraction_metadata: source.extraction_metadata && typeof source.extraction_metadata === 'object' ? source.extraction_metadata : {},
+  }
+  normalized.draft_frontmatter.title ||= doc.metadata?.title || 'Untitled paper'
+  normalized.draft_frontmatter.aliases = coerceArray(normalized.draft_frontmatter.aliases).filter((alias) => typeof alias === 'string')
+  for (const key of requiredArrays) normalized[key] = coerceArray(source[key])
+  return normalized
 }
 
 function validateExtractionShape(value) {
@@ -92,7 +164,7 @@ export class PaperExtractor {
         route.provider
       )
       try {
-        parsed = parseModelJson(response)
+        parsed = normalizeExtractionShape(parseModelJson(response), doc)
         validateExtractionShape(parsed)
         validationError = null
         break
