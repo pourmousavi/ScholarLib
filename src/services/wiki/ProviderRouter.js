@@ -42,6 +42,8 @@ export class ProviderRouter {
         task,
         model: selected.model,
         temperature: selected.temperature ?? 0.1,
+        maxTokens: Math.max(1024, Math.min(8192, tokensOut || 1024)),
+        format: task === 'extract_paper' ? 'json' : undefined,
         estimated_cost_usd: preflight.cost_usd,
       },
     }

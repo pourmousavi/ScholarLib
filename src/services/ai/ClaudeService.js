@@ -114,7 +114,7 @@ class ClaudeService {
    * @param {string} model - Model name
    * @returns {Promise<string>}
    */
-  async chat(messages, model = 'claude-haiku-4-5-20251001') {
+  async chat(messages, model = 'claude-haiku-4-5-20251001', options = {}) {
     const apiKey = this.getApiKey()
     if (!apiKey) {
       throw { code: 'AI_NOT_CONFIGURED', message: 'Claude API key not set' }
@@ -133,7 +133,7 @@ class ClaudeService {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 1024,
+        max_tokens: options.maxTokens || options.max_tokens || 1024,
         system: systemMessage?.content || '',
         messages: chatMessages
       })

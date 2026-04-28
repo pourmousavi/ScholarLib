@@ -181,7 +181,7 @@ class OllamaService {
    * @param {string} model - Model name
    * @returns {Promise<string>}
    */
-  async chat(messages, model = 'llama3.2') {
+  async chat(messages, model = 'llama3.2', options = {}) {
     let res
     try {
       res = await fetch(`${this.baseURL}/api/chat`, {
@@ -190,7 +190,9 @@ class OllamaService {
         body: JSON.stringify({
           model,
           messages,
-          stream: false
+          stream: false,
+          ...(options.format ? { format: options.format } : {}),
+          ...(options.temperature !== undefined ? { options: { temperature: options.temperature } } : {})
         })
       })
     } catch (err) {

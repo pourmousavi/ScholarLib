@@ -51,7 +51,7 @@ describe('wiki Phase 0B services', () => {
       providerRouter: { route: vi.fn().mockResolvedValue({ provider: 'ollama', model: 'local', callOptions: {} }) },
       llmClient: {
         chat: vi.fn()
-          .mockResolvedValueOnce('{"bad":true}')
+          .mockResolvedValueOnce('not json')
           .mockResolvedValueOnce(JSON.stringify({ ...extraction, draft_frontmatter: { ...extraction.draft_frontmatter, sensitivity: 'confidential' } })),
       },
     })

@@ -31,10 +31,12 @@ function getDocumentSensitivity(doc) {
 function parseModelJson(raw) {
   const text = String(raw || '').trim()
   try { return JSON.parse(text) } catch {
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
+    if (fenced) return JSON.parse(fenced[1].trim())
     const start = text.indexOf('{')
     const end = text.lastIndexOf('}')
     if (start >= 0 && end > start) return JSON.parse(text.slice(start, end + 1))
-    throw new WikiExtractionValidationError('Model did not return valid JSON')
+    throw new WikiExtractionValidationError('Model did not return valid JSON', { preview: text.slice(0, 500) })
   }
 }
 
@@ -89,8 +91,8 @@ export class PaperExtractor {
         route.callOptions,
         route.provider
       )
-      parsed = parseModelJson(response)
       try {
+        parsed = parseModelJson(response)
         validateExtractionShape(parsed)
         validationError = null
         break
@@ -157,11 +159,27 @@ export class PaperExtractor {
 
   _buildPrompt({ schema, doc, pageText, pdf }) {
     return [
-      { role: 'system', content: 'You extract ScholarLib wiki paper proposals. Return strict JSON only.' },
+      { role: 'system', content: 'You extract ScholarLib wiki paper proposals. Return only valid JSON. Do not include markdown fences, prose, comments, or trailing text.' },
       {
         role: 'user',
         content: [
           `Schema:\n${schema}`,
+          `Return this exact JSON object shape:
+{
+  "draft_frontmatter": { "title": "...", "aliases": [], "doi": null },
+  "draft_body": "markdown body using only ID wikilinks or no wikilinks",
+  "claims": [
+    { "claim_text": "...", "confidence": "low|medium|high", "supported_by": [
+      { "pdf_page": 1, "char_start": 0, "char_end": 0, "quote_snippet": "..." }
+    ] }
+  ],
+  "methods_used": [],
+  "datasets_used": [],
+  "concepts_touched": [],
+  "open_question_candidates": [],
+  "contradiction_signals": [],
+  "extraction_metadata": { "tokens_out": 0 }
+}`,
           `Metadata:\n${JSON.stringify(doc.metadata || {}, null, 2)}`,
           `Extraction confidence: ${pdf.extraction_confidence}`,
           `Paper text:\n${pageText}`,
@@ -199,10 +217,10 @@ export { getDocumentSensitivity, validateExtractionShape }
 function createDefaultWikiLLMClient() {
   return {
     chat(messages, model, callOptions, provider = 'ollama') {
-      if (provider === 'claude') return claudeService.chat(messages, model)
-      if (provider === 'openai') return openaiService.chat(messages, model)
-      if (provider === 'gemini') return geminiService.chat(messages, model)
-      return ollamaService.chat(messages, model)
+      if (provider === 'claude') return claudeService.chat(messages, model, callOptions)
+      if (provider === 'openai') return openaiService.chat(messages, model, callOptions)
+      if (provider === 'gemini') return geminiService.chat(messages, model, callOptions)
+      return ollamaService.chat(messages, model, callOptions)
     },
     isAvailable: (force) => ollamaService.isAvailable(force),
     getLastError: () => ollamaService.getLastError(),
