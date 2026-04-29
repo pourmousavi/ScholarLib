@@ -81,7 +81,11 @@ function normalizeDraftBody(value, doc = {}) {
     if (parts.length) return parts.join('\n\n')
     return `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``
   }
-  return `# ${doc.metadata?.title || 'Untitled paper'}\n\nNo structured summary was returned by the model.`
+  // Nothing usable. Return empty so validateExtractionShape rejects this
+  // pass and the retry loop in extractPaper asks the model again. Falling
+  // back to a placeholder message here would silently commit an empty page
+  // (the bug that produced "No structured summary was returned by the model").
+  return ''
 }
 
 function normalizeClaimShape(claim) {
@@ -118,6 +122,12 @@ function validateExtractionShape(value) {
   if (!value || typeof value !== 'object') throw new WikiExtractionValidationError('Extraction output must be an object')
   if (!value.draft_frontmatter || typeof value.draft_frontmatter !== 'object') throw new WikiExtractionValidationError('draft_frontmatter is required')
   if (typeof value.draft_body !== 'string') throw new WikiExtractionValidationError('draft_body must be a string')
+  if (!value.draft_body.trim()) {
+    throw new WikiExtractionValidationError(
+      'draft_body is empty — the model returned a JSON response without any of: draft_body, body, markdown, summary, abstract. Trying again may produce a usable summary.',
+      { extraction_metadata: value.extraction_metadata || null }
+    )
+  }
   for (const key of requiredArrays) {
     if (!Array.isArray(value[key])) throw new WikiExtractionValidationError(`${key} must be an array`)
   }

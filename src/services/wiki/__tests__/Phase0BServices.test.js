@@ -120,6 +120,42 @@ describe('wiki Phase 0B services', () => {
     expect(result.claims[0]).toMatchObject({ claim_text: 'Temperature increases degradation.', confidence: 'medium' })
   })
 
+  it('rejects extraction when the model JSON omits every body field, after one retry', async () => {
+    const adapter = new MemoryAdapter()
+    await WikiService.initialize(adapter)
+    const bodylessResponse = JSON.stringify({
+      draft_frontmatter: { title: 'Sample paper' },
+      // intentionally no draft_body / body / markdown / summary / abstract
+      claims: [],
+      methods_used: [],
+      datasets_used: [],
+      concepts_touched: [],
+      open_question_candidates: [],
+      contradiction_signals: [],
+    })
+    const chat = vi.fn()
+      .mockResolvedValueOnce(bodylessResponse)
+      .mockResolvedValueOnce(bodylessResponse)
+    const extractor = new PaperExtractor({
+      pdfTextExtractor: {
+        extractPdf: async () => ({
+          pages: [{ index: 0, text: 'paper text', page_text_hash: 'h' }],
+          extraction_version: 'test',
+          extraction_confidence: 0.9,
+          ocr_warnings: [],
+        }),
+      },
+      providerRouter: { route: vi.fn().mockResolvedValue({ provider: 'ollama', model: 'local', callOptions: {} }) },
+      llmClient: { chat },
+    })
+    await expect(extractor.extractPaper('d1', library, adapter)).rejects.toMatchObject({
+      code: 'WIKI_EXTRACTION_VALIDATION_ERROR',
+      message: expect.stringContaining('draft_body is empty'),
+    })
+    // Confirm the extractor actually retried once before giving up.
+    expect(chat).toHaveBeenCalledTimes(2)
+  })
+
   it('does not cloud-fallback for confidential extraction when Ollama is unavailable', async () => {
     const adapter = new MemoryAdapter()
     await WikiService.initialize(adapter)
