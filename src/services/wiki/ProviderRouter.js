@@ -9,6 +9,19 @@ const DEFAULT_MODELS = {
   claudeOpus: 'claude-opus-4-20250514',
 }
 
+// Ollama defaults to num_ctx: 2048, which truncates a paper-sized prompt
+// long before the model sees it. Pick a window that comfortably fits the
+// 24K-token cap PaperExtractor._fitContext enforces, keyed per task so
+// classify-style calls don't pay the RAM cost of a 32K window.
+const OLLAMA_NUM_CTX_BY_TASK = {
+  extract_paper: 32768,
+  update_concept: 32768,
+  lint: 16384,
+  classify: 8192,
+  verify_claim: 16384,
+  synthesise_position: 16384,
+}
+
 export class ProviderRouter {
   constructor({ capabilityCheck, sensitivityGate, costEstimator, settings = {} } = {}) {
     this.capabilityCheck = capabilityCheck || { synthesis_grade_local: true, models: [] }
@@ -35,18 +48,18 @@ export class ProviderRouter {
       namespace: context.namespace || '',
     })
 
-    return {
-      provider: selected.provider,
+    const callOptions = {
+      task,
       model: selected.model,
-      callOptions: {
-        task,
-        model: selected.model,
-        temperature: selected.temperature ?? 0.1,
-        maxTokens: Math.max(1024, Math.min(8192, tokensOut || 1024)),
-        format: task === 'extract_paper' ? 'json' : undefined,
-        estimated_cost_usd: preflight.cost_usd,
-      },
+      temperature: selected.temperature ?? 0.1,
+      maxTokens: Math.max(1024, Math.min(8192, tokensOut || 1024)),
+      format: task === 'extract_paper' ? 'json' : undefined,
+      estimated_cost_usd: preflight.cost_usd,
     }
+    if (selected.provider === 'ollama' && OLLAMA_NUM_CTX_BY_TASK[task]) {
+      callOptions.num_ctx = OLLAMA_NUM_CTX_BY_TASK[task]
+    }
+    return { provider: selected.provider, model: selected.model, callOptions }
   }
 
   _select(task, capability, context = {}) {

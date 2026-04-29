@@ -136,19 +136,40 @@ class OllamaService {
   }
 
   /**
+   * Build the runtime `options` object Ollama expects on /api/chat.
+   * Ollama silently uses `num_ctx: 2048` by default, which truncates long
+   * prompts before the model sees them — that's how a 30-page paper turns
+   * into "Sparse extraction — 0 claims, 0 methods, 0 datasets". Map our
+   * caller-facing keys (maxTokens, num_ctx, num_predict) onto Ollama's
+   * native names so callers can pick a context window that fits the input.
+   */
+  _buildOllamaOptions({ temperature, num_ctx, num_predict, maxTokens } = {}) {
+    const options = {}
+    if (temperature !== undefined) options.temperature = temperature
+    if (num_ctx !== undefined) options.num_ctx = num_ctx
+    const predict = num_predict ?? maxTokens
+    if (predict !== undefined) options.num_predict = predict
+    return Object.keys(options).length ? options : null
+  }
+
+  /**
    * Stream chat completion
    * @param {Array} messages - Chat messages [{role, content}]
    * @param {string} model - Model name (default: llama3.2)
+   * @param {object} options - { temperature, num_ctx, num_predict, maxTokens, format }
    * @yields {string} Content chunks
    */
-  async *streamChat(messages, model = 'llama3.2') {
+  async *streamChat(messages, model = 'llama3.2', options = {}) {
+    const ollamaOptions = this._buildOllamaOptions(options)
     const res = await fetch(`${this.baseURL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model,
         messages,
-        stream: true
+        stream: true,
+        ...(options.format ? { format: options.format } : {}),
+        ...(ollamaOptions ? { options: ollamaOptions } : {}),
       })
     })
 
@@ -190,6 +211,7 @@ class OllamaService {
    * @returns {Promise<string>}
    */
   async chat(messages, model = 'llama3.2', options = {}) {
+    const ollamaOptions = this._buildOllamaOptions(options)
     let res
     try {
       res = await fetch(`${this.baseURL}/api/chat`, {
@@ -200,7 +222,7 @@ class OllamaService {
           messages,
           stream: false,
           ...(options.format ? { format: options.format } : {}),
-          ...(options.temperature !== undefined ? { options: { temperature: options.temperature } } : {})
+          ...(ollamaOptions ? { options: ollamaOptions } : {}),
         })
       })
     } catch (err) {

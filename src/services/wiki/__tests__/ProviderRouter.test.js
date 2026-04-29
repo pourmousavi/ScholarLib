@@ -37,6 +37,17 @@ describe('wiki ProviderRouter and cost estimator', () => {
     })
     const route = await router.route('extract_paper', { sensitivity: 'public' })
     expect(route).toMatchObject({ provider: 'ollama', model: 'llama3.1:8b' })
+    expect(route.callOptions.num_ctx).toBe(32768)
+  })
+
+  it('does not set num_ctx on cloud routes', async () => {
+    const router = new ProviderRouter({
+      capabilityCheck: { synthesis_grade_local: false },
+      costEstimator: new CostEstimator(),
+    })
+    const route = await router.route('extract_paper', { sensitivity: 'public' })
+    expect(route.provider).toBe('claude')
+    expect(route.callOptions.num_ctx).toBeUndefined()
   })
 
   it('routes routine extraction to Haiku when local synthesis is unavailable and content is public', async () => {
