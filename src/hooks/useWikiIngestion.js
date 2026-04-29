@@ -87,8 +87,10 @@ export function useWikiIngestion() {
         ...library,
         documents: { ...library.documents, [docId]: doc },
       }
-      useWikiIngestStore.getState().setStage('extracting')
-      const extraction = await new PaperExtractor().extractPaper(docId, updatedLibrary, adapter)
+      useWikiIngestStore.getState().setStage('extracting_pdf')
+      const extraction = await new PaperExtractor().extractPaper(docId, updatedLibrary, adapter, {
+        onProgress: (stage) => useWikiIngestStore.getState().setStage(stage),
+      })
       useWikiIngestStore.getState().setStage('building')
       const proposalId = await new ProposalBuilder({ adapter }).buildProposal(
         extraction,

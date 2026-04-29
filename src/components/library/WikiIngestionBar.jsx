@@ -2,21 +2,30 @@ import { useWikiIngestStore } from '../../store/wikiIngestStore'
 import styles from './IndexingBar.module.css'
 
 const STAGE_WEIGHTS = {
+  // paper
   preparing: 0.1,
+  extracting_pdf: 0.1,
+  calling_model: 0.5,
+  calling_model_retry: 0.5,
+  validating: 0.1,
+  building: 0.2,
+  // grant
   extracting: 0.6,
-  building: 0.3,
   writing: 0.3,
 }
 
 const STAGE_ORDER = {
-  paper: ['preparing', 'extracting', 'building'],
+  paper: ['preparing', 'extracting_pdf', 'calling_model', 'validating', 'building'],
   grant: ['preparing', 'extracting', 'writing'],
 }
 
 const STAGE_TEXT = {
   paper: {
     preparing: 'Preparing wiki...',
-    extracting: 'Extracting paper with model...',
+    extracting_pdf: 'Reading PDF text...',
+    calling_model: 'Asking model to extract — this can take several minutes',
+    calling_model_retry: 'Retrying — first response failed validation',
+    validating: 'Checking model response...',
     building: 'Building wiki proposal...',
   },
   grant: {
@@ -54,12 +63,14 @@ export default function WikiIngestionBar() {
   }
 
   const order = STAGE_ORDER[mode] || STAGE_ORDER.paper
+  // calling_model_retry sits at the same position as calling_model on the bar
+  const positionStage = currentStage === 'calling_model_retry' ? 'calling_model' : currentStage
   let baseProgress = 0
   for (const stage of order) {
-    if (stage === currentStage) break
+    if (stage === positionStage) break
     baseProgress += STAGE_WEIGHTS[stage] || 0
   }
-  baseProgress += (STAGE_WEIGHTS[currentStage] || 0) * 0.5
+  baseProgress += (STAGE_WEIGHTS[positionStage] || 0) * 0.5
   const progressPercent = Math.min(99, Math.round(baseProgress * 100))
 
   const stageLabel = STAGE_TEXT[mode]?.[currentStage] || 'Working...'

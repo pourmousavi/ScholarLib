@@ -146,6 +146,9 @@ export class PaperExtractor {
     if (!doc) throw new Error(`Document not found: ${scholarlibDocId}`)
     if (!doc.box_path) throw new Error(`Document has no PDF path: ${scholarlibDocId}`)
 
+    const onProgress = typeof options.onProgress === 'function' ? options.onProgress : () => {}
+
+    onProgress('extracting_pdf')
     const schema = await WikiSchemaService.read(adapter)
     const pdf = await this.pdfTextExtractor.extractPdf(adapter, doc.box_path)
     const sensitivity = getDocumentSensitivity(doc)
@@ -169,6 +172,7 @@ export class PaperExtractor {
     let parsed
     let validationError = null
     for (let attempt = 0; attempt < 2; attempt++) {
+      onProgress(attempt === 0 ? 'calling_model' : 'calling_model_retry')
       const response = await this.llmClient.chat(
         attempt === 0 ? messages : [...messages, { role: 'user', content: `Previous JSON failed validation: ${validationError.message}. Return corrected JSON only.` }],
         route.model,
@@ -176,6 +180,7 @@ export class PaperExtractor {
         route.provider
       )
       try {
+        onProgress('validating')
         parsed = normalizeExtractionShape(parseModelJson(response), doc)
         validateExtractionShape(parsed)
         validationError = null
