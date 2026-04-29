@@ -1527,3 +1527,164 @@
 .lintFinding.severity_high { border-left-color: var(--error); }
 .lintFinding.severity_medium { border-left-color: var(--warning); }
 .lintFinding.severity_low { border-left-color: var(--success); }
+
+/* ===========================================================================
+ * Interactive feedback (hover / focus / active / disabled)
+ *
+ * Added in the wiki UI overhaul. Before this block the wiki had only six
+ * `:hover` rules across 1500+ lines of CSS, so most clickable elements had no
+ * feedback at all — clicking felt broken because nothing told you whether
+ * you'd hovered or pressed. The block below applies consistent transitions,
+ * hover, active, focus-visible (keyboard), and disabled states to every
+ * interactive class in this file.
+ *
+ * If you add a new interactive element, give it `cursor: pointer` and either
+ * one of these existing classes or its own entry below.
+ * ===========================================================================
+ */
+
+.primaryBtn,
+.secondaryBtn,
+.dangerBtn {
+  transition: filter 120ms ease, border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+
+.primaryBtn:hover,
+.secondaryBtn:hover,
+.dangerBtn:hover {
+  filter: brightness(1.15);
+}
+
+.primaryBtn:active,
+.secondaryBtn:active,
+.dangerBtn:active {
+  filter: brightness(0.92);
+}
+
+.primaryBtn:focus-visible,
+.secondaryBtn:focus-visible,
+.dangerBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.primaryBtn:disabled,
+.secondaryBtn:disabled,
+.dangerBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.iconBtn {
+  transition: background-color 120ms ease, color 120ms ease;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+}
+
+.iconBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.iconBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.proposalCard,
+.proposalItem,
+.changeCard,
+.inboxStatChip,
+.changeEvidenceBtn {
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, transform 80ms ease;
+}
+
+.proposalCard:hover,
+.proposalItem:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-border);
+}
+
+.proposalCard:focus-visible,
+.proposalItem:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.proposalCard:active,
+.proposalItem:active {
+  transform: translateY(1px);
+}
+
+.changeCard:hover {
+  border-color: var(--border-default);
+  background: var(--bg-hover);
+}
+
+.inboxStatChip {
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.inboxStatChip:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.inboxStatChip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.changeEvidenceBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.usefulnessStar {
+  transition: color 120ms ease, transform 80ms ease;
+}
+
+.usefulnessStar:hover {
+  color: var(--accent);
+  transform: scale(1.1);
+}
+
+.bootstrapMatchList button {
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.bootstrapMatchList button:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-border);
+}
+
+.workspaceTab {
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.workspaceTab:focus-visible,
+.workspaceClose:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Catch-all for any plain <button> inside the wiki workspace that doesn't
+ * carry one of the named classes above. Gives at least a faint hover. */
+.workspace button {
+  transition: filter 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+
+.workspace button:not(:disabled):hover {
+  filter: brightness(1.15);
+}
+
+.workspace button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
