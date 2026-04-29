@@ -378,6 +378,8 @@ export default function MainPanel({ isMobile = false }) {
         onChange={handleAttachFileSelected}
         style={{ display: 'none' }}
       />
+        </>
+      )}
       {metadataPreflight && (
         <MetadataPreflightModal
           document={metadataPreflight.document}
@@ -387,8 +389,6 @@ export default function MainPanel({ isMobile = false }) {
           onIngest={runPreflightIngest}
           onCancel={cancelWikiPreflight}
         />
-      )}
-        </>
       )}
     </div>
   )
