@@ -131,7 +131,7 @@ src/components/wiki/
 
 ### Key reference
 
-- [`docs/WIKI_USER_GUIDE.md`](docs/WIKI_USER_GUIDE.md) — practical user guide; reference for "what does this surface do?"
+- [`docs/docs/wiki/index.md`](docs/docs/wiki/index.md) — practical user guide; reference for "what does this surface do?"
 - [`SCHOLARLIB_WIKI_DESIGN_V2_1.md`](SCHOLARLIB_WIKI_DESIGN_V2_1.md) §6.8 — full lint rule catalogue; §10 — phase exit criteria; §14 — glossary.
 - The phase prompts each end with a "Notes for the user" section worth re-reading when picking up that phase's surface.
 
@@ -139,7 +139,7 @@ src/components/wiki/
 
 ## Key Reference Docs
 
-- [WIKI_USER_GUIDE.md](docs/WIKI_USER_GUIDE.md) — End-to-end user walk-through of the wiki layer
+- [WIKI_USER_GUIDE.md](docs/docs/wiki/index.md) — End-to-end user walk-through of the wiki layer
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — Full system design, data flow, API contracts
 - [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) — Colors, fonts, spacing, all component specs
 - [USER_SETUP.md](docs/USER_SETUP.md) — Manual tasks Ali must complete (accounts, keys, config)

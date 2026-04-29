@@ -38,7 +38,7 @@ A professional academic reference manager with AI-powered document Q&A. Built fo
 - Works with university Box accounts
 
 ### LLM Wiki Layer
-A persistent, LLM-maintained markdown layer above your PDFs that compounds with use — see [docs/WIKI_USER_GUIDE.md](docs/WIKI_USER_GUIDE.md) for the full walk-through.
+A persistent, LLM-maintained markdown layer above your PDFs that compounds with use — see [docs/docs/wiki/index.md](docs/docs/wiki/index.md) for the full walk-through.
 
 - **Proposal-and-review** — the model proposes wiki edits per ingested paper; you approve them in an Inbox with risk-tiered diffs.
 - **Concept, method, dataset, person, paper, position pages** — markdown pages under `_wiki/` in your own storage, owned by you, readable in any text editor.
@@ -107,7 +107,7 @@ VITE_APP_BASE_URL=https://yourusername.github.io/scholarlib
 ## Documentation
 
 - [CLAUDE.md](CLAUDE.md) — Build guide for developers and AI coding tools
-- [docs/WIKI_USER_GUIDE.md](docs/WIKI_USER_GUIDE.md) — How to use the LLM Wiki layer end-to-end
+- [docs/docs/wiki/index.md](docs/docs/wiki/index.md) — How to use the LLM Wiki layer end-to-end
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System design
 - [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) — UI components and styling
 - [docs/USER_SETUP.md](docs/USER_SETUP.md) — Setup instructions for end users

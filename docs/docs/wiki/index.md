@@ -1,8 +1,15 @@
+---
+sidebar_position: 1
+slug: /wiki
+title: Wiki Layer User Guide
+description: How to use the LLM Wiki layer end-to-end — from your first paper ingestion through wiki-assisted chat.
+---
+
 # ScholarLib Wiki — User Guide
 
 Practical walk-through of the LLM Wiki layer: what it is, where to click, what each surface does, and how to move from a fresh install to a knowledge graph that supports your real writing.
 
-> **Source of truth.** This guide describes the application as shipped through Phase 6+. The authoritative design lives in [`SCHOLARLIB_WIKI_DESIGN_V2_1.md`](../SCHOLARLIB_WIKI_DESIGN_V2_1.md); the phase-by-phase build instructions live in `SCHOLARLIB_WIKI_PHASE_*.md` at the repository root. When this guide and the design disagree, the design wins — please open an issue so the guide can be corrected.
+> **Source of truth.** This guide describes the application as shipped through Phase 6+. The authoritative design lives in [`SCHOLARLIB_WIKI_DESIGN_V2_1.md`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_DESIGN_V2_1.md); the phase-by-phase build instructions live in `SCHOLARLIB_WIKI_PHASE_*.md` at the repository root. When this guide and the design disagree, the design wins — please open an issue so the guide can be corrected.
 
 ---
 
@@ -112,7 +119,7 @@ This is the most common operation.
 
 ## 6. Workflow B — Review proposals in the Inbox
 
-The Inbox tab is the queue you work through. From the Phase 2 spec, the design target is **<5 minutes per normal paper** (no high-risk pages).
+The Inbox tab is the queue you work through. From the Phase 2 spec, the design target is **under 5 minutes per normal paper** (no high-risk pages).
 
 **Top of the inbox shows:**
 
@@ -427,7 +434,7 @@ While in safety mode:
 
 After any recovery action, the wiki state is reset to `Normal` and ingestion resumes.
 
-A weekly lint pass writes findings to `_wiki/lint-reports/YYYY-MM-DD.md` and surfaces them in the Inbox. The lint rules are listed in [`SCHOLARLIB_WIKI_DESIGN_V2_1.md`](../SCHOLARLIB_WIKI_DESIGN_V2_1.md) §6.8.
+A weekly lint pass writes findings to `_wiki/lint-reports/YYYY-MM-DD.md` and surfaces them in the Inbox. The lint rules are listed in [`SCHOLARLIB_WIKI_DESIGN_V2_1.md`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_DESIGN_V2_1.md) §6.8.
 
 ---
 
@@ -512,14 +519,15 @@ These are the "Notes for the user" sections from each phase prompt, distilled. T
 
 Source-of-truth documents at the repository root:
 
-- [`SCHOLARLIB_WIKI_DESIGN_V2_1.md`](../SCHOLARLIB_WIKI_DESIGN_V2_1.md) — the design contract. §4 lists every architectural decision (`[DEC-NN]`) and amendment (`[A-NN]`). §5 is the storage layout. §6 is the schema spec. §7 is the ingestion pipeline. §8 is chat integration. §10 is the phase plan.
-- [`SCHOLARLIB_WIKI_PHASE_0A_PROMPT.md`](../SCHOLARLIB_WIKI_PHASE_0A_PROMPT.md) through [`SCHOLARLIB_WIKI_PHASE_6_PLUS_PROMPT.md`](../SCHOLARLIB_WIKI_PHASE_6_PLUS_PROMPT.md) — the per-phase build prompts. Each contains its own "Notes for the user" section and exit criteria.
-- [`scholarlib-wiki-phase-prompts-final-addendum.md`](../scholarlib-wiki-phase-prompts-final-addendum.md) — cross-phase corrections to the prompts.
+- [`SCHOLARLIB_WIKI_DESIGN_V2_1.md`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_DESIGN_V2_1.md) — the design contract. §4 lists every architectural decision (`[DEC-NN]`) and amendment (`[A-NN]`). §5 is the storage layout. §6 is the schema spec. §7 is the ingestion pipeline. §8 is chat integration. §10 is the phase plan.
+- Per-phase build prompts: [`PHASE_0A`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_0A_PROMPT.md) · [`0B`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_0B_PROMPT.md) · [`1`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_1_PROMPT.md) · [`2`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_2_PROMPT.md) · [`3`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_3_PROMPT.md) · [`4`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_4_PROMPT.md) · [`5`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_5_PROMPT.md) · [`6+`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_6_PLUS_PROMPT.md). Each contains its own "Notes for the user" section and exit criteria.
+- [Cross-phase addendum](https://github.com/pourmousavi/ScholarLib/blob/main/scholarlib-wiki-phase-prompts-final-addendum.md) — corrections that apply to every phase prompt.
 
 Project docs:
 
-- [`README.md`](../README.md) — top-level project overview.
-- [`CLAUDE.md`](../CLAUDE.md) — build guide for AI coding tools.
-- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — overall ScholarLib architecture (the wiki sits on top of this).
-- [`docs/USER_SETUP.md`](USER_SETUP.md) — Box/Dropbox account setup, API keys.
-- [`docs/LIBRARY_SCHEMA.md`](LIBRARY_SCHEMA.md) — `library.json` schema (the wiki reads this, never writes it).
+- [`README.md`](https://github.com/pourmousavi/ScholarLib/blob/main/README.md) — top-level project overview.
+- [`CLAUDE.md`](https://github.com/pourmousavi/ScholarLib/blob/main/CLAUDE.md) — build guide for AI coding tools.
+- [`docs/ARCHITECTURE.md`](https://github.com/pourmousavi/ScholarLib/blob/main/docs/ARCHITECTURE.md) — overall ScholarLib architecture (the wiki sits on top of this).
+- [`docs/USER_SETUP.md`](https://github.com/pourmousavi/ScholarLib/blob/main/docs/USER_SETUP.md) — Box/Dropbox account setup, API keys.
+- [`docs/LIBRARY_SCHEMA.md`](https://github.com/pourmousavi/ScholarLib/blob/main/docs/LIBRARY_SCHEMA.md) — `library.json` schema (the wiki reads this, never writes it).
+- [Obsidian setup](/wiki/obsidian-setup) — pointing Obsidian at the read-only export.

@@ -25,6 +25,12 @@ const sidebars = {
       ],
     },
     'ai-chat',
+    {
+      type: 'category',
+      label: 'Wiki Layer',
+      link: { type: 'doc', id: 'wiki/index' },
+      items: ['wiki/obsidian-setup'],
+    },
     'settings',
     'shortcuts',
   ],

@@ -1,3 +1,9 @@
+---
+sidebar_position: 2
+title: Obsidian Setup
+description: Point Obsidian at the read-only wiki export for graph view and mobile reading.
+---
+
 # Obsidian Setup For ScholarLib Wiki Export
 
 ScholarLib writes a generated, read-only Obsidian mirror to `_wiki_export_obsidian/`.
