@@ -241,7 +241,8 @@ Grants are sensitive. They live in a private namespace (`_wiki/_private/grant/`)
    - Switches the wiki workspace to the **Grants** tab so you can see the result.
 3. **The Grants tab** lists all un-ingested grant documents detected in your library. Each row has an **Ingest grant** button that runs the same pipeline. Existing grant pages are grouped into outcome buckets: pending, under_review, won, rejected, withdrawn, and other.
 4. **Update outcomes and feedback.** Open a grant card, choose the outcome, paste reviewer feedback, and add outcome notes. Save re-reads the page after writing so the form reflects the committed state.
-5. **Attach related source documents.** Use **Attach related document** to connect outcome notices, reviewer feedback PDFs, budgets, support letters, appendices, or other grant-folder documents. Outcome notice and reviewer feedback PDFs are summarised locally via Ollama and appended under clearly labelled page sections.
+5. **Attach related source documents.** Use **Attach related document** to connect outcome notices, reviewer feedback files, budgets, support letters, appendices, or other grant-folder documents. Reviewer feedback and outcome notice files populate the matching editable section automatically; PDF files are summarised locally via Ollama, and text/markdown files are read directly.
+6. **Archive mistaken entries.** If you accidentally ingest a document that is not a grant application, use **Archive entry** on the grant form. The page is hidden from the normal Grants view but remains in `_wiki/` with `archived: true` for audit and recovery.
 
 Re-ingesting the same grant document is idempotent. ScholarLib checks `source_doc_id` and opens the existing grant page instead of creating a duplicate. If funder, program, submitted year, and title match another grant but the source document differs, ScholarLib warns before continuing.
 

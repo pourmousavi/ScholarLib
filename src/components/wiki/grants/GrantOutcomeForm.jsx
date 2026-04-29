@@ -21,7 +21,7 @@ function formStateForPage(page) {
   }
 }
 
-export default function GrantOutcomeForm({ grantPage, grants = [], library, adapter, onSaved }) {
+export default function GrantOutcomeForm({ grantPage, grants = [], library, adapter, onSaved, onArchived }) {
   const [form, setForm] = useState(() => formStateForPage(grantPage))
   const [saving, setSaving] = useState(false)
   const [attachOpen, setAttachOpen] = useState(false)
@@ -94,6 +94,24 @@ export default function GrantOutcomeForm({ grantPage, grants = [], library, adap
     }
   }
 
+  const archive = async () => {
+    if (!adapter || !grantPage || saving) return
+    const ok = window.confirm('Archive this grant entry? It will be hidden from the normal Grants view but kept in the wiki for audit/recovery.')
+    if (!ok) return
+    setSaving(true)
+    setError(null)
+    try {
+      const page = await new GrantIngestion({ adapter }).archiveGrantPage(grantPage.id, {
+        archive_reason: 'mistake',
+      })
+      onArchived?.(page)
+    } catch (err) {
+      setError(err.message || 'Failed to archive grant')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (!grantPage) return null
 
   return (
@@ -141,6 +159,9 @@ export default function GrantOutcomeForm({ grantPage, grants = [], library, adap
         </button>
         {attachOpen && (
           <div className={styles.attachBox}>
+            <p className={styles.meta}>
+              Reviewer feedback and outcome notice files populate the matching editable section automatically.
+            </p>
             <label className={styles.field}>
               Document
               <select value={attachDocId} onChange={(event) => setAttachDocId(event.target.value)}>
@@ -170,6 +191,9 @@ export default function GrantOutcomeForm({ grantPage, grants = [], library, adap
       </details>
 
       <div className={styles.actions}>
+        <button type="button" className={styles.dangerButton} onClick={archive} disabled={saving}>
+          Archive entry
+        </button>
         <button type="button" className={styles.bucket} onClick={() => setForm(formStateForPage(grantPage))} disabled={!dirty || saving}>
           Cancel
         </button>

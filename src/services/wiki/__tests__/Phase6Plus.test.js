@@ -238,6 +238,60 @@ describe('Phase 6+ post-trust extensions', () => {
     expect(updated.body).not.toContain('Outcome Notes (from')
   })
 
+  it('attachRelatedDocument populates reviewer feedback and outcome notes from text files', async () => {
+    const adapter = new MemoryAdapter()
+    await adapter.uploadFile('sources/review.txt', new Blob(['Reviewer 1: strong fit.']))
+    await adapter.uploadFile('sources/notice.txt', new Blob(['Outcome: not funded this round.']))
+    const created = await new GrantIngestion({ adapter }).ingestGrant({
+      title: 'Text attachment grant',
+      provider: 'ollama',
+      body: '## Reviewer Feedback\n\n\n## Outcome Notes\n\n',
+    })
+    const library = {
+      documents: {
+        d_review: { id: 'd_review', filename: 'review.txt', box_path: 'sources/review.txt', metadata: { title: 'Review text' } },
+        d_notice: { id: 'd_notice', filename: 'notice.txt', box_path: 'sources/notice.txt', metadata: { title: 'Notice text' } },
+      },
+    }
+
+    const withFeedback = await new GrantIngestion({ adapter }).attachRelatedDocument(created.id, 'd_review', {
+      relation: 'reviewer_feedback',
+      extractBody: true,
+      library,
+    })
+    const withNotice = await new GrantIngestion({ adapter }).attachRelatedDocument(created.id, 'd_notice', {
+      relation: 'outcome_notice',
+      extractBody: true,
+      library,
+    })
+
+    expect(withFeedback.frontmatter.reviewer_feedback).toContain('Reviewer 1: strong fit.')
+    expect(withFeedback.body).toContain('## Reviewer Feedback')
+    expect(withFeedback.body).toContain('Reviewer 1: strong fit.')
+    expect(withNotice.body).toContain('## Outcome Notes')
+    expect(withNotice.body).toContain('Outcome: not funded this round.')
+  })
+
+  it('archives grant pages instead of deleting them', async () => {
+    const adapter = new MemoryAdapter()
+    const created = await new GrantIngestion({ adapter }).ingestGrant({
+      title: 'Mistaken grant',
+      provider: 'ollama',
+      body: 'Not actually a grant application.',
+    })
+
+    const archived = await new GrantIngestion({ adapter }).archiveGrantPage(created.id, {
+      archive_reason: 'mistake',
+    })
+
+    expect(archived.frontmatter).toMatchObject({
+      archived: true,
+      archive_reason: 'mistake',
+      human_edited: true,
+    })
+    expect(await PageStore.readPage(adapter, created.id)).toBeTruthy()
+  })
+
   it('ingestDocument returns the existing grant on matching source_doc_id', async () => {
     const adapter = new MemoryAdapter()
     await adapter.uploadFile('sources/grant.md', new Blob(['Summary.']))

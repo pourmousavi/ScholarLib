@@ -47,6 +47,10 @@ function isPdfDocument(document) {
   return /\.pdf(?:$|\?)/i.test(document?.box_path || document?.filename || '')
 }
 
+function isTextDocument(document) {
+  return /\.(txt|md|markdown|text)(?:$|\?)/i.test(document?.box_path || document?.filename || document?.ai_chat_source_file || '')
+}
+
 function today() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -68,14 +72,19 @@ export function replaceOrAppendSection(body, headingLevel, headingText, content)
   return `${[text, replacement].filter(Boolean).join('\n\n').trimEnd()}\n`
 }
 
-function appendSection(body, headingLevel, headingText, content) {
-  const heading = `${'#'.repeat(headingLevel)} ${headingText}`
-  return `${[String(body || '').trimEnd(), `${heading}\n\n${String(content ?? '').trim()}`].filter(Boolean).join('\n\n').trimEnd()}\n`
-}
-
 function sectionContent(body, headingLevel, headingText) {
   const match = String(body || '').match(sectionPattern(headingLevel, headingText))
   return match ? match[2].trim() : ''
+}
+
+function appendFieldContent(existing, title, content) {
+  const clean = String(content || '').trim()
+  if (!clean) return String(existing || '').trim()
+  const labelled = title ? `From ${title}\n\n${clean}` : clean
+  const current = String(existing || '').trim()
+  if (!current) return labelled
+  if (current.includes(clean)) return current
+  return `${current}\n\n${labelled}`
 }
 
 function sourceDocumentsSection(sourceDoc) {
@@ -268,12 +277,20 @@ export class GrantIngestion {
     const alreadyAttached = existing.some((entry) => entry.scholarlib_doc_id === scholarlibDocId)
     const related_source_docs = alreadyAttached ? existing : [...existing, nextEntry]
     let body = page.body
-    if (!alreadyAttached && extractBody && isPdfDocument(document) && (relation === 'outcome_notice' || relation === 'reviewer_feedback')) {
-      const summary = await this._summarisePdf(document)
-      const heading = relation === 'reviewer_feedback'
-        ? `Reviewer Feedback (from ${document.filename || nextEntry.title})`
-        : `Outcome Notes (from ${document.filename || nextEntry.title})`
-      body = appendSection(body, 2, heading, summary)
+    const frontmatterPatch = {}
+    if (!alreadyAttached && extractBody && (relation === 'outcome_notice' || relation === 'reviewer_feedback')) {
+      const extracted = await this._extractRelatedDocumentText(document)
+      if (extracted) {
+        const sourceTitle = document.filename || nextEntry.title
+        if (relation === 'reviewer_feedback') {
+          const reviewerFeedback = appendFieldContent(page.frontmatter?.reviewer_feedback, sourceTitle, extracted)
+          frontmatterPatch.reviewer_feedback = reviewerFeedback
+          body = replaceOrAppendSection(body, 2, 'Reviewer Feedback', reviewerFeedback)
+        } else {
+          const outcomeNotes = appendFieldContent(sectionContent(body, 2, 'Outcome Notes'), sourceTitle, extracted)
+          body = replaceOrAppendSection(body, 2, 'Outcome Notes', outcomeNotes)
+        }
+      }
     }
     const now = new Date().toISOString()
     return this.pageStore.writePage(this.adapter, {
@@ -283,12 +300,37 @@ export class GrantIngestion {
       type: 'grant',
       frontmatter: {
         ...page.frontmatter,
+        ...frontmatterPatch,
         related_source_docs,
         human_edited: true,
         last_human_review: now,
         last_updated: now,
       },
       body,
+    }, page.storage?.revision)
+  }
+
+  async archiveGrantPage(grantPageId, {
+    archive_reason = 'mistake',
+    superseded_by = '',
+  } = {}) {
+    const page = await this.pageStore.readPage(this.adapter, grantPageId)
+    const now = new Date().toISOString()
+    return this.pageStore.writePage(this.adapter, {
+      ...page,
+      title: page.frontmatter?.title || grantPageId,
+      handle: page.frontmatter?.handle,
+      type: 'grant',
+      frontmatter: {
+        ...page.frontmatter,
+        archived: true,
+        archive_reason,
+        superseded_by: superseded_by || page.frontmatter?.superseded_by || undefined,
+        human_edited: true,
+        last_human_review: now,
+        last_updated: now,
+      },
+      body: page.body,
     }, page.storage?.revision)
   }
 
@@ -350,6 +392,25 @@ export class GrantIngestion {
     const summary = String(response || '').trim() || 'not extracted'
     await this._cacheGrantSummary({ pdf_text_hash, summary, document, route })
     return summary
+  }
+
+  async _extractRelatedDocumentText(document) {
+    if (document.ai_chat_source_file) {
+      try {
+        const blob = await this.adapter.downloadFile(document.ai_chat_source_file)
+        const text = await blob.text()
+        if (text.trim()) return text.trim()
+      } catch (error) {
+        console.warn('Failed to read related source markdown:', error)
+      }
+    }
+    if (isPdfDocument(document)) return this._summarisePdf(document)
+    if (isTextDocument(document) && document.box_path) {
+      const blob = await this.adapter.downloadFile(document.box_path)
+      const text = await blob.text()
+      return text.trim()
+    }
+    return ''
   }
 
   _fitContext(pages) {

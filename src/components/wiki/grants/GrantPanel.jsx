@@ -15,6 +15,7 @@ export default function GrantPanel({ adapter }) {
   const [grants, setGrants] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [activeOutcome, setActiveOutcome] = useState('pending')
+  const [showArchived, setShowArchived] = useState(false)
   const [ingestingDocId, setIngestingDocId] = useState(null)
   const documents = useLibraryStore((s) => s.documents)
   const folders = useLibraryStore((s) => s.folders)
@@ -102,18 +103,20 @@ export default function GrantPanel({ adapter }) {
 
   const counts = useMemo(() => {
     const next = Object.fromEntries(OUTCOMES.map((outcome) => [outcome, 0]))
-    for (const grant of grants) {
+    for (const grant of grants.filter((page) => showArchived || page.frontmatter?.archived !== true)) {
       const outcome = OUTCOMES.includes(grant.frontmatter?.outcome) ? grant.frontmatter.outcome : 'other'
       next[outcome] += 1
     }
     return next
-  }, [grants])
+  }, [grants, showArchived])
 
   const filtered = grants.filter((grant) => {
+    if (!showArchived && grant.frontmatter?.archived === true) return false
     const outcome = OUTCOMES.includes(grant.frontmatter?.outcome) ? grant.frontmatter.outcome : 'other'
     return outcome === activeOutcome
   })
-  const selected = grants.find(grant => grant.id === selectedId) || filtered[0] || grants[0]
+  const visibleGrants = grants.filter((grant) => showArchived || grant.frontmatter?.archived !== true)
+  const selected = filtered.find(grant => grant.id === selectedId) || filtered[0] || visibleGrants[0]
   const pendingGrantDocs = getUningestedGrantDocuments(documents, folders)
 
   const onSaved = async (page) => {
@@ -122,6 +125,14 @@ export default function GrantPanel({ adapter }) {
     setActiveOutcome(page.frontmatter?.outcome || 'pending')
     const refreshed = next.find((entry) => entry.id === page.id)
     showToast({ message: refreshed ? 'Grant page saved' : 'Grant page saved; refresh if it is not visible', type: 'success' })
+  }
+
+  const onArchived = async (page) => {
+    const next = await loadGrants()
+    const visible = next.filter((grant) => grant.frontmatter?.archived !== true)
+    setSelectedId(visible[0]?.id || null)
+    setShowArchived(false)
+    showToast({ message: `Archived '${page.frontmatter?.title || page.id}'`, type: 'success' })
   }
 
   return (
@@ -168,9 +179,17 @@ export default function GrantPanel({ adapter }) {
             {outcome} · {counts[outcome] || 0}
           </button>
         ))}
+        <label className={styles.archiveToggle}>
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(event) => setShowArchived(event.target.checked)}
+          />
+          Show archived
+        </label>
       </div>
 
-      {grants.length === 0 ? (
+      {visibleGrants.length === 0 ? (
         <div className={wikiStyles.empty}>No grant pages found.</div>
       ) : (
         <div className={styles.layout}>
@@ -183,7 +202,10 @@ export default function GrantPanel({ adapter }) {
                 onClick={() => setSelectedId(grant.id)}
               >
                 <strong>{grant.frontmatter?.title || grant.id}</strong>
-                <span className={styles.meta}>{grant.frontmatter?.funder || 'Unknown funder'} · {grant.frontmatter?.submitted || 'No year'}</span>
+                <span className={styles.meta}>
+                  {grant.frontmatter?.funder || 'Unknown funder'} · {grant.frontmatter?.submitted || 'No year'}
+                  {grant.frontmatter?.archived ? ' · archived' : ''}
+                </span>
               </button>
             ))}
             {filtered.length === 0 && <div className={wikiStyles.empty}>No grants in this outcome bucket.</div>}
@@ -194,6 +216,7 @@ export default function GrantPanel({ adapter }) {
             library={library}
             adapter={adapter}
             onSaved={onSaved}
+            onArchived={onArchived}
           />
         </div>
       )}
