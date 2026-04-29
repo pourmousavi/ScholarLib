@@ -2,10 +2,15 @@ import { useCallback } from 'react'
 import { useUIStore } from '../store/uiStore'
 import { useLibraryStore } from '../store/libraryStore'
 import { useStorageStore } from '../store/storageStore'
+import { useWikiIngestStore } from '../store/wikiIngestStore'
 import { PaperExtractor, ProposalBuilder, WikiService, findPaperBySourceDocId } from '../services/wiki'
 import { GrantIngestion } from '../services/wiki/grants/GrantIngestion'
 import { isGrantDocument } from '../services/wiki/grants/GrantLibraryClassifier'
 import { useToast } from './useToast'
+
+function docDisplayName(doc) {
+  return doc?.metadata?.title || doc?.title || doc?.name || doc?.id || 'document'
+}
 
 /**
  * Centralised wiki ingestion entry points used by both the MainPanel
@@ -45,7 +50,9 @@ export function useWikiIngestion() {
   const ingestPaper = useCallback(async (doc) => {
     const docId = doc?.id
     if (!docId || !adapter || isDemoMode) return
+    const progress = useWikiIngestStore.getState()
     setWikiIngesting(true)
+    progress.startIngest({ mode: 'paper', docId, docName: docDisplayName(doc) })
     try {
       const state = useLibraryStore.getState()
       const library = {
@@ -70,6 +77,7 @@ export function useWikiIngestion() {
         )
         if (!ok) {
           showToast({ message: `Already ingested as "${existingTitle}". Re-ingest cancelled.`, type: 'info' })
+          useWikiIngestStore.getState().completeIngest()
           return
         }
         supersedeOldPaperId = existing.id
@@ -79,7 +87,9 @@ export function useWikiIngestion() {
         ...library,
         documents: { ...library.documents, [docId]: doc },
       }
+      useWikiIngestStore.getState().setStage('extracting')
       const extraction = await new PaperExtractor().extractPaper(docId, updatedLibrary, adapter)
+      useWikiIngestStore.getState().setStage('building')
       const proposalId = await new ProposalBuilder({ adapter }).buildProposal(
         extraction,
         updatedLibrary,
@@ -92,9 +102,11 @@ export function useWikiIngestion() {
         type: 'success',
       })
       setActivePanel('wiki')
+      useWikiIngestStore.getState().completeIngest()
     } catch (error) {
       console.error('Wiki ingestion failed:', error)
       showToast({ message: error.message || 'Wiki ingestion failed', type: 'error' })
+      useWikiIngestStore.getState().failIngest(error)
     } finally {
       setWikiIngesting(false)
     }
@@ -104,7 +116,18 @@ export function useWikiIngestion() {
     const docId = doc?.id
     if (!docId || !doc || !adapter || isDemoMode) return
     setWikiIngesting(true)
+    if (!confirmDuplicate) {
+      useWikiIngestStore.getState().startIngest({
+        mode: 'grant',
+        docId,
+        docName: docDisplayName(doc),
+      })
+    } else {
+      useWikiIngestStore.getState().setStage('preparing')
+    }
+    let handledDuplicatePrompt = false
     try {
+      useWikiIngestStore.getState().setStage('extracting')
       const result = await new GrantIngestion({ adapter }).ingestDocument({
         ...doc,
         id: docId,
@@ -116,6 +139,7 @@ export function useWikiIngestion() {
       }, { confirmDuplicate })
       const page = result.page
 
+      useWikiIngestStore.getState().setStage('writing')
       updateDocument(docId, {
         reference_type: 'grant',
         user_data: {
@@ -139,19 +163,23 @@ export function useWikiIngestion() {
       setWikiSelectedGrantPageId(page.id)
       setWikiWorkspaceTab('grants')
       setActivePanel('wiki')
+      useWikiIngestStore.getState().completeIngest()
     } catch (error) {
       if (error?.code === 'GRANT_POSSIBLE_DUPLICATE') {
         const ok = window.confirm(error.message)
         if (ok) {
+          handledDuplicatePrompt = true
           setWikiIngesting(false)
           return ingestGrant(doc, { confirmDuplicate: true })
         }
+        useWikiIngestStore.getState().completeIngest()
       } else {
         console.error('Grant ingestion failed:', error)
         showToast({ message: error.message || 'Grant ingestion failed', type: 'error' })
+        useWikiIngestStore.getState().failIngest(error)
       }
     } finally {
-      setWikiIngesting(false)
+      if (!handledDuplicatePrompt) setWikiIngesting(false)
     }
   }, [
     adapter,

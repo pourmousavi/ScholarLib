@@ -9,6 +9,7 @@ import { collectionService } from '../../services/tags/CollectionService'
 import { useToast } from '../../hooks/useToast'
 import DocCard from './DocCard'
 import IndexingBar from './IndexingBar'
+import WikiIngestionBar from './WikiIngestionBar'
 import ActiveFilters from './ActiveFilters'
 import BulkActionsBar from './BulkActionsBar'
 import UploadZone from '../metadata/UploadZone'
@@ -450,6 +451,7 @@ export default function DocList({ isMobile = false }) {
         pendingDocs={getPendingDocs()}
         onIndexAll={handleIndexAll}
       />
+      <WikiIngestionBar />
     </div>
   )
 }
