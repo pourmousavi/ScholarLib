@@ -19,6 +19,114 @@ function isIdLink(target) {
   return /^(c|m|d|pe|p|g|q|po|a)_[0-9A-HJKMNP-TV-Z]{10,}$/i.test(target)
 }
 
+/**
+ * Render a string for inclusion in a YAML scalar inside a fenced block.
+ * Quotes anything that contains characters YAML treats specially or that
+ * could break the surrounding ```fence.
+ */
+function yamlScalar(value) {
+  const s = String(value ?? '')
+  if (!s) return '""'
+  if (s.includes('\n') || /[:#\[\]{}|>"'\\&*!%@`]/.test(s) || /^[\s-]/.test(s)) return JSON.stringify(s)
+  return s
+}
+
+function buildClaimBlock(claim) {
+  const claimId = typeof claim.id === 'string' && claim.id.startsWith('cl_') ? claim.id : `cl_${ulid()}`
+  const lines = [
+    '```scholarlib-claim',
+    `id: ${claimId}`,
+    `claim_text: ${yamlScalar(claim.claim_text)}`,
+    `confidence: ${claim.confidence || 'medium'}`,
+    `verifier_status: ${claim.verifier_status || 'unverified'}`,
+  ]
+  if (Array.isArray(claim.supported_by) && claim.supported_by.length) {
+    lines.push('supported_by:')
+    for (const ev of claim.supported_by) {
+      lines.push(`  - pdf_page: ${Number.isFinite(ev.pdf_page) ? ev.pdf_page : 0}`)
+      lines.push(`    char_start: ${Number.isFinite(ev.char_start) ? ev.char_start : 0}`)
+      lines.push(`    char_end: ${Number.isFinite(ev.char_end) ? ev.char_end : 0}`)
+      if (ev.page_text_hash) lines.push(`    page_text_hash: ${yamlScalar(ev.page_text_hash)}`)
+      if (ev.quote_snippet) lines.push(`    quote_snippet: ${yamlScalar(ev.quote_snippet)}`)
+    }
+  }
+  if (Array.isArray(claim.contradicted_by) && claim.contradicted_by.length) {
+    lines.push(`contradicted_by: ${JSON.stringify(claim.contradicted_by)}`)
+  }
+  if (claim.contested) lines.push('contested: true')
+  lines.push('```')
+  return lines.join('\n')
+}
+
+function buildQuestionBlock(question) {
+  const text = typeof question === 'string'
+    ? question
+    : (question.candidate_question || question.question || question.text || '')
+  if (!String(text).trim()) return ''
+  const id = typeof question === 'object' && question.id?.startsWith('qc_') ? question.id : `qc_${ulid()}`
+  return ['```scholarlib-question-candidate', `id: ${id}`, `candidate_question: ${yamlScalar(text)}`, '```'].join('\n')
+}
+
+function buildBulletedSection(title, items) {
+  const filtered = (items || [])
+    .map((item) => (typeof item === 'string' ? item : item?.name || item?.title || item?.label || ''))
+    .map((s) => String(s).trim())
+    .filter(Boolean)
+  if (filtered.length === 0) return ''
+  return [`## ${title}`, '', ...filtered.map((s) => `- ${s}`)].join('\n')
+}
+
+/**
+ * Compose the full canonical paper-page body from the model's prose summary
+ * plus the structured arrays. The previous implementation stored only
+ * `extraction.draft_body` in the page, dropping every claim block, methods
+ * list, datasets list, concepts list, and open question — exactly the
+ * information that makes a paper page useful later.
+ *
+ * Output shape (per design §6.2):
+ *   <prose summary>
+ *
+ *   ## Claims
+ *   ```scholarlib-claim ... ```
+ *   ```scholarlib-claim ... ```
+ *
+ *   ## Methods used
+ *   - ...
+ *
+ *   ## Datasets used
+ *   - ...
+ *
+ *   ## Concepts touched
+ *   - ...
+ *
+ *   ## Open questions
+ *   ```scholarlib-question-candidate ... ```
+ *
+ * Unsupported claims are NOT included — they live in the proposal as
+ * `canonical_action: do_not_apply` for review only, never in the canonical
+ * page body (per [A-11]).
+ */
+function composePaperBody({ draftBody, claims = [], methods = [], datasets = [], concepts = [], openQuestions = [] }) {
+  const sections = []
+  const prose = String(draftBody || '').trim()
+  if (prose) sections.push(prose)
+  if (claims.length) {
+    const blocks = ['## Claims', '', ...claims.map(buildClaimBlock)]
+    sections.push(blocks.join('\n'))
+  }
+  const methodsSection = buildBulletedSection('Methods used', methods)
+  if (methodsSection) sections.push(methodsSection)
+  const datasetsSection = buildBulletedSection('Datasets used', datasets)
+  if (datasetsSection) sections.push(datasetsSection)
+  const conceptsSection = buildBulletedSection('Concepts touched', concepts)
+  if (conceptsSection) sections.push(conceptsSection)
+  if (openQuestions.length) {
+    const blocks = ['## Open questions', '', ...openQuestions.map(buildQuestionBlock).filter(Boolean)]
+    if (blocks.length > 2) sections.push(blocks.join('\n'))
+  }
+  return sections.join('\n\n').trim() + '\n'
+}
+
 export class ProposalBuilder {
   constructor({ adapter, verifier, riskTierer } = {}) {
     this.adapter = adapter
@@ -71,6 +179,15 @@ export class ProposalBuilder {
       ...extraction.draft_frontmatter,
     }
 
+    const composedBody = composePaperBody({
+      draftBody: extraction.draft_body,
+      claims,
+      methods: extraction.methods_used,
+      datasets: extraction.datasets_used,
+      concepts: extraction.concepts_touched,
+      openQuestions: extraction.open_question_candidates,
+    })
+
     const paperChange = {
       change_id: `ch_${ulid()}`,
       operation: existingIds.has(paperId) ? 'modify' : 'create',
@@ -80,11 +197,11 @@ export class ProposalBuilder {
       expected_base_hash: null,
       expected_base_revision: null,
       draft_frontmatter: draftFrontmatter,
-      draft_body: extraction.draft_body,
+      draft_body: composedBody,
       diff_summary: `Created paper page with ${claims.length} claim${claims.length === 1 ? '' : 's'}`,
       claims_added: claims,
       claims_added_unsupported: unsupported,
-      wikilinks_to: wikilinks(extraction.draft_body),
+      wikilinks_to: wikilinks(composedBody),
       is_creation: !existingIds.has(paperId),
       is_deletion: false,
     }

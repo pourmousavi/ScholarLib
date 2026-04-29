@@ -217,6 +217,58 @@ describe('wiki Phase 0B services', () => {
       .rejects.toThrow('Unresolved alias-style wikilink')
   })
 
+  it('composes the page body with claim blocks, methods, datasets, concepts, and open questions', async () => {
+    const adapter = new MemoryAdapter()
+    await WikiService.initialize(adapter)
+    const richExtraction = {
+      ...extraction,
+      methods_used: ['model predictive control', 'machine learning'],
+      datasets_used: ['ARENA AEMO 2023'],
+      concepts_touched: ['battery aging', 'state of health'],
+      open_question_candidates: [{ candidate_question: 'Does cycling rate dominate calendar aging at high temperatures?' }],
+      claims: [
+        {
+          claim_text: 'Calendar aging accelerates above 35°C.',
+          confidence: 'high',
+          supported_by: [{ pdf_page: 4, char_start: 120, char_end: 240, page_text_hash: 'sha256:abc' }],
+        },
+      ],
+    }
+    const builder = new ProposalBuilder({
+      adapter,
+      verifier: { verifyClaim: vi.fn().mockResolvedValue({ status: 'supported', verifier_model: 'mock', justification: 'ok' }) },
+    })
+    const proposal = await new ProposalStore(adapter).read(await builder.buildProposal(richExtraction, library))
+    const body = proposal.page_changes[0].draft_body
+    expect(body).toContain('## Claims')
+    expect(body).toContain('```scholarlib-claim')
+    expect(body).toContain('claim_text: Calendar aging accelerates above 35°C.')
+    expect(body).toContain('verifier_status: supported')
+    expect(body).toContain('## Methods used')
+    expect(body).toContain('- model predictive control')
+    expect(body).toContain('## Datasets used')
+    expect(body).toContain('- ARENA AEMO 2023')
+    expect(body).toContain('## Concepts touched')
+    expect(body).toContain('- battery aging')
+    expect(body).toContain('## Open questions')
+    expect(body).toContain('```scholarlib-question-candidate')
+  })
+
+  it('omits structured sections that have no entries (clean body for sparse extractions)', async () => {
+    const adapter = new MemoryAdapter()
+    await WikiService.initialize(adapter)
+    const minimal = { ...extraction, methods_used: [], datasets_used: [], concepts_touched: [], open_question_candidates: [], claims: [] }
+    const builder = new ProposalBuilder({ adapter })
+    const proposal = await new ProposalStore(adapter).read(await builder.buildProposal(minimal, library))
+    const body = proposal.page_changes[0].draft_body
+    expect(body).not.toContain('## Claims')
+    expect(body).not.toContain('## Methods used')
+    expect(body).not.toContain('## Datasets used')
+    expect(body).not.toContain('## Concepts touched')
+    expect(body).not.toContain('## Open questions')
+    expect(body.trim()).toBe('Summary with no links.')
+  })
+
   it('preserves unsupported claims outside canonical applied claims', async () => {
     const adapter = new MemoryAdapter()
     await WikiService.initialize(adapter)
