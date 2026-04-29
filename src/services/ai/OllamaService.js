@@ -4,8 +4,14 @@
  * Requires Ollama running locally: ollama serve
  * Default endpoint: http://localhost:11434
  *
- * IMPORTANT: Ollama must be started with CORS enabled:
- *   OLLAMA_ORIGINS="*" ollama serve
+ * IMPORTANT: Ollama must be started with CORS enabled.
+ *
+ * One-time fix on macOS (persists across reboots):
+ *   bash scripts/setup-ollama-mac.sh
+ *
+ * Manual one-shot for the current login session:
+ *   launchctl setenv OLLAMA_ORIGINS "https://alipourmousavi.com"
+ *   then quit Ollama from the menu bar and reopen it.
  */
 class OllamaService {
   constructor() {
@@ -70,7 +76,7 @@ class OllamaService {
           this.lastError = 'Connection timeout - Ollama may not be running'
         } else if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
           // This usually means CORS blocked or network error
-          this.lastError = 'Cannot reach Ollama - check CORS settings'
+          this.lastError = 'Cannot reach Ollama (CORS or not running). On macOS, run `bash scripts/setup-ollama-mac.sh` once to fix this permanently across reboots. If Ollama is not running, start it from the menu bar.'
         } else if (err.message?.includes('NetworkError')) {
           this.lastError = 'Network error - is Ollama running?'
         } else {
@@ -198,7 +204,18 @@ class OllamaService {
     } catch (err) {
       if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
         const origin = typeof window !== 'undefined' ? window.location.origin : 'this app origin'
-        const message = `Cannot reach Ollama from ${origin}. Start Ollama with CORS enabled, for example: OLLAMA_ORIGINS="${origin}" ollama serve`
+        const message = [
+          `Cannot reach Ollama from ${origin}. This is a CORS or network problem.`,
+          ``,
+          `One-time fix on macOS (persists across reboots):`,
+          `  bash scripts/setup-ollama-mac.sh`,
+          ``,
+          `Quick fix for the current login session only:`,
+          `  launchctl setenv OLLAMA_ORIGINS "${origin}"`,
+          `  then fully quit Ollama from the menu bar and reopen it.`,
+          ``,
+          `If Ollama is not running, start it from the menu bar or run \`ollama serve\` in a terminal.`,
+        ].join('\n')
         this.lastError = message
         throw { code: 'OLLAMA_CORS_OR_NETWORK', message }
       }

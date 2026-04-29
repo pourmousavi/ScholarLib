@@ -90,10 +90,55 @@ Before the wiki can do anything useful:
 
 1. **Connect storage** (Box or Dropbox) via Settings → Storage. The wiki will refuse to operate in demo mode.
 2. **Configure at least one model provider.** The wiki defaults to Ollama for non-sensitive tasks; without it, you must enable a cloud provider in Settings (Claude, OpenAI, or Gemini). Sensitive content (grant pages) is Ollama-only by policy and is **never** sent to a cloud provider.
-3. **Optional but recommended:** install [Ollama](https://ollama.com) locally and pull a synthesis-grade model (e.g. `llama3.3:70b` or `qwen2.5:32b`) and an embedding model (`nomic-embed-text`). With local models, routine paper ingestion costs $0; verifier passes on high-impact claims fall back to a small cloud model.
+3. **Optional but recommended:** install [Ollama](https://ollama.com) locally and pull a synthesis-grade model (e.g. `llama3.3:70b` or `qwen2.5:32b`) and an embedding model (`nomic-embed-text`). With local models, routine paper ingestion costs $0; verifier passes on high-impact claims fall back to a small cloud model. **One-time CORS setup:** see §4.1 below — without it, the browser blocks the app from talking to Ollama and ingestion will fail with a CORS error.
 4. **Decide on themes.** Before bootstrapping (see §8), have a list of 5–8 research themes you want the wiki to cover. The wiki does not auto-cluster — themes are user-defined.
 
 The wiki creates `_wiki/` lazily on first ingestion. Nothing to scaffold.
+
+### 4.1 Ollama CORS — one-time setup on macOS
+
+If you have ever seen this error during paper or grant ingestion:
+
+```
+Access to fetch at 'http://localhost:11434/api/tags' from origin
+'https://alipourmousavi.com' has been blocked by CORS policy
+```
+
+it means Ollama is not whitelisting the app origin. Ollama only accepts cross-origin requests from origins listed in the `OLLAMA_ORIGINS` environment variable, and that variable is **not set by default**.
+
+**Fix it once and for all** by running the included setup script from the repository root:
+
+```bash
+bash scripts/setup-ollama-mac.sh
+```
+
+What the script does:
+
+- Writes a LaunchAgent at `~/Library/LaunchAgents/com.scholarlib.ollama-cors.plist` that re-applies `OLLAMA_ORIGINS` at every login. This is what `launchctl setenv` alone does **not** do — `setenv` is session-scoped, which is why the manual hack stops working after a reboot.
+- Sets the env var in the current launchd session immediately, so you do not have to log out and back in.
+- Restarts the Ollama menu-bar app so the running process sees the new env var.
+
+**Verify** with:
+
+```bash
+launchctl getenv OLLAMA_ORIGINS
+```
+
+You should see `https://alipourmousavi.com,http://localhost:5173,...`. If you do, hard-refresh the app (⌘⇧R) and ingestion will work. If the variable is set but the CORS error still appears, fully quit Ollama from the menu bar (Quit, not just close the menu) and reopen it.
+
+The script is idempotent — re-running it just refreshes the LaunchAgent.
+
+**Rollback** (if you ever want to remove this):
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.scholarlib.ollama-cors.plist
+rm ~/Library/LaunchAgents/com.scholarlib.ollama-cors.plist
+launchctl unsetenv OLLAMA_ORIGINS
+```
+
+**On Linux:** add `export OLLAMA_ORIGINS="https://alipourmousavi.com"` to your shell profile (`~/.bashrc`, `~/.zshrc`) and restart `ollama serve`.
+
+**On Windows:** set `OLLAMA_ORIGINS` via System Properties → Environment Variables, then restart the Ollama service.
 
 ---
 
