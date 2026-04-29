@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useUIStore } from '../../store/uiStore'
 import { useStorageStore } from '../../store/storageStore'
 import { ObsidianExporter } from '../../services/wiki'
 import Inbox from './Inbox'
@@ -22,6 +23,12 @@ export default function WikiWorkspace() {
   const [exportStatus, setExportStatus] = useState(null)
   const [isExporting, setIsExporting] = useState(false)
   const adapter = useStorageStore((s) => s.adapter)
+  const previousPanel = useUIStore((s) => s.previousPanel)
+  const setActivePanel = useUIStore((s) => s.setActivePanel)
+
+  const closeWorkspace = () => {
+    setActivePanel(previousPanel && previousPanel !== 'wiki' ? previousPanel : 'pdf')
+  }
 
   const runExport = async () => {
     if (!adapter || isExporting) return
@@ -40,16 +47,27 @@ export default function WikiWorkspace() {
   return (
     <div className={styles.workspace}>
       <div className={styles.workspaceNav}>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`${styles.workspaceTab} ${activeTab === tab.id ? styles.active : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <div className={styles.workspaceTabs}>
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`${styles.workspaceTab} ${activeTab === tab.id ? styles.active : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className={styles.workspaceClose}
+          onClick={closeWorkspace}
+          title="Close Wiki"
+          aria-label="Close Wiki"
+        >
+          ×
+        </button>
       </div>
       <div className={styles.workspaceBody}>
         {activeTab === 'inbox' && <Inbox />}

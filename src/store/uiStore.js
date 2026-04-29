@@ -80,6 +80,7 @@ const initialPdfViewer = getInitialPdfViewer()
 
 export const useUIStore = create((set) => ({
   activePanel: 'pdf',
+  previousPanel: null,
   showModal: null,
   sidebarCollapsed: false,
   docListCollapsed: false,
@@ -109,7 +110,10 @@ export const useUIStore = create((set) => ({
   // PDF viewer selection (pdfjs or embedpdf)
   pdfViewer: initialPdfViewer,
 
-  setActivePanel: (panel) => set({ activePanel: panel }),
+  setActivePanel: (panel) => set((state) => ({
+    activePanel: panel,
+    previousPanel: panel === state.activePanel ? state.previousPanel : state.activePanel,
+  })),
   setShowModal: (modal) => set({ showModal: modal }),
 
   // Citation export actions

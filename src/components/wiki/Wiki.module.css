@@ -18,11 +18,19 @@
 
 .workspaceNav {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-1);
   padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
-  overflow-x: auto;
   flex-shrink: 0;
+}
+
+.workspaceTabs {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  min-width: 0;
 }
 
 .workspaceTab {
@@ -34,6 +42,25 @@
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.workspaceClose {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.workspaceClose:hover {
+  border-color: var(--accent-border);
+  color: var(--accent);
+  background: var(--bg-hover);
 }
 
 .workspaceTab:hover {
