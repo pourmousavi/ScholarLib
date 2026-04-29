@@ -8,6 +8,8 @@ import { needsEnrichment } from '../../utils/enrichment'
 import { enrichFromDOI } from '../../services/metadata/EnrichmentService'
 import { settingsService } from '../../services/settings/SettingsService'
 import { PaperExtractor, ProposalBuilder, WikiService } from '../../services/wiki'
+import { GrantIngestion } from '../../services/wiki/grants/GrantIngestion'
+import { isGrantDocument } from '../../services/wiki/grants/GrantLibraryClassifier'
 import ViewerSwitch from '../viewer/ViewerSwitch'
 import SplitViewPanel from './SplitViewPanel'
 import { NotesPanel } from '../notes'
@@ -24,6 +26,7 @@ export default function MainPanel({ isMobile = false }) {
   const activePanel = useUIStore((s) => s.activePanel)
   const setActivePanel = useUIStore((s) => s.setActivePanel)
   const setShowModal = useUIStore((s) => s.setShowModal)
+  const setWikiWorkspaceTab = useUIStore((s) => s.setWikiWorkspaceTab)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const toggleDocList = useUIStore((s) => s.toggleDocList)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
@@ -34,6 +37,7 @@ export default function MainPanel({ isMobile = false }) {
   const selectedDocId = useLibraryStore((s) => s.selectedDocId)
   const selectedFolderId = useLibraryStore((s) => s.selectedFolderId)
   const documents = useLibraryStore((s) => s.documents)
+  const folders = useLibraryStore((s) => s.folders)
   const updateDocument = useLibraryStore((s) => s.updateDocument)
   const selectedDoc = selectedDocId ? documents[selectedDocId] : null
 
@@ -47,6 +51,7 @@ export default function MainPanel({ isMobile = false }) {
   // News articles with .md source don't need a PDF
   const isNewsWithContent = selectedDoc?.reference_type === 'news_article' && selectedDoc?.ai_chat_source_file
   const noPdfAttached = selectedDoc && !selectedDoc.box_path && !isNewsWithContent
+  const selectedDocIsGrant = isGrantDocument(selectedDoc, folders)
 
   const handleAttachPdf = useCallback(() => {
     if (isDemoMode || !adapter) return
@@ -241,6 +246,45 @@ export default function MainPanel({ isMobile = false }) {
     }
   }
 
+  const handleIngestWikiGrant = async () => {
+    if (!selectedDocId || !selectedDoc || !adapter || isDemoMode || isWikiIngesting) return
+    setIsWikiIngesting(true)
+    try {
+      const page = await new GrantIngestion({ adapter }).ingestDocument({
+        ...selectedDoc,
+        id: selectedDocId,
+        reference_type: 'grant',
+        user_data: {
+          ...selectedDoc.user_data,
+          wiki_type: 'grant'
+        }
+      })
+
+      updateDocument(selectedDocId, {
+        reference_type: 'grant',
+        user_data: {
+          ...selectedDoc.user_data,
+          wiki_type: 'grant'
+        },
+        wiki: {
+          ...selectedDoc.wiki,
+          grant_page_id: page.id,
+          grant_page_path: page.path,
+          grant_ingested_at: new Date().toISOString()
+        }
+      })
+      await useLibraryStore.getState().saveLibrary(adapter)
+      showToast({ message: `Grant wiki page created: ${page.frontmatter.title}`, type: 'success' })
+      setWikiWorkspaceTab('grants')
+      setActivePanel('wiki')
+    } catch (error) {
+      console.error('Grant ingestion failed:', error)
+      showToast({ message: error.message || 'Grant ingestion failed', type: 'error' })
+    } finally {
+      setIsWikiIngesting(false)
+    }
+  }
+
   return (
     <div className={styles.panel}>
       {activePanel === 'wiki' ? (
@@ -300,12 +344,14 @@ export default function MainPanel({ isMobile = false }) {
           {settingsService.getWikiEnabled() && selectedDoc && (
             <button
               className={styles.shareBtn}
-              onClick={handleIngestWikiPaper}
-              disabled={!selectedDoc?.box_path || isWikiIngesting}
-              title="Ingest this paper into Wiki"
+              onClick={selectedDocIsGrant ? handleIngestWikiGrant : handleIngestWikiPaper}
+              disabled={(!selectedDocIsGrant && !selectedDoc?.box_path) || isWikiIngesting}
+              title={selectedDocIsGrant ? 'Ingest this grant into private Wiki' : 'Ingest this paper into Wiki'}
             >
               {isWikiIngesting ? (
                 <span style={{ fontSize: 11 }}>...</span>
+              ) : selectedDocIsGrant ? (
+                <span style={{ fontSize: 10, fontWeight: 700 }}>G</span>
               ) : (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5z"/>

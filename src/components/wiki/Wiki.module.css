@@ -130,6 +130,29 @@
   text-align: left;
 }
 
+.queueItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+}
+
+.queueItem strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.queueItem p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
 .primaryBtn,
 .secondaryBtn {
   padding: var(--space-2) var(--space-3);

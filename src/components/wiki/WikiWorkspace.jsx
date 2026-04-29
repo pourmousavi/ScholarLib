@@ -19,12 +19,13 @@ const TABS = [
 ]
 
 export default function WikiWorkspace() {
-  const [activeTab, setActiveTab] = useState('inbox')
   const [exportStatus, setExportStatus] = useState(null)
   const [isExporting, setIsExporting] = useState(false)
   const adapter = useStorageStore((s) => s.adapter)
   const previousPanel = useUIStore((s) => s.previousPanel)
   const setActivePanel = useUIStore((s) => s.setActivePanel)
+  const activeTab = useUIStore((s) => s.wikiWorkspaceTab)
+  const setActiveTab = useUIStore((s) => s.setWikiWorkspaceTab)
 
   const closeWorkspace = () => {
     setActivePanel(previousPanel && previousPanel !== 'wiki' ? previousPanel : 'pdf')

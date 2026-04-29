@@ -5,7 +5,8 @@ import { useUIStore } from '../../store/uiStore'
 import { useIndexStore } from '../../store/indexStore'
 import { useToast } from '../../hooks/useToast'
 import { indexService } from '../../services/indexing/IndexService'
-import { ContextMenu, ShareIcon, LinkIcon, UsersIcon, RenameIcon, UnshareIcon, FolderMinusIcon, ExportIcon, RefreshIcon } from '../ui'
+import { isGrantFolder } from '../../services/wiki/grants/GrantLibraryClassifier'
+import { ContextMenu, ShareIcon, LinkIcon, UsersIcon, RenameIcon, UnshareIcon, FolderMinusIcon, ExportIcon, RefreshIcon, FolderIcon } from '../ui'
 import styles from './FolderTree.module.css'
 
 export default function FolderTree() {
@@ -310,6 +311,25 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
   // Check if folder is shared with anyone
   const isShared = folder.shared_with && folder.shared_with.length > 0
   const canDelete = docCount === 0 && !hasChildren
+  const grantFolder = isGrantFolder(folder)
+
+  const handleToggleGrantFolder = async () => {
+    handleCloseContextMenu()
+    try {
+      updateFolder(folder.id, {
+        kind: grantFolder ? undefined : 'grant',
+        wiki_type: grantFolder ? undefined : 'grant'
+      })
+      await saveLibrary()
+      showToast({
+        message: grantFolder ? 'Folder unmarked as grants' : 'Folder marked as grants',
+        type: 'success'
+      })
+    } catch (error) {
+      console.error('Failed to update grant folder marker:', error)
+      showToast({ message: 'Failed to update folder', type: 'error' })
+    }
+  }
 
   const contextMenuItems = [
     {
@@ -333,6 +353,11 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
       icon: <RefreshIcon />,
       onClick: handleReindexFolder,
       disabled: docCount === 0 || isIndexing || isDemoMode
+    },
+    {
+      label: grantFolder ? 'Unmark as grant folder' : 'Mark as grant folder',
+      icon: <FolderIcon />,
+      onClick: handleToggleGrantFolder
     },
     // Only show "View who has access" if folder is shared
     ...(isShared ? [{
@@ -403,6 +428,9 @@ const FolderNode = memo(function FolderNode({ folder, depth }) {
             ▸
           </button>
           <span className={styles.name}>{folder.name}</span>
+          {grantFolder && (
+            <span className={styles.grantBadge} title="Grant folder">Grant</span>
+          )}
           {showDocCounts && (
             <span className={styles.count} aria-label={`${docCount} documents`}>{docCount}</span>
           )}

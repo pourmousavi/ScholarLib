@@ -6,6 +6,7 @@ import { ObsidianFormatter } from '../export/ObsidianFormatter'
 import { ObsidianExporter } from '../export/ObsidianExporter'
 import { GrantIngestion } from '../grants/GrantIngestion'
 import { GrantNamespacePolicy } from '../grants/GrantNamespacePolicy'
+import { getUningestedGrantDocuments, isGrantDocument } from '../grants/GrantLibraryClassifier'
 import { QuestionClusterer } from '../questions/QuestionClusterer'
 import { QuestionPromoter } from '../questions/QuestionPromoter'
 import { LintService } from '../lint/LintService'
@@ -69,6 +70,39 @@ describe('Phase 6+ post-trust extensions', () => {
     })
     expect(page.path).toContain('_wiki/_private/grant')
     expect(page.frontmatter).toMatchObject({ sensitivity: 'confidential', scope: 'private', share_review_status: 'blocked_sensitive' })
+  })
+
+  it('classifies grant folders and ingests grant documents with source metadata', async () => {
+    const adapter = new MemoryAdapter()
+    await adapter.uploadFile('sources/grant.md', new Blob(['A confidential proposal summary.']))
+    const folders = [
+      { id: 'f_root', parent_id: null, name: 'Research' },
+      { id: 'f_grants', parent_id: 'f_root', name: 'Grants', kind: 'grant' },
+      { id: 'f_child', parent_id: 'f_grants', name: 'ARC' },
+    ]
+    const document = {
+      id: 'd_grant',
+      folder_id: 'f_child',
+      filename: 'arc-proposal.pdf',
+      box_path: 'PDFs/arc-proposal.pdf',
+      ai_chat_source_file: 'sources/grant.md',
+      metadata: { title: 'ARC Discovery Proposal', funder: 'ARC', program: 'Discovery' },
+      user_data: { tags: ['bess'] },
+    }
+
+    expect(isGrantDocument(document, folders)).toBe(true)
+    expect(getUningestedGrantDocuments({ d_grant: document }, folders)).toHaveLength(1)
+
+    const page = await new GrantIngestion({ adapter }).ingestDocument(document)
+    expect(page.path).toContain('_wiki/_private/grant')
+    expect(page.frontmatter).toMatchObject({
+      type: 'grant',
+      title: 'ARC Discovery Proposal',
+      funder: 'ARC',
+      source_doc_id: 'd_grant',
+      source_box_path: 'PDFs/arc-proposal.pdf',
+    })
+    expect(page.body).toContain('A confidential proposal summary.')
   })
 
   it('lint flags grant-derived prose on public pages', async () => {

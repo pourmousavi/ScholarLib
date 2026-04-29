@@ -174,3 +174,15 @@
   color: var(--text-faint);
   flex-shrink: 0;
 }
+
+.grantBadge {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  color: var(--warning);
+  background: var(--warning-bg);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.4;
+}
