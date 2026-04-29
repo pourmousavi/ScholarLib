@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { MemoryAdapter } from '../../storage/MemoryAdapter'
 import { PaperExtractor } from '../extraction/PaperExtractor'
 import { RiskTierer } from '../RiskTierer'
-import { ProposalBuilder } from '../proposals/ProposalBuilder'
+import { ProposalBuilder, findPaperBySourceDocId } from '../proposals/ProposalBuilder'
 import { ProposalApplier } from '../proposals/ProposalApplier'
 import { ProposalStore } from '../proposals/ProposalStore'
 import { PositionDraftService } from '../positions/PositionDraftService'
@@ -267,6 +267,70 @@ describe('wiki Phase 0B services', () => {
     expect(body).not.toContain('## Concepts touched')
     expect(body).not.toContain('## Open questions')
     expect(body.trim()).toBe('Summary with no links.')
+  })
+
+  it('finds an existing paper page by scholarlib_doc_id once sidecars are regenerated', async () => {
+    const adapter = new MemoryAdapter()
+    await WikiService.initialize(adapter)
+    const builder = new ProposalBuilder({
+      adapter,
+      verifier: { verifyClaim: vi.fn().mockResolvedValue({ status: 'supported', verifier_model: 'mock', justification: 'ok' }) },
+    })
+    const proposalId = await builder.buildProposal(extraction, library)
+    await new ProposalApplier({ adapter }).applyProposal(proposalId, { mode: 'all' })
+    const found = await findPaperBySourceDocId(adapter, 'd1')
+    expect(found).toBeTruthy()
+    expect(found.scholarlib_doc_id).toBe('d1')
+    expect(found.id.startsWith('p_')).toBe(true)
+    expect(await findPaperBySourceDocId(adapter, 'unknown-doc')).toBeNull()
+  })
+
+  it('supersedes the old paper page when re-ingesting the same source document', async () => {
+    const adapter = new MemoryAdapter()
+    await WikiService.initialize(adapter)
+    const builder = new ProposalBuilder({
+      adapter,
+      verifier: { verifyClaim: vi.fn().mockResolvedValue({ status: 'supported', verifier_model: 'mock', justification: 'ok' }) },
+    })
+
+    // First ingestion
+    const firstProposalId = await builder.buildProposal(extraction, library)
+    await new ProposalApplier({ adapter }).applyProposal(firstProposalId, { mode: 'all' })
+    const firstPaper = await findPaperBySourceDocId(adapter, 'd1')
+    expect(firstPaper).toBeTruthy()
+    const oldPageId = firstPaper.id
+
+    // Second ingestion with supersedeOldPaperId — proposal should include
+    // an archive modify change for the original page.
+    const secondProposalId = await builder.buildProposal(
+      { ...extraction, draft_body: 'Refreshed summary.' },
+      library,
+      { supersedeOldPaperId: oldPageId }
+    )
+    const proposal = await new ProposalStore(adapter).read(secondProposalId)
+    expect(proposal.page_changes).toHaveLength(2)
+    const archiveChange = proposal.page_changes.find((change) => change.page_id === oldPageId)
+    expect(archiveChange).toBeTruthy()
+    expect(archiveChange.operation).toBe('modify')
+    expect(archiveChange.draft_frontmatter.archived).toBe(true)
+    expect(archiveChange.draft_frontmatter.archive_reason).toBe('superseded')
+    expect(archiveChange.draft_frontmatter.superseded_by).toMatch(/^p_/)
+    expect(archiveChange.risk_tier).toBe('low')
+
+    // Apply — old page must come back archived; new page is canonical.
+    await new ProposalApplier({ adapter }).applyProposal(secondProposalId, { mode: 'all' })
+    const { PageStore } = await import('../PageStore')
+    const oldPage = await PageStore.readPage(adapter, oldPageId)
+    expect(oldPage.frontmatter.archived).toBe(true)
+    expect(oldPage.frontmatter.superseded_by).toMatch(/^p_/)
+    expect(oldPage.frontmatter.superseded_by).not.toBe(oldPageId)
+
+    // findPaperBySourceDocId should now skip the archived page and return
+    // the new one (so a third ingest would supersede the new page, not the
+    // archived old one).
+    const current = await findPaperBySourceDocId(adapter, 'd1')
+    expect(current.id).not.toBe(oldPageId)
+    expect(current.archived).toBeFalsy()
   })
 
   it('preserves unsupported claims outside canonical applied claims', async () => {

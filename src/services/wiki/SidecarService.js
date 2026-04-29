@@ -15,7 +15,11 @@ export function normalizeAliasKey(alias) {
 
 export class SidecarService {
   static async regenerate(adapter) {
-    const pages = await PageStore.listPages(adapter)
+    // Force a fresh read from the adapter. ProposalApplier writes pages via
+    // `adapter.writeTextIfRevision` directly (bypassing PageStore.writePage),
+    // so the PageStore listPages cache can hold pre-modify content here. A
+    // forced read guarantees the sidecar reflects the current files on disk.
+    const pages = await PageStore.listPages(adapter, { force: true })
     const pageRows = []
     const aliases = {}
     const conflicts = []
@@ -35,6 +39,9 @@ export class SidecarService {
         last_updated: page.frontmatter.last_updated || null,
         last_human_review: page.frontmatter.last_human_review || null,
         archived: page.frontmatter.archived === true,
+        archive_reason: page.frontmatter.archive_reason || null,
+        superseded_by: page.frontmatter.superseded_by || null,
+        scholarlib_doc_id: page.frontmatter.scholarlib_doc_id || null,
         outcome: page.frontmatter.outcome,
         outcome_other: page.frontmatter.outcome_other,
         funder: page.frontmatter.funder,
@@ -43,6 +50,13 @@ export class SidecarService {
         related_source_docs: page.frontmatter.related_source_docs || [],
       }
       pageRows.push(row)
+
+      // Archived pages are intentionally outside the active alias graph.
+      // Including them in alias resolution would clash with whatever
+      // superseded them (same title, different ULID), trip
+      // WIKI_ALIAS_COLLISION on every legitimate "refresh ingestion", and
+      // wedge sidecar regeneration. Skip them here.
+      if (row.archived) continue
 
       for (const alias of [row.title, ...row.aliases]) {
         const key = normalizeAliasKey(alias)

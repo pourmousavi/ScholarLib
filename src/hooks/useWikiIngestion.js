@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { useUIStore } from '../store/uiStore'
 import { useLibraryStore } from '../store/libraryStore'
 import { useStorageStore } from '../store/storageStore'
-import { PaperExtractor, ProposalBuilder, WikiService } from '../services/wiki'
+import { PaperExtractor, ProposalBuilder, WikiService, findPaperBySourceDocId } from '../services/wiki'
 import { GrantIngestion } from '../services/wiki/grants/GrantIngestion'
 import { isGrantDocument } from '../services/wiki/grants/GrantLibraryClassifier'
 import { useToast } from './useToast'
@@ -57,13 +57,40 @@ export function useWikiIngestion() {
         smart_collections: state.smartCollections,
       }
       await WikiService.regenerateSidecars(adapter)
+
+      // Check if this paper has already been ingested. If so, ask the user
+      // whether to refresh — the new page becomes canonical and the old one
+      // gets archived (frontmatter flip; old wikilinks stay intact).
+      const existing = await findPaperBySourceDocId(adapter, docId)
+      let supersedeOldPaperId = null
+      if (existing) {
+        const existingTitle = existing.title || existing.id
+        const ok = window.confirm?.(
+          `This paper is already in the wiki as "${existingTitle}".\n\nRe-ingest will create a new page with the latest model output and archive the old one (archived: true, superseded_by: <new id>). Existing wikilinks to the old page stay valid.\n\nContinue?`
+        )
+        if (!ok) {
+          showToast({ message: `Already ingested as "${existingTitle}". Re-ingest cancelled.`, type: 'info' })
+          return
+        }
+        supersedeOldPaperId = existing.id
+      }
+
       const updatedLibrary = {
         ...library,
         documents: { ...library.documents, [docId]: doc },
       }
       const extraction = await new PaperExtractor().extractPaper(docId, updatedLibrary, adapter)
-      const proposalId = await new ProposalBuilder({ adapter }).buildProposal(extraction, updatedLibrary)
-      showToast({ message: `Wiki proposal created: ${proposalId}`, type: 'success' })
+      const proposalId = await new ProposalBuilder({ adapter }).buildProposal(
+        extraction,
+        updatedLibrary,
+        { supersedeOldPaperId }
+      )
+      showToast({
+        message: supersedeOldPaperId
+          ? `Wiki proposal created: ${proposalId} (will archive old page on accept)`
+          : `Wiki proposal created: ${proposalId}`,
+        type: 'success',
+      })
       setActivePanel('wiki')
     } catch (error) {
       console.error('Wiki ingestion failed:', error)

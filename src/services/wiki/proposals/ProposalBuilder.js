@@ -127,6 +127,41 @@ function composePaperBody({ draftBody, claims = [], methods = [], datasets = [],
   return sections.join('\n\n').trim() + '\n'
 }
 
+/**
+ * Look up an existing canonical paper page that was ingested from the same
+ * ScholarLib library document, so that re-ingestion can supersede it instead
+ * of silently producing a duplicate. Returns the sidecar row or null.
+ *
+ * Falls back to scanning page bodies when the sidecar lacks scholarlib_doc_id
+ * (true for any sidecar generated before that field was added — happens once
+ * per wiki and self-heals on the next sidecar regen).
+ */
+export async function findPaperBySourceDocId(adapter, sourceDocId) {
+  if (!adapter || !sourceDocId) return null
+  const sidecar = await readJSONOrNull(adapter, WikiPaths.pagesSidecar)
+  const rows = sidecar?.pages || []
+  const direct = rows.find((row) =>
+    row.id?.startsWith('p_') && row.scholarlib_doc_id === sourceDocId && !row.archived
+  )
+  if (direct) return direct
+  // Old sidecar without scholarlib_doc_id: read paper pages and check
+  // frontmatter directly. This is slow but only happens once.
+  const needsScan = rows.some((row) => row.id?.startsWith('p_') && row.scholarlib_doc_id === undefined)
+  if (!needsScan) return null
+  for (const row of rows) {
+    if (!row.id?.startsWith('p_') || row.archived) continue
+    try {
+      const page = await PageStore.readPage(adapter, row.id)
+      if (page.frontmatter?.scholarlib_doc_id === sourceDocId) {
+        return { ...row, scholarlib_doc_id: sourceDocId }
+      }
+    } catch {
+      // tolerate missing pages — sidecar may be stale
+    }
+  }
+  return null
+}
+
 export class ProposalBuilder {
   constructor({ adapter, verifier, riskTierer } = {}) {
     this.adapter = adapter
@@ -134,7 +169,7 @@ export class ProposalBuilder {
     this.riskTierer = riskTierer || new RiskTierer()
   }
 
-  async buildProposal(extraction, library) {
+  async buildProposal(extraction, library, options = {}) {
     const store = new ProposalStore(this.adapter)
     const proposalId = store.createId()
     const pagesSidecar = await readJSONOrNull(this.adapter, WikiPaths.pagesSidecar)
@@ -144,7 +179,14 @@ export class ProposalBuilder {
     const sourceDoc = library.documents?.[sourceDocId] || {}
 
     const paperId = extraction.draft_frontmatter.id || createPageId('paper')
-    const handle = extraction.draft_frontmatter.handle || slugify(extraction.draft_frontmatter.title || sourceDoc.metadata?.title || paperId)
+    const baseHandle = extraction.draft_frontmatter.handle || slugify(extraction.draft_frontmatter.title || sourceDoc.metadata?.title || paperId)
+    // When superseding an existing paper page the old file still occupies its
+    // path on disk (we archive it via a frontmatter flip rather than deleting
+    // it). Append a short suffix from the new ULID so the new file lands at a
+    // unique path. Authored handles are respected verbatim.
+    const handle = options.supersedeOldPaperId && !extraction.draft_frontmatter.handle
+      ? `${baseHandle}-${paperId.split('_').pop().slice(-6).toLowerCase()}`
+      : baseHandle
     const claims = []
     const unsupported = []
     for (const claim of extraction.claims || []) {
@@ -212,6 +254,17 @@ export class ProposalBuilder {
     paperChange.risk_tier = unsupported.length > 0 ? 'high' : risk.tier
     paperChange.risk_reason = unsupported.length > 0 ? 'Verifier rejected one or more claims' : risk.reason
 
+    const pageChanges = [paperChange]
+
+    // Supersede an older paper page for the same source document. The old
+    // page is not deleted — it gets `archived: true` + `archive_reason:
+    // superseded` + `superseded_by: <new id>` so the link graph stays intact
+    // and the chat retrieval can opt out of archived pages.
+    if (options.supersedeOldPaperId) {
+      const archiveChange = await this._buildArchiveChange(options.supersedeOldPaperId, paperId)
+      if (archiveChange) pageChanges.push(archiveChange)
+    }
+
     const proposal = {
       proposal_id: proposalId,
       created_at: new Date().toISOString(),
@@ -222,7 +275,7 @@ export class ProposalBuilder {
       },
       extraction_metadata: extraction.extraction_metadata,
       bootstrap_context: extraction.bootstrap_context || null,
-      page_changes: [paperChange],
+      page_changes: pageChanges,
       candidate_records: {
         question_candidates: extraction.open_question_candidates || [],
         author_entries: sourceDoc.metadata?.authors || [],
@@ -232,6 +285,45 @@ export class ProposalBuilder {
     }
     await store.save(proposal)
     return proposalId
+  }
+
+  async _buildArchiveChange(oldPageId, newPageId) {
+    let oldPage
+    try {
+      oldPage = await PageStore.readPage(this.adapter, oldPageId)
+    } catch (error) {
+      // Old page does not exist — nothing to archive. The supersede signal
+      // is now meaningless but we silently drop it rather than failing the
+      // whole ingestion.
+      return null
+    }
+    const today = new Date().toISOString().slice(0, 10)
+    const updatedFrontmatter = {
+      ...oldPage.frontmatter,
+      archived: true,
+      archive_reason: 'superseded',
+      superseded_by: newPageId,
+      last_updated: today,
+    }
+    return {
+      change_id: `ch_${ulid()}`,
+      operation: 'modify',
+      page_id: oldPageId,
+      page_type: oldPage.frontmatter?.type || 'paper',
+      target_path: oldPage.path,
+      expected_base_hash: oldPage.hash,
+      expected_base_revision: oldPage.storage?.revision ?? null,
+      draft_frontmatter: updatedFrontmatter,
+      draft_body: oldPage.body,
+      diff_summary: `Archived as superseded by ${newPageId}`,
+      claims_added: [],
+      claims_added_unsupported: [],
+      wikilinks_to: wikilinks(oldPage.body),
+      is_creation: false,
+      is_deletion: false,
+      risk_tier: 'low',
+      risk_reason: 'Frontmatter-only archive flag flip',
+    }
   }
 
   _validateWikilinks(change, existingIds, createdIds) {
