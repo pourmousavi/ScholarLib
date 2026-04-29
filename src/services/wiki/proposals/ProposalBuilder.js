@@ -230,6 +230,23 @@ export class ProposalBuilder {
       openQuestions: extraction.open_question_candidates,
     })
 
+    // Detect sparse extractions — the model returned a JSON-shaped response
+    // that passes validation but extracted essentially nothing. Common cause:
+    // a small local Ollama model echoed the title and returned all-empty
+    // arrays. We flag this so the RiskTierer can escalate to medium so the
+    // user has to look at it before approving, instead of slipping through
+    // batch auto-approve.
+    const claimsCount = claims?.length || 0
+    const methodsCount = extraction.methods_used?.length || 0
+    const datasetsCount = extraction.datasets_used?.length || 0
+    const conceptsCount = extraction.concepts_touched?.length || 0
+    const proseLength = String(extraction.draft_body || '').replace(/^#.*$/gm, '').trim().length
+    // Trigger only when ALL four substantive arrays are empty. A single claim
+    // with an empty methods/datasets/concepts list is borderline but tolerable;
+    // zero of everything is the unambiguous "model echoed the title" signal
+    // we saw in the wild.
+    const sparseExtraction = claimsCount === 0 && methodsCount === 0 && datasetsCount === 0 && conceptsCount === 0
+
     const paperChange = {
       change_id: `ch_${ulid()}`,
       operation: existingIds.has(paperId) ? 'modify' : 'create',
@@ -246,6 +263,19 @@ export class ProposalBuilder {
       wikilinks_to: wikilinks(composedBody),
       is_creation: !existingIds.has(paperId),
       is_deletion: false,
+      extraction_quality: sparseExtraction
+        ? {
+            sparse: true,
+            reason: `Model returned ${claimsCount} claim${claimsCount === 1 ? '' : 's'}, ${methodsCount} method${methodsCount === 1 ? '' : 's'}, ${datasetsCount} dataset${datasetsCount === 1 ? '' : 's'}, ${conceptsCount} concept${conceptsCount === 1 ? '' : 's'} — likely a model-quality issue, consider re-ingesting with a stronger model`,
+            totals: {
+              claims: claimsCount,
+              methods: methodsCount,
+              datasets: datasetsCount,
+              concepts: conceptsCount,
+              prose_chars: proseLength,
+            },
+          }
+        : { sparse: false },
     }
     createdIds.add(paperId)
 

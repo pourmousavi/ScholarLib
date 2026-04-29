@@ -333,6 +333,53 @@ describe('wiki Phase 0B services', () => {
     expect(current.archived).toBeFalsy()
   })
 
+  it('escalates a sparse extraction to medium risk so it cannot slip through batch auto-approve', async () => {
+    const adapter = new MemoryAdapter()
+    await WikiService.initialize(adapter)
+    const sparseExtraction = {
+      draft_frontmatter: { title: 'A novel mixed-integer paper', scholarlib_doc_id: 'd1' },
+      draft_body: '# A novel mixed-integer paper',
+      claims: [],
+      methods_used: [],
+      datasets_used: [],
+      concepts_touched: [],
+      open_question_candidates: [],
+      contradiction_signals: [],
+      extraction_metadata: { extraction_confidence: 0.95, ocr_warnings: [] },
+    }
+    const builder = new ProposalBuilder({ adapter })
+    const proposal = await new ProposalStore(adapter).read(await builder.buildProposal(sparseExtraction, library))
+    const change = proposal.page_changes[0]
+    expect(change.extraction_quality?.sparse).toBe(true)
+    expect(change.extraction_quality.totals).toMatchObject({ claims: 0, methods: 0, datasets: 0, concepts: 0 })
+    expect(change.risk_tier).toBe('medium')
+    expect(change.risk_reason).toContain('Sparse extraction')
+  })
+
+  it('keeps a substantive extraction at low risk so quick approval still works', async () => {
+    const adapter = new MemoryAdapter()
+    await WikiService.initialize(adapter)
+    const richExtraction = {
+      ...extraction,
+      methods_used: ['model predictive control', 'machine learning'],
+      datasets_used: ['ARENA AEMO 2023'],
+      concepts_touched: ['battery aging', 'state of health', 'frequency control'],
+      open_question_candidates: [{ candidate_question: 'How does cycling rate interact with calendar aging?' }],
+      claims: [
+        { claim_text: 'Calendar aging accelerates above 35°C.', confidence: 'high', supported_by: [{ pdf_page: 4, char_start: 120, char_end: 240 }] },
+        { claim_text: 'MPC reduces capacity fade by 12%.', confidence: 'high', supported_by: [{ pdf_page: 6, char_start: 50, char_end: 180 }] },
+      ],
+    }
+    const builder = new ProposalBuilder({
+      adapter,
+      verifier: { verifyClaim: vi.fn().mockResolvedValue({ status: 'supported', verifier_model: 'mock', justification: 'ok' }) },
+    })
+    const proposal = await new ProposalStore(adapter).read(await builder.buildProposal(richExtraction, library))
+    const change = proposal.page_changes[0]
+    expect(change.extraction_quality?.sparse).toBe(false)
+    expect(change.risk_tier).toBe('low')
+  })
+
   it('preserves unsupported claims outside canonical applied claims', async () => {
     const adapter = new MemoryAdapter()
     await WikiService.initialize(adapter)

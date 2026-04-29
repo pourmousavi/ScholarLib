@@ -25,6 +25,7 @@ export class RiskTierer {
     if (change.operation === 'modify' && ['concept', 'method', 'dataset', 'person'].includes(targetType)) return medium('Modifies existing canonical knowledge page')
     if (change.is_creation === true && ['concept', 'method', 'dataset'].includes(targetType)) return medium('Creates canonical knowledge page')
     if ((change.claims_added || []).some((claim) => claim.confidence === 'medium')) return medium('Adds medium-confidence claim')
+    if (change.extraction_quality?.sparse === true) return medium(`Sparse extraction — ${change.extraction_quality.reason || 'model returned little structured content'}`)
 
     if (change.is_creation === true && targetType === 'paper') return low('Creates a paper page from extracted metadata')
     if (change.candidate_only === true) return low('Adds candidate records only')

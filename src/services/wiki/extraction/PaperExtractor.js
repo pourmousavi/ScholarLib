@@ -257,29 +257,53 @@ export class PaperExtractor {
       : null
     const userParts = [
       `Schema:\n${schema}`,
-      `Return this exact JSON object shape:
+      `Return this exact JSON shape (and ONLY valid JSON — no markdown fences, no prose, no commentary):
 {
-  "draft_frontmatter": { "title": "...", "aliases": [], "doi": null },
-  "draft_body": "markdown body using only ID wikilinks or no wikilinks",
+  "draft_frontmatter": {
+    "title": "<full paper title>",
+    "aliases": ["<short citation, e.g. 'Smith 2024'>"],
+    "doi": "<DOI if present, else null>"
+  },
+  "draft_body": "<150-400 word markdown summary covering: contribution, approach, key findings, limitations. Plain prose. Use only ID-based wikilinks (e.g. [[c_01J...]]) — never alias-style wikilinks like [[calendar aging]].>",
   "claims": [
-    { "claim_text": "...", "confidence": "low|medium|high", "supported_by": [
-      { "pdf_page": 1, "char_start": 0, "char_end": 0, "quote_snippet": "..." }
-    ] }
+    {
+      "claim_text": "<a substantive claim the paper makes — a result, a finding, a position, a quantitative bound>",
+      "confidence": "low|medium|high",
+      "supported_by": [
+        { "pdf_page": <int>, "char_start": <int>, "char_end": <int>, "quote_snippet": "<short verbatim quote that supports the claim>" }
+      ]
+    }
   ],
-  "methods_used": [],
-  "datasets_used": [],
-  "concepts_touched": [],
-  "open_question_candidates": [],
-  "contradiction_signals": [],
-  "extraction_metadata": { "tokens_out": 0 }
+  "methods_used": ["<method/algorithm/technique name>"],
+  "datasets_used": ["<dataset name (with source if given)>"],
+  "concepts_touched": ["<key domain concept the paper engages with>"],
+  "open_question_candidates": [
+    { "candidate_question": "<a question the paper raises but does not answer>" }
+  ],
+  "contradiction_signals": [
+    { "summary": "<finding that contradicts prior work, if any>" }
+  ],
+  "extraction_metadata": { "tokens_out": <int>, "extraction_notes": "<optional one-liner about anything unusual>" }
 }`,
+      `Extraction targets — these are how a complete extraction looks:
+- claims: 3-8 substantive claims. A "substantive" claim is a result or position that another researcher would cite or argue against, not boilerplate. Quote-snippets must come verbatim from the paper text.
+- methods_used: every algorithm, optimisation approach, statistical test, simulation tool, or experimental procedure the paper applies. Typical: 2-6.
+- datasets_used: every dataset the paper analyses, by name (and source where given). Typical: 0-4.
+- concepts_touched: 3-7 domain concepts the paper engages with (calendar aging, FCAS markets, MPC, etc.).
+- open_question_candidates: 0-3, only if the paper explicitly states unanswered questions or directions for future work.
+- draft_body: 150-400 words of plain prose summarising the work. Not the abstract; a synthesis.
+
+If a field is genuinely empty after careful reading, return []. But empty arrays are a red flag — re-read the paper before claiming nothing is there. Do not return placeholder titles, do not echo the title as the body, do not return all-empty arrays unless the paper truly contains no methods, datasets, claims, or concepts.`,
       `Metadata:\n${JSON.stringify(doc.metadata || {}, null, 2)}`,
       `Extraction confidence: ${pdf.extraction_confidence}`,
     ]
     if (bootstrapBlock) userParts.push(bootstrapBlock)
     userParts.push(`Paper text:\n${pageText}`)
     return [
-      { role: 'system', content: 'You extract ScholarLib wiki paper proposals. Return only valid JSON. Do not include markdown fences, prose, comments, or trailing text.' },
+      {
+        role: 'system',
+        content: 'You are an expert research librarian extracting structured wiki entries from academic papers. Read the paper carefully — methods, results, datasets, key claims, limitations. Produce a structured JSON proposal that captures the paper\'s substantive content. Return ONLY valid JSON: no markdown fences, no prose, no comments, no trailing text.',
+      },
       { role: 'user', content: userParts.join('\n\n') },
     ]
   }
