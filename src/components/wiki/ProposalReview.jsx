@@ -3,6 +3,7 @@ import { ProposalReviewSubmitter } from '../../services/wiki'
 import { PageDiffer } from '../../services/wiki/diff/PageDiffer'
 import { PageStore } from '../../services/wiki/PageStore'
 import { STORAGE_ERRORS } from '../../services/storage/StorageAdapter'
+import { authorDisplay } from '../../utils/authorDisplay'
 import ProposalHeader from './proposalReview/ProposalHeader'
 import RiskTierSection from './proposalReview/RiskTierSection'
 import PageDiffView from './proposalReview/PageDiffView'
@@ -373,7 +374,7 @@ export default function ProposalReview({ proposal, adapter, onApplied, onClose, 
             {candidateRecords.author_entries?.length > 0 && (
               <div>
                 <strong>Author entries</strong>
-                <ul>{candidateRecords.author_entries.map((entry, index) => <li key={index}>{entry.first} {entry.last}</li>)}</ul>
+                <ul>{candidateRecords.author_entries.map((entry, index) => <li key={index}>{authorDisplay(entry)}</li>)}</ul>
               </div>
             )}
             {candidateRecords.contradiction_signals?.length > 0 && (
