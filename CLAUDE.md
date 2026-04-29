@@ -56,12 +56,95 @@ Then load only the files needed for that stage. Do NOT carry context from previo
 
 ---
 
+## LLM Wiki Layer (Phases 0A–6+, additive)
+
+After the 21 base stages, ScholarLib gained an **LLM-maintained markdown wiki** layered above the existing PDF library. It is opt-in, owned by the user (lives at `_wiki/` in their Box/Dropbox), and does not modify any pre-wiki feature. The wiki is built in **8 phases** plus a deferred Phase 7/8 backlog.
+
+### Source of truth
+
+The design contract is [`SCHOLARLIB_WIKI_DESIGN_V2_1.md`](SCHOLARLIB_WIKI_DESIGN_V2_1.md) at the repo root. Every architectural decision is numbered (`[DEC-NN]`) and every amendment is numbered (`[A-NN]`); reference these IDs when discussing trade-offs. The per-phase build prompts are `SCHOLARLIB_WIKI_PHASE_0A_PROMPT.md` through `SCHOLARLIB_WIKI_PHASE_6_PLUS_PROMPT.md`. The cross-phase corrections live in `scholarlib-wiki-phase-prompts-final-addendum.md` — apply these on every phase run.
+
+### Phase status
+
+| Phase | Topic | Status |
+|---|---|---|
+| 0A | Storage adapter API extension, page store, sidecars, two-phase op files, safety mode | shipped |
+| 0B | Single-paper ingestion spike (extract → verify → propose → review) | shipped |
+| 1 | 10-paper schema trial with kill/redesign gates and Phase 1 reporter | shipped |
+| 2 | Inbox + ProposalReview UX with risk-tiered diffs and review-debt auto-pause | shipped |
+| 3 | Controlled bootstrap (themes, dashboard extensions, lint cadence, Phase 3 report, Phase 5 readiness gates) | shipped |
+| 4 | ChatOrchestrator extracted, RAG parity preserved | shipped |
+| 5 | Wiki-assisted chat, multi-signal routing, save-as-candidate, benchmark | shipped |
+| 6+ | Obsidian export, grant namespace, question clustering | shipped (subset) |
+| 7 | Gap finder, cross-pollinator, position synthesizer, save-from-chat batch UI | not started |
+| 8 | Grant pattern miner | not started |
+
+### Working on the wiki
+
+- **Read the design first.** When asked to extend any wiki feature, load `SCHOLARLIB_WIKI_DESIGN_V2_1.md` (or at least the relevant `[DEC-NN]` section), the matching phase prompt, and the addendum. Do not work from memory of the high-level shape.
+- **Two-phase op files are non-negotiable** [A-01]. Pending op file written *before* page writes; committed op file written *after* successful page writes and sidecar regeneration. Recovery scans pending ops on startup.
+- **Sidecars are generated, never hand-edited.** `pages.json`, `aliases.json`, `links.json`, `claims.json`, `sources.json`, `authors.json` regenerate from canonical pages.
+- **Canonical wikilinks are ID-only** [A-06]. Proposals containing alias-style links are rejected before commit.
+- **Risk tiers are deterministic.** Models propose; rules in code override. Encode the rules as code, not as prompts.
+- **Sensitivity check is pre-prompt.** The provider router inspects `sensitivity:` and `allowed_providers:` *before* constructing any cloud-bound prompt. Grant content is Ollama-only by policy and never reaches a cloud provider.
+- **Quality gates are checked, not asserted.** Phase 5 does not begin until all nine [DEC-19] gates return true. The checker is implemented in `BootstrapReporter.checkPhase5Gates`.
+
+### Code map
+
+```
+src/services/wiki/
+├── WikiPaths.js           ← single source of truth for storage paths
+├── WikiStorage.js         ← readJSONOrNull, writeJSONWithRevision helpers
+├── PageStore.js           ← CRUD over canonical markdown pages
+├── SidecarService.js      ← regenerates _wiki/_system/*.json
+├── OperationLogService.js ← two-phase op file writes + recovery
+├── WikiStateService.js    ← safety mode state machine
+├── extraction/            ← PaperExtractor, PdfTextExtractor (Phase 0B)
+├── proposals/             ← ProposalBuilder, ProposalApplier, ProposalStore, ClaimVerifier, ReviewDebtCalculator
+├── diff/                  ← PageDiffer for review UI
+├── positions/             ← PositionDraftGenerator, PositionDraftService
+├── migrations/            ← SchemaMigrationRunner + migration_1_*
+├── phase1/                ← Phase 1 quality metrics, ingestion checklist, usefulness, reporter
+├── phase3/                ← Phase 3 metrics (per-theme, cross-paper, cost projection)
+├── bootstrap/             ← BootstrapPlanService, BootstrapContext, BootstrapReporter
+├── lint/                  ← LintService (10 rules), LintScheduler
+├── chat/                  ← ChatOrchestrator, IntentClassifier, WikiRetrieval, CandidateStore (Phases 4–5)
+├── benchmark/             ← BenchmarkSession (Phase 5)
+├── grants/                ← GrantIngestion, GrantNamespacePolicy, GrantLibraryClassifier (Phase 6+)
+├── questions/             ← QuestionClusterer, QuestionPromoter (Phase 6+)
+└── export/                ← ObsidianExporter, ObsidianFormatter (Phase 6+)
+
+src/components/wiki/
+├── WikiWorkspace.jsx      ← 6-tab shell (Inbox / Quality / Grants / Questions / Benchmark / Obsidian)
+├── Inbox.jsx              ← proposals, lint, stale, recovery
+├── ProposalReview.jsx     ← risk-tiered diffs, evidence viewer, accept/edit/reject
+├── QualityDashboard.jsx   ← Phase 1 + Phase 3 metrics, mid-bootstrap banner, Phase 3 report button
+├── bootstrap/             ← BootstrapList (built but not yet wired into a tab)
+├── grants/GrantPanel.jsx
+├── questions/QuestionInbox.jsx
+├── benchmark/BenchmarkRunner.jsx
+├── chat/SaveCandidateButton.jsx
+├── proposalReview/        ← PageDiffView, SourceEvidencePopover, ChangeEditDialog, ProposalHeader, RiskTierSection
+├── lint/LintReportView.jsx
+└── recovery/RecoveryActions.jsx
+```
+
+### Key reference
+
+- [`docs/WIKI_USER_GUIDE.md`](docs/WIKI_USER_GUIDE.md) — practical user guide; reference for "what does this surface do?"
+- [`SCHOLARLIB_WIKI_DESIGN_V2_1.md`](SCHOLARLIB_WIKI_DESIGN_V2_1.md) §6.8 — full lint rule catalogue; §10 — phase exit criteria; §14 — glossary.
+- The phase prompts each end with a "Notes for the user" section worth re-reading when picking up that phase's surface.
+
+---
+
 ## Key Reference Docs
 
+- [WIKI_USER_GUIDE.md](docs/WIKI_USER_GUIDE.md) — End-to-end user walk-through of the wiki layer
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — Full system design, data flow, API contracts
 - [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) — Colors, fonts, spacing, all component specs
 - [USER_SETUP.md](docs/USER_SETUP.md) — Manual tasks Ali must complete (accounts, keys, config)
 - [LIBRARY_SCHEMA.md](docs/LIBRARY_SCHEMA.md) — library.json data structure reference
+- [SCHOLARLIB_WIKI_DESIGN_V2_1.md](SCHOLARLIB_WIKI_DESIGN_V2_1.md) — Wiki layer design contract (source of truth)
 
 ---
 

@@ -37,6 +37,20 @@ A professional academic reference manager with AI-powered document Q&A. Built fo
 - Activity dashboard showing who accessed what
 - Works with university Box accounts
 
+### LLM Wiki Layer
+A persistent, LLM-maintained markdown layer above your PDFs that compounds with use — see [docs/WIKI_USER_GUIDE.md](docs/WIKI_USER_GUIDE.md) for the full walk-through.
+
+- **Proposal-and-review** — the model proposes wiki edits per ingested paper; you approve them in an Inbox with risk-tiered diffs.
+- **Concept, method, dataset, person, paper, position pages** — markdown pages under `_wiki/` in your own storage, owned by you, readable in any text editor.
+- **Verifier pass** — every high-impact claim is checked against its quoted evidence; unsupported claims are kept visible but never silently committed.
+- **Quality dashboard** — five tracked metrics (claim rejection, review time, schema migrations, concept-page usefulness, manual cleanup) with auto-pause on threshold breach.
+- **Controlled bootstrap** — tools to plan and ingest 25–30 of your papers + 10–15 external anchors with per-theme coverage tracking and a one-shot mid-bootstrap schema revision.
+- **Wiki-assisted chat** — chat routes between wiki (synthesis) and RAG (extractive); save useful answers back as wiki candidates.
+- **Grants kept private** — mark a folder as a grant folder; documents inside route to a private namespace that never reaches a cloud provider.
+- **Obsidian export** — generate a read-only mirror at `_wiki_export_obsidian/` for graph view and mobile reading.
+
+The design is in [SCHOLARLIB_WIKI_DESIGN_V2_1.md](SCHOLARLIB_WIKI_DESIGN_V2_1.md); the per-phase build prompts are in `SCHOLARLIB_WIKI_PHASE_*.md`.
+
 ### PWA Support
 - Install as a desktop/mobile app
 - Works offline (with cached data)
@@ -92,10 +106,12 @@ VITE_APP_BASE_URL=https://yourusername.github.io/scholarlib
 
 ## Documentation
 
-- [CLAUDE.md](CLAUDE.md) — Build guide for developers
+- [CLAUDE.md](CLAUDE.md) — Build guide for developers and AI coding tools
+- [docs/WIKI_USER_GUIDE.md](docs/WIKI_USER_GUIDE.md) — How to use the LLM Wiki layer end-to-end
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System design
 - [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) — UI components and styling
 - [docs/USER_SETUP.md](docs/USER_SETUP.md) — Setup instructions for end users
+- [SCHOLARLIB_WIKI_DESIGN_V2_1.md](SCHOLARLIB_WIKI_DESIGN_V2_1.md) — Wiki layer design contract (source of truth)
 - [CHANGELOG.md](CHANGELOG.md) — Version history
 
 ## License
