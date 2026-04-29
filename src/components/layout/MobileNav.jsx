@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useUIStore } from '../../store/uiStore'
 import { useLibraryStore } from '../../store/libraryStore'
+import { settingsService } from '../../services/settings/SettingsService'
 import styles from './MobileNav.module.css'
 
 export default function MobileNav() {
@@ -76,6 +77,12 @@ export default function MobileNav() {
     setShowMoreMenu(false)
     closeAllOverlays()
     setActivePanel('pdf')
+  }
+
+  const handleWiki = () => {
+    setShowMoreMenu(false)
+    closeAllOverlays()
+    setActivePanel('wiki')
   }
 
   const handleSettings = () => {
@@ -175,6 +182,15 @@ export default function MobileNav() {
               </svg>
               <span>Chat History</span>
             </button>
+            {settingsService.getWikiEnabled() && (
+              <button className={styles.menuItem} onClick={handleWiki}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5z"/>
+                  <path d="M8 7h7M8 11h8M8 15h5"/>
+                </svg>
+                <span>Wiki</span>
+              </button>
+            )}
             <button className={styles.menuItem} onClick={handleSettings}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="3"/>

@@ -1,4 +1,5 @@
 export { default as Inbox } from './Inbox'
+export { default as WikiWorkspace } from './WikiWorkspace'
 export { default as PageReader } from './PageReader'
 export { default as ProposalReview } from './ProposalReview'
 export { default as ProposalReviewMinimal } from './ProposalReviewMinimal'

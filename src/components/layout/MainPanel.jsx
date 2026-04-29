@@ -13,7 +13,7 @@ import SplitViewPanel from './SplitViewPanel'
 import { NotesPanel } from '../notes'
 import { ChatPanel } from '../ai'
 import LitOrbitInsights from '../library/LitOrbitInsights'
-import { Inbox as WikiInbox } from '../wiki'
+import { WikiWorkspace } from '../wiki'
 import styles from './MainPanel.module.css'
 
 export default function MainPanel({ isMobile = false }) {
@@ -244,7 +244,7 @@ export default function MainPanel({ isMobile = false }) {
   return (
     <div className={styles.panel}>
       {activePanel === 'wiki' ? (
-        <WikiInbox />
+        <WikiWorkspace />
       ) : (
         <>
       {/* Top bar */}

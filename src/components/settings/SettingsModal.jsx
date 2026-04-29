@@ -124,6 +124,7 @@ export default function SettingsModal({ onClose }) {
   const [wikiCapability, setWikiCapability] = useState(null)
   const [wikiIntegrity, setWikiIntegrity] = useState(null)
   const [wikiActionLoading, setWikiActionLoading] = useState(null)
+  const [wikiExportStatus, setWikiExportStatus] = useState(null)
 
   // Migration state
   const [showMigrationWizard, setShowMigrationWizard] = useState(false)
@@ -2262,11 +2263,33 @@ export default function SettingsModal({ onClose }) {
           <button
             className={styles.secondaryBtn}
             disabled={!!wikiActionLoading || !enabled}
-            onClick={() => runWikiAction('obsidian-export', () => new ObsidianExporter({ adapter }).export())}
+            onClick={() => runWikiAction('obsidian-export', async () => {
+              const manifest = await new ObsidianExporter({ adapter }).export()
+              setWikiExportStatus(manifest)
+              return manifest
+            })}
           >
             Export to Obsidian
           </button>
         </div>
+
+        {wikiExportStatus && (
+          <div className={styles.wikiResult}>
+            <strong>Obsidian export</strong>
+            <div className={styles.wikiResultRow}>
+              <span>Pages</span>
+              <span>{wikiExportStatus.page_count}</span>
+            </div>
+            <div className={styles.wikiResultRow}>
+              <span>Files</span>
+              <span>{wikiExportStatus.files?.length || 0}</span>
+            </div>
+            <div className={styles.wikiResultRow}>
+              <span>Generated</span>
+              <span>{wikiExportStatus.generated_at}</span>
+            </div>
+          </div>
+        )}
 
         {wikiActionLoading && (
           <p className={styles.hint}>Running {wikiActionLoading}...</p>
