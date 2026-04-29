@@ -12,6 +12,18 @@ function docDisplayName(doc) {
   return doc?.metadata?.title || doc?.title || doc?.name || doc?.id || 'document'
 }
 
+function describeWikiError(error) {
+  if (error?.code === 'WIKI_ALIAS_COLLISION' && Array.isArray(error.conflicts) && error.conflicts.length) {
+    const lines = error.conflicts.slice(0, 3).map((c) => {
+      const ids = (c.page_ids || []).join(' ↔ ')
+      return `  • "${c.alias}" — ${ids}`
+    })
+    const more = error.conflicts.length > 3 ? `\n  …and ${error.conflicts.length - 3} more` : ''
+    return `Wiki has two non-archived pages sharing a title/alias. Open the Inbox or archive the old page to resolve:\n${lines.join('\n')}${more}`
+  }
+  return error?.message || 'Wiki ingestion failed'
+}
+
 /**
  * Centralised wiki ingestion entry points used by both the MainPanel
  * top-bar button and the doc-card right-click menu. Routes everything
@@ -107,8 +119,9 @@ export function useWikiIngestion() {
       useWikiIngestStore.getState().completeIngest()
     } catch (error) {
       console.error('Wiki ingestion failed:', error)
-      showToast({ message: error.message || 'Wiki ingestion failed', type: 'error' })
-      useWikiIngestStore.getState().failIngest(error)
+      const message = describeWikiError(error)
+      showToast({ message, type: 'error' })
+      useWikiIngestStore.getState().failIngest({ message })
     } finally {
       setWikiIngesting(false)
     }
@@ -177,8 +190,9 @@ export function useWikiIngestion() {
         useWikiIngestStore.getState().completeIngest()
       } else {
         console.error('Grant ingestion failed:', error)
-        showToast({ message: error.message || 'Grant ingestion failed', type: 'error' })
-        useWikiIngestStore.getState().failIngest(error)
+        const message = describeWikiError(error)
+        showToast({ message, type: 'error' })
+        useWikiIngestStore.getState().failIngest({ message })
       }
     } finally {
       if (!handledDuplicatePrompt) setWikiIngesting(false)
