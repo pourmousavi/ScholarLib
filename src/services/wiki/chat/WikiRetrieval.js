@@ -102,6 +102,7 @@ export class WikiRetrieval {
 
     const allPages = (await this.pageStore.listPages(options.adapter))
       .filter(page => !page.path?.startsWith(`${WikiPaths.root}/_inbox/`))
+      .filter(page => options.includeArchived === true || page.frontmatter?.archived !== true)
     const scopedPages = this.filterScope(allPages, scope, options)
 
     const aliasMatches = await this.aliasAndTitleMatches(query, scopedPages, options)

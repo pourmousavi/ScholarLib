@@ -64,13 +64,15 @@ Phase 1 is single-user. The data model accommodates a future team layer with no 
 
 ## 3. Where to find it in the app
 
-The wiki lives in its own workspace. Click the **Wiki** button in the left sidebar (or the wiki entry on mobile) and the main panel switches to the **Wiki Workspace**. The workspace has six tabs along the top:
+The wiki lives in its own workspace. Click the **Wiki** button in the left sidebar (or the wiki entry on mobile) and the main panel switches to the **Wiki Workspace**. The workspace has eight tabs along the top:
 
 | Tab | What it is |
 |---|---|
 | **Inbox** | Pending proposals to review, lint findings, stale page flags, recovery actions |
 | **Quality** | The five-metric quality dashboard, with Phase 3 extensions (theme coverage, bootstrap progress, mid-bootstrap migration trigger, Phase 3 report button) |
-| **Grants** | Un-ingested documents in folders you have marked as grant folders |
+| **Bootstrap** | The Phase 3 bootstrap plan: own papers, external anchors, themes, order, and ingestion status |
+| **Pages** | Read-only browser for committed wiki pages, grouped by type, with clickable ID wikilinks |
+| **Grants** | Grant ingestion, outcome buckets, reviewer feedback, outcome notes, and related source documents |
 | **Questions** | Open-question candidates clustered for promotion to canonical question pages |
 | **Benchmark** | The synthesis-question benchmark runner (10 questions × 3 paths) |
 | **Obsidian** | One-click read-only export to `_wiki_export_obsidian/` |
@@ -100,14 +102,15 @@ This is the most common operation.
 
 1. Select a PDF in the document list.
 2. Click the **paper-ingest** button in the top action bar (the icon shows a folded page with a plus). For a grant-folder document, the same button shows **G** and routes to grant ingestion (see §9).
-3. The pipeline runs in the background:
+3. Check the **metadata pre-flight** modal. Correct obvious title, year, DOI, author, funder, program, or submitted-year problems before the wiki page or proposal is created. This is where you catch joined strings such as `Round 182025`.
+4. The pipeline runs in the background:
    - Reads PDF text via PDF.js.
    - Reads `pages.json` and `aliases.json` to find candidate concept pages this paper might touch.
    - Routes the extraction call: Ollama-first; falls back to a cloud provider only if local is unavailable and the document is not sensitive.
    - Generates a structured proposal: a paper page plus updates to listed concept/method/dataset pages, with claims and evidence locators (PDF page + char range + page-text hash).
    - Runs a **verifier pass** on every claim flagged high-impact: a frontier model is asked whether the quoted evidence supports the claim. Unsupported claims are kept in the proposal as `do_not_apply` so you can see why they were filtered.
    - Writes the proposal to `_wiki/_proposals/prop_<ulid>.json`.
-4. The proposal appears in the **Inbox** tab. The workspace does not auto-open — switch to it when you are ready to review.
+5. The proposal appears in the **Inbox** tab. The workspace does not auto-open — switch to it when you are ready to review.
 
 **Re-ingesting the same paper is idempotent** — the proposal builder produces the same shape from the same input, so nothing duplicates.
 
@@ -181,12 +184,7 @@ Phase 3 is the **controlled bootstrap**: you manually pick 25–30 of your most-
 - `targets` — bootstrap size targets (default 25–30 own, 10–15 external).
 - Schema-revision flag and at-paper marker.
 
-**A note on the UI status.** The `BootstrapList` component is built and tested but is **not yet mounted in the workspace tabs**. Until it is wired (a small follow-up), you can either:
-
-- Manage the plan via `BootstrapPlanService` from a dev console, or
-- Skip the formal plan and ingest your papers in the order you want — the rest of the Phase 3 mechanics (per-theme metrics, bootstrap progress, mid-bootstrap migration banner, Phase 3 report) read the plan if it exists but tolerate its absence.
-
-If/when wired, the BootstrapList shows a two-column layout (own-papers left, external anchors right) with drag-to-reorder, theme tags, ingestion status (queued / in-progress / ingested), and a progress bar at top. External anchors are blocked from ingestion while any own-paper is still queued.
+Open the **Bootstrap** tab to manage this plan in the app. The tab shows own-papers and external anchors with theme tags, order controls, ingestion status (queued / in-progress / ingested / deferred), and a progress bar at top. External anchors are blocked from ingestion while any own-paper is still queued.
 
 **Sequencing matters:**
 
@@ -235,16 +233,21 @@ The Phase 3 report is the input to deciding whether to proceed to Phase 4. The e
 Grants are sensitive. They live in a private namespace (`_wiki/_private/grant/`) and are **Ollama-only by policy** — no cloud provider sees them.
 
 1. **Mark a folder as a grant folder.** Right-click any folder in the FolderTree and choose **Mark as grant folder**. A "Grant" badge appears next to the folder name. Marking is recursive — every document inside, including in nested subfolders, is now treated as a grant document.
-2. **Ingest grant documents.** With a document inside a grant folder selected, the paper-ingest button in the top action bar shows **G** instead of the usual icon. Click it. The pipeline:
+2. **Ingest grant documents.** With a document inside a grant folder selected, the paper-ingest button in the top action bar shows **G** instead of the usual icon. Click it. The metadata pre-flight modal opens first so you can correct title, funder, program, and submitted year. The pipeline:
    - Routes the extraction through `GrantNamespacePolicy` which blocks any cloud provider.
+   - Extracts PDF text and asks local Ollama for a structured `Generated Application Summary`. If Ollama is unavailable, ingestion fails clearly and no grant page is created.
    - Writes the resulting page to `_wiki/_private/grant/`.
    - Updates `library.json` so the document records `wiki.grant_page_id`, `grant_page_path`, `grant_ingested_at`.
    - Switches the wiki workspace to the **Grants** tab so you can see the result.
-3. **The Grants tab** lists all un-ingested grant documents detected in your library. Each row has an **Ingest grant** button that runs the same pipeline.
+3. **The Grants tab** lists all un-ingested grant documents detected in your library. Each row has an **Ingest grant** button that runs the same pipeline. Existing grant pages are grouped into outcome buckets: pending, under_review, won, rejected, withdrawn, and other.
+4. **Update outcomes and feedback.** Open a grant card, choose the outcome, paste reviewer feedback, and add outcome notes. Save re-reads the page after writing so the form reflects the committed state.
+5. **Attach related source documents.** Use **Attach related document** to connect outcome notices, reviewer feedback PDFs, budgets, support letters, appendices, or other grant-folder documents. Outcome notice and reviewer feedback PDFs are summarised locally via Ollama and appended under clearly labelled page sections.
+
+Re-ingesting the same grant document is idempotent. ScholarLib checks `source_doc_id` and opens the existing grant page instead of creating a duplicate. If funder, program, submitted year, and title match another grant but the source document differs, ScholarLib warns before continuing.
 
 To unmark a folder, right-click and choose **Unmark as grant folder**. Already-ingested grant pages remain in `_wiki/_private/grant/`.
 
-**Lint rules include `grant_namespace_leakage`** which fires if any grant content appears in a non-private page or vice versa.
+**Lint rules include `grant_namespace_leakage`, `related_source_doc_unknown`, and `archived_target_missing`.** These catch grant content leakage, related documents that no longer exist in `library.json`, and archived pages whose `superseded_by` target is missing.
 
 ---
 
@@ -452,12 +455,11 @@ The wiki is built in 8 phases. As of the latest commit:
 | 4 | ChatOrchestrator extracted, RAG parity preserved | shipped |
 | 5 | Wiki-assisted chat, multi-signal routing, save-as-candidate, benchmark | shipped |
 | 6+ | Obsidian export, grant namespace, question clustering | shipped (subset) |
+| UX recovery increment 1 | Pages browser, Bootstrap tab, grant form, grant PDF summaries, metadata pre-flight, archive schema | shipped |
 | 7 | Gap finder, cross-pollinator, position synthesizer, save-from-chat batch UI | not started |
 | 8 | Grant pattern miner | not started |
 
-**Known wiring gaps** (UI exists, services exist, but not yet mounted into the workspace):
-
-- `BootstrapList` — Phase 3 bootstrap plan curation. The service (`BootstrapPlanService`) and component (`BootstrapList.jsx`) work; they are not yet exposed as a workspace tab. See §7 for the workaround.
+Increment 1 closed the main post-Phase-6+ usability gaps: committed pages are browsable in-app, bootstrap planning no longer requires a console, grant outcomes and reviewer feedback are editable from the Grants tab, related grant documents can be attached, grant PDF ingestion produces a labelled generated summary, and ingestion starts with a metadata pre-flight check.
 
 If you discover other gaps as you use the wiki, please open an issue.
 

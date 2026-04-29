@@ -18,6 +18,8 @@ export const LINT_RULES = [
   'pending_op_recovery_debt',
   'stale_evidence_locators',
   'grant_namespace_leakage',
+  'archived_target_missing',
+  'related_source_doc_unknown',
 ]
 
 const DEFAULT_OPTIONS = {
@@ -191,6 +193,7 @@ export async function lintStalePositionPages(snapshot, options, now = new Date()
 export async function lintOrphanPages(snapshot) {
   const findings = []
   for (const page of snapshot.pages) {
+    if (page.frontmatter?.archived === true) continue
     const type = pageType(page)
     if (type === 'paper' || type === 'position_draft' || type === 'position') continue
     const incoming = snapshot.incomingLinks.get(page.id) || []
@@ -293,6 +296,35 @@ export async function lintGrantNamespaceLeakage(snapshot) {
   return findings
 }
 
+export async function lintArchivedTargetMissing(snapshot) {
+  const findings = []
+  for (const page of snapshot.pages) {
+    const target = page.frontmatter?.superseded_by
+    if (!target) continue
+    if (!snapshot.pagesById.has(target)) {
+      findings.push(finding('archived_target_missing',
+        `Page "${page.frontmatter.title || page.id}" points superseded_by at missing page "${target}".`,
+        { page_id: page.id, severity: 'medium', details: { superseded_by: target } }))
+    }
+  }
+  return findings
+}
+
+export async function lintRelatedSourceDocUnknown(snapshot, library = {}) {
+  const findings = []
+  const documents = library.documents || {}
+  for (const page of snapshot.pages) {
+    for (const entry of page.frontmatter?.related_source_docs || []) {
+      const docId = entry?.scholarlib_doc_id
+      if (!docId || documents[docId]) continue
+      findings.push(finding('related_source_doc_unknown',
+        `Page "${page.frontmatter.title || page.id}" references unknown ScholarLib document "${docId}".`,
+        { page_id: page.id, severity: 'medium', details: { scholarlib_doc_id: docId, relation: entry?.relation || null } }))
+    }
+  }
+  return findings
+}
+
 export async function lintMalformedOpFiles(adapter) {
   const findings = []
   const files = await listFilesRecursive(adapter, WikiPaths.opsRoot)
@@ -390,6 +422,8 @@ export class LintService {
     if (rules.includes('contested_claims')) findings.push(...await lintContestedClaims(snapshot))
     if (rules.includes('stale_evidence_locators')) findings.push(...await lintStaleEvidenceLocators(snapshot))
     if (rules.includes('grant_namespace_leakage')) findings.push(...await lintGrantNamespaceLeakage(snapshot))
+    if (rules.includes('archived_target_missing')) findings.push(...await lintArchivedTargetMissing(snapshot))
+    if (rules.includes('related_source_doc_unknown')) findings.push(...await lintRelatedSourceDocUnknown(snapshot, this.options.library || {}))
     if (rules.includes('malformed_op_files')) findings.push(...await lintMalformedOpFiles(this.adapter))
     if (rules.includes('pending_op_recovery_debt')) findings.push(...await lintPendingOpRecoveryDebt(this.adapter, this.options, now))
 

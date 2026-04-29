@@ -15,6 +15,7 @@ import SplitViewPanel from './SplitViewPanel'
 import { NotesPanel } from '../notes'
 import { ChatPanel } from '../ai'
 import LitOrbitInsights from '../library/LitOrbitInsights'
+import MetadataPreflightModal from '../library/MetadataPreflightModal'
 import { WikiWorkspace } from '../wiki'
 import styles from './MainPanel.module.css'
 
@@ -22,6 +23,7 @@ export default function MainPanel({ isMobile = false }) {
   const [pdfUrl, setPdfUrl] = useState(null)
   const [pdfError, setPdfError] = useState(null)
   const [isWikiIngesting, setIsWikiIngesting] = useState(false)
+  const [metadataPreflight, setMetadataPreflight] = useState(null)
 
   const activePanel = useUIStore((s) => s.activePanel)
   const setActivePanel = useUIStore((s) => s.setActivePanel)
@@ -220,8 +222,9 @@ export default function MainPanel({ isMobile = false }) {
     setShowModal('share')
   }
 
-  const handleIngestWikiPaper = async () => {
-    if (!selectedDocId || !adapter || isDemoMode || isWikiIngesting) return
+  const handleIngestWikiPaper = async (doc = selectedDoc) => {
+    const docId = doc?.id || selectedDocId
+    if (!docId || !adapter || isDemoMode || isWikiIngesting) return
     setIsWikiIngesting(true)
     try {
       const state = useLibraryStore.getState()
@@ -234,8 +237,12 @@ export default function MainPanel({ isMobile = false }) {
         smart_collections: state.smartCollections,
       }
       await WikiService.regenerateSidecars(adapter)
-      const extraction = await new PaperExtractor().extractPaper(selectedDocId, library, adapter)
-      const proposalId = await new ProposalBuilder({ adapter }).buildProposal(extraction, library)
+      const updatedLibrary = {
+        ...library,
+        documents: { ...library.documents, [docId]: doc },
+      }
+      const extraction = await new PaperExtractor().extractPaper(docId, updatedLibrary, adapter)
+      const proposalId = await new ProposalBuilder({ adapter }).buildProposal(extraction, updatedLibrary)
       showToast({ message: `Wiki proposal created: ${proposalId}`, type: 'success' })
       setActivePanel('wiki')
     } catch (error) {
@@ -246,43 +253,68 @@ export default function MainPanel({ isMobile = false }) {
     }
   }
 
-  const handleIngestWikiGrant = async () => {
-    if (!selectedDocId || !selectedDoc || !adapter || isDemoMode || isWikiIngesting) return
+  const handleIngestWikiGrant = async (doc = selectedDoc, duplicateConfirmed = false) => {
+    const docId = doc?.id || selectedDocId
+    if (!docId || !doc || !adapter || isDemoMode || isWikiIngesting) return
     setIsWikiIngesting(true)
     try {
-      const page = await new GrantIngestion({ adapter }).ingestDocument({
-        ...selectedDoc,
-        id: selectedDocId,
+      const result = await new GrantIngestion({ adapter }).ingestDocument({
+        ...doc,
+        id: docId,
         reference_type: 'grant',
         user_data: {
-          ...selectedDoc.user_data,
+          ...doc.user_data,
           wiki_type: 'grant'
         }
-      })
+      }, { confirmDuplicate: duplicateConfirmed })
+      const page = result.page
 
-      updateDocument(selectedDocId, {
+      updateDocument(docId, {
         reference_type: 'grant',
         user_data: {
-          ...selectedDoc.user_data,
+          ...doc.user_data,
           wiki_type: 'grant'
         },
         wiki: {
-          ...selectedDoc.wiki,
+          ...doc.wiki,
           grant_page_id: page.id,
           grant_page_path: page.path,
           grant_ingested_at: new Date().toISOString()
         }
       })
       await useLibraryStore.getState().saveLibrary(adapter)
-      showToast({ message: `Grant wiki page created: ${page.frontmatter.title}`, type: 'success' })
+      showToast({
+        message: result.alreadyIngested ? `Already ingested as '${page.frontmatter.title}'` : `Grant wiki page created: ${page.frontmatter.title}`,
+        type: result.alreadyIngested ? 'info' : 'success'
+      })
+      useUIStore.getState().setWikiSelectedGrantPageId(page.id)
       setWikiWorkspaceTab('grants')
       setActivePanel('wiki')
     } catch (error) {
-      console.error('Grant ingestion failed:', error)
-      showToast({ message: error.message || 'Grant ingestion failed', type: 'error' })
+      if (error.code === 'GRANT_POSSIBLE_DUPLICATE') {
+        const ok = window.confirm(error.message)
+        if (ok) return handleIngestWikiGrant(doc, true)
+      } else {
+        console.error('Grant ingestion failed:', error)
+        showToast({ message: error.message || 'Grant ingestion failed', type: 'error' })
+      }
     } finally {
       setIsWikiIngesting(false)
     }
+  }
+
+  const openWikiPreflight = () => {
+    if (!selectedDoc || !adapter || isDemoMode || isWikiIngesting) return
+    setMetadataPreflight({
+      document: { ...selectedDoc, id: selectedDocId },
+      defaultType: selectedDocIsGrant ? 'grant' : 'paper',
+    })
+  }
+
+  const runPreflightIngest = async (document, type) => {
+    setMetadataPreflight(null)
+    if (type === 'grant') await handleIngestWikiGrant(document)
+    else await handleIngestWikiPaper(document)
   }
 
   return (
@@ -344,7 +376,7 @@ export default function MainPanel({ isMobile = false }) {
           {settingsService.getWikiEnabled() && selectedDoc && (
             <button
               className={styles.shareBtn}
-              onClick={selectedDocIsGrant ? handleIngestWikiGrant : handleIngestWikiPaper}
+              onClick={openWikiPreflight}
               disabled={(!selectedDocIsGrant && !selectedDoc?.box_path) || isWikiIngesting}
               title={selectedDocIsGrant ? 'Ingest this grant into private Wiki' : 'Ingest this paper into Wiki'}
             >
@@ -432,6 +464,16 @@ export default function MainPanel({ isMobile = false }) {
         onChange={handleAttachFileSelected}
         style={{ display: 'none' }}
       />
+      {metadataPreflight && (
+        <MetadataPreflightModal
+          document={metadataPreflight.document}
+          library={{ documents, folders }}
+          adapter={adapter}
+          defaultType={metadataPreflight.defaultType}
+          onIngest={runPreflightIngest}
+          onCancel={() => setMetadataPreflight(null)}
+        />
+      )}
         </>
       )}
     </div>

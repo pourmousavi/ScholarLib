@@ -56,6 +56,7 @@ export {
   clearMigrationRegistry,
 } from './migrations/SchemaMigrationRunner'
 export { migration_1_0_to_1_1 } from './migrations/migration_1_0_to_1_1'
+export { migration_1_1_to_1_2 } from './migrations/migration_1_1_to_1_2'
 export {
   BootstrapPlanService,
   BOOTSTRAP_SECTIONS,

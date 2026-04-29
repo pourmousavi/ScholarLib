@@ -1,104 +1,150 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLibraryStore } from '../../../store/libraryStore'
+import { useUIStore } from '../../../store/uiStore'
 import { useToast } from '../../../hooks/useToast'
 import { PageStore } from '../../../services/wiki/PageStore'
 import { GrantIngestion } from '../../../services/wiki/grants/GrantIngestion'
 import { getUningestedGrantDocuments } from '../../../services/wiki/grants/GrantLibraryClassifier'
-import styles from '../Wiki.module.css'
+import GrantOutcomeForm from './GrantOutcomeForm'
+import wikiStyles from '../Wiki.module.css'
+import styles from './GrantPanel.module.css'
+
+const OUTCOMES = ['pending', 'under_review', 'won', 'rejected', 'withdrawn', 'other']
 
 export default function GrantPanel({ adapter }) {
   const [grants, setGrants] = useState([])
   const [selectedId, setSelectedId] = useState(null)
+  const [activeOutcome, setActiveOutcome] = useState('pending')
   const [ingestingDocId, setIngestingDocId] = useState(null)
   const documents = useLibraryStore((s) => s.documents)
   const folders = useLibraryStore((s) => s.folders)
   const updateDocument = useLibraryStore((s) => s.updateDocument)
+  const targetedGrantId = useUIStore((s) => s.wikiSelectedGrantPageId)
+  const setTargetedGrantId = useUIStore((s) => s.setWikiSelectedGrantPageId)
   const { showToast } = useToast()
 
+  const library = useMemo(() => ({ documents, folders }), [documents, folders])
+
   const loadGrants = useCallback(async () => {
-    if (!adapter) return
+    if (!adapter) return []
     const pages = await PageStore.listPages(adapter)
-    setGrants(pages.filter(page => page.frontmatter?.type === 'grant'))
+    const next = pages
+      .filter(page => page.frontmatter?.type === 'grant')
+      .sort((a, b) => String(a.frontmatter?.title || a.id).localeCompare(String(b.frontmatter?.title || b.id)))
+    setGrants(next)
+    return next
   }, [adapter])
 
   useEffect(() => {
     let cancelled = false
-    async function load() {
-      if (!adapter) return
-      const pages = await PageStore.listPages(adapter)
-      if (!cancelled) setGrants(pages.filter(page => page.frontmatter?.type === 'grant'))
-    }
-    load()
+    loadGrants().then((next) => {
+      if (cancelled) return
+      if (!selectedId && next[0]) setSelectedId(next[0].id)
+    })
     return () => { cancelled = true }
-  }, [adapter])
+  }, [loadGrants])
 
-  const ingestGrantDocument = async (document) => {
+  useEffect(() => {
+    if (!targetedGrantId) return
+    setSelectedId(targetedGrantId)
+    const grant = grants.find((page) => page.id === targetedGrantId)
+    if (grant) setActiveOutcome(grant.frontmatter?.outcome || 'pending')
+    setTargetedGrantId(null)
+  }, [targetedGrantId, grants, setTargetedGrantId])
+
+  const ingestGrantDocument = async (document, duplicateConfirmed = false) => {
     if (!adapter || ingestingDocId) return
     setIngestingDocId(document.id)
     try {
-      const page = await new GrantIngestion({ adapter }).ingestDocument({
+      const result = await new GrantIngestion({ adapter }).ingestDocument({
         ...document,
         reference_type: 'grant',
         user_data: {
           ...document.user_data,
           wiki_type: 'grant'
         }
-      })
-      updateDocument(document.id, {
-        reference_type: 'grant',
-        user_data: {
-          ...document.user_data,
-          wiki_type: 'grant'
-        },
-        wiki: {
-          ...document.wiki,
-          grant_page_id: page.id,
-          grant_page_path: page.path,
-          grant_ingested_at: new Date().toISOString()
-        }
-      })
-      await useLibraryStore.getState().saveLibrary(adapter)
+      }, { confirmDuplicate: duplicateConfirmed })
+      const page = result.page
+      if (result.alreadyIngested) {
+        showToast({ message: `Already ingested as '${page.frontmatter.title}'`, type: 'info' })
+      } else {
+        updateDocument(document.id, {
+          reference_type: 'grant',
+          user_data: {
+            ...document.user_data,
+            wiki_type: 'grant'
+          },
+          wiki: {
+            ...document.wiki,
+            grant_page_id: page.id,
+            grant_page_path: page.path,
+            grant_ingested_at: new Date().toISOString()
+          }
+        })
+        await useLibraryStore.getState().saveLibrary(adapter)
+        showToast({ message: `Grant wiki page created: ${page.frontmatter.title}`, type: 'success' })
+      }
       await loadGrants()
       setSelectedId(page.id)
-      showToast({ message: `Grant wiki page created: ${page.frontmatter.title}`, type: 'success' })
+      setActiveOutcome(page.frontmatter?.outcome || 'pending')
     } catch (error) {
-      console.error('Grant ingestion failed:', error)
-      showToast({ message: error.message || 'Grant ingestion failed', type: 'error' })
+      if (error.code === 'GRANT_POSSIBLE_DUPLICATE') {
+        const ok = window.confirm(error.message)
+        if (ok) return ingestGrantDocument(document, true)
+      } else {
+        console.error('Grant ingestion failed:', error)
+        showToast({ message: error.message || 'Grant ingestion failed', type: 'error' })
+      }
     } finally {
       setIngestingDocId(null)
     }
   }
 
-  const selected = grants.find(grant => grant.id === selectedId) || grants[0]
+  const counts = useMemo(() => {
+    const next = Object.fromEntries(OUTCOMES.map((outcome) => [outcome, 0]))
+    for (const grant of grants) {
+      const outcome = OUTCOMES.includes(grant.frontmatter?.outcome) ? grant.frontmatter.outcome : 'other'
+      next[outcome] += 1
+    }
+    return next
+  }, [grants])
+
+  const filtered = grants.filter((grant) => {
+    const outcome = OUTCOMES.includes(grant.frontmatter?.outcome) ? grant.frontmatter.outcome : 'other'
+    return outcome === activeOutcome
+  })
+  const selected = grants.find(grant => grant.id === selectedId) || filtered[0] || grants[0]
   const pendingGrantDocs = getUningestedGrantDocuments(documents, folders)
-  const grouped = grants.reduce((acc, grant) => {
-    const key = grant.frontmatter?.outcome || 'pending'
-    acc[key] ||= []
-    acc[key].push(grant)
-    return acc
-  }, {})
+
+  const onSaved = async (page) => {
+    const next = await loadGrants()
+    setSelectedId(page.id)
+    setActiveOutcome(page.frontmatter?.outcome || 'pending')
+    const refreshed = next.find((entry) => entry.id === page.id)
+    showToast({ message: refreshed ? 'Grant page saved' : 'Grant page saved; refresh if it is not visible', type: 'success' })
+  }
 
   return (
-    <div className={styles.inbox}>
-      <div className={styles.header}>
+    <div className={wikiStyles.inbox}>
+      <div className={wikiStyles.header}>
         <div>
           <h2>Grants</h2>
-          <p>Private grant namespace. Mark a folder as grants to show its documents here.</p>
+          <p>Private grant namespace. Edit outcomes, feedback, notes, and related source documents.</p>
         </div>
       </div>
 
       {pendingGrantDocs.length > 0 && (
-        <section className={styles.change}>
+        <section className={wikiStyles.change}>
           <h3>Grant Documents To Ingest</h3>
-          <div className={styles.proposalList}>
+          <div className={wikiStyles.proposalList}>
             {pendingGrantDocs.map(document => (
-              <div key={document.id} className={styles.queueItem}>
+              <div key={document.id} className={wikiStyles.queueItem}>
                 <div>
                   <strong>{document.metadata?.title || document.filename || document.id}</strong>
                   <p>{document.filename || document.box_path || 'ScholarLib document'}</p>
                 </div>
                 <button
-                  className={styles.primaryBtn}
+                  className={wikiStyles.primaryBtn}
                   type="button"
                   onClick={() => ingestGrantDocument(document)}
                   disabled={!adapter || ingestingDocId === document.id}
@@ -111,31 +157,44 @@ export default function GrantPanel({ adapter }) {
         </section>
       )}
 
+      <div className={styles.buckets}>
+        {OUTCOMES.map((outcome) => (
+          <button
+            key={outcome}
+            type="button"
+            className={`${styles.bucket} ${activeOutcome === outcome ? styles.active : ''}`}
+            onClick={() => setActiveOutcome(outcome)}
+          >
+            {outcome} · {counts[outcome] || 0}
+          </button>
+        ))}
+      </div>
+
       {grants.length === 0 ? (
-        <div className={styles.empty}>No grant pages found.</div>
+        <div className={wikiStyles.empty}>No grant pages found.</div>
       ) : (
-        <div className={styles.diff}>
-          <div>
-            {Object.entries(grouped).map(([outcome, rows]) => (
-              <section key={outcome} className={styles.change}>
-                <h3>{outcome}</h3>
-                {rows.map(grant => (
-                  <button key={grant.id} className={styles.proposalItem} type="button" onClick={() => setSelectedId(grant.id)}>
-                    <span>{grant.frontmatter?.title || grant.id}</span>
-                    <span>{grant.frontmatter?.submitted || ''}</span>
-                  </button>
-                ))}
-              </section>
+        <div className={styles.layout}>
+          <div className={styles.list}>
+            {filtered.map(grant => (
+              <button
+                key={grant.id}
+                className={`${styles.cardButton} ${selected?.id === grant.id ? styles.active : ''}`}
+                type="button"
+                onClick={() => setSelectedId(grant.id)}
+              >
+                <strong>{grant.frontmatter?.title || grant.id}</strong>
+                <span className={styles.meta}>{grant.frontmatter?.funder || 'Unknown funder'} · {grant.frontmatter?.submitted || 'No year'}</span>
+              </button>
             ))}
+            {filtered.length === 0 && <div className={wikiStyles.empty}>No grants in this outcome bucket.</div>}
           </div>
-          {selected && (
-            <article className={styles.change}>
-              <h3>{selected.frontmatter?.title}</h3>
-              <p>{selected.frontmatter?.funder} {selected.frontmatter?.program}</p>
-              <p>Outcome: {selected.frontmatter?.outcome}</p>
-              <pre>{selected.body}</pre>
-            </article>
-          )}
+          <GrantOutcomeForm
+            grantPage={selected}
+            grants={grants}
+            library={library}
+            adapter={adapter}
+            onSaved={onSaved}
+          />
         </div>
       )}
     </div>

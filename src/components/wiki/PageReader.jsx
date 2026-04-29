@@ -24,12 +24,14 @@ export default function PageReader({ body, pagesById = {}, onOpenPage }) {
           if (href?.startsWith('#wiki-')) {
             const id = href.replace('#wiki-', '')
             const page = pagesById[id]
+            const missing = !page
             return (
               <button
                 type="button"
                 title={page?.title || id}
+                data-broken-wikilink={missing ? 'true' : undefined}
                 onClick={() => onOpenPage?.(id)}
-                style={{ color: 'var(--accent)', background: 'none', border: 0, padding: 0, cursor: 'pointer' }}
+                style={{ color: missing ? 'var(--error)' : 'var(--accent)', background: 'none', border: 0, padding: 0, cursor: missing ? 'help' : 'pointer' }}
               >
                 {children}
               </button>

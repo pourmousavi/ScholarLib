@@ -82,6 +82,7 @@ export const useUIStore = create((set) => ({
   activePanel: 'pdf',
   previousPanel: null,
   wikiWorkspaceTab: localStorage.getItem('sv_wiki_workspace_tab') || 'inbox',
+  wikiSelectedGrantPageId: null,
   showModal: null,
   sidebarCollapsed: false,
   docListCollapsed: false,
@@ -119,6 +120,7 @@ export const useUIStore = create((set) => ({
     localStorage.setItem('sv_wiki_workspace_tab', tab)
     set({ wikiWorkspaceTab: tab })
   },
+  setWikiSelectedGrantPageId: (pageId) => set({ wikiSelectedGrantPageId: pageId }),
   setShowModal: (modal) => set({ showModal: modal }),
 
   // Citation export actions

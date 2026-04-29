@@ -45,8 +45,10 @@ A persistent, LLM-maintained markdown layer above your PDFs that compounds with 
 - **Verifier pass** — every high-impact claim is checked against its quoted evidence; unsupported claims are kept visible but never silently committed.
 - **Quality dashboard** — five tracked metrics (claim rejection, review time, schema migrations, concept-page usefulness, manual cleanup) with auto-pause on threshold breach.
 - **Controlled bootstrap** — tools to plan and ingest 25–30 of your papers + 10–15 external anchors with per-theme coverage tracking and a one-shot mid-bootstrap schema revision.
+- **In-app Pages browser** — browse committed paper, concept, method, dataset, position, grant, question, person, and analysis pages without opening the cloud folder.
 - **Wiki-assisted chat** — chat routes between wiki (synthesis) and RAG (extractive); save useful answers back as wiki candidates.
-- **Grants kept private** — mark a folder as a grant folder; documents inside route to a private namespace that never reaches a cloud provider.
+- **Grants kept private** — mark a folder as a grant folder; documents inside route to a private namespace that never reaches a cloud provider, with local PDF summaries, outcome editing, reviewer feedback, and related source attachments.
+- **Metadata pre-flight** — correct paper or grant metadata before ingestion creates a proposal or page.
 - **Obsidian export** — generate a read-only mirror at `_wiki_export_obsidian/` for graph view and mobile reading.
 
 The design is in [SCHOLARLIB_WIKI_DESIGN_V2_1.md](SCHOLARLIB_WIKI_DESIGN_V2_1.md); the per-phase build prompts are in `SCHOLARLIB_WIKI_PHASE_*.md`.

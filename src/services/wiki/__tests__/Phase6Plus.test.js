@@ -4,7 +4,7 @@ import { PageStore } from '../PageStore'
 import { WikiPaths } from '../WikiPaths'
 import { ObsidianFormatter } from '../export/ObsidianFormatter'
 import { ObsidianExporter } from '../export/ObsidianExporter'
-import { GrantIngestion } from '../grants/GrantIngestion'
+import { GrantIngestion, replaceOrAppendSection } from '../grants/GrantIngestion'
 import { GrantNamespacePolicy } from '../grants/GrantNamespacePolicy'
 import { getUningestedGrantDocuments, isGrantDocument } from '../grants/GrantLibraryClassifier'
 import { QuestionClusterer } from '../questions/QuestionClusterer'
@@ -12,6 +12,7 @@ import { QuestionPromoter } from '../questions/QuestionPromoter'
 import { LintService } from '../lint/LintService'
 import { IntegrityService } from '../IntegrityService'
 import { SidecarService } from '../SidecarService'
+import { WikiRetrieval } from '../chat/WikiRetrieval'
 
 async function seedPages(adapter) {
   await PageStore.writePage(adapter, {
@@ -177,5 +178,142 @@ describe('Phase 6+ post-trust extensions', () => {
       (issue) => issue.code === 'PAGE_MISSING_FROM_SIDECAR' && issue.page_id?.startsWith('g_')
     )
     expect(remainingGrantWarnings).toHaveLength(0)
+  })
+
+  it('updates grant fields and preserves unrelated body sections', async () => {
+    const adapter = new MemoryAdapter()
+    const created = await new GrantIngestion({ adapter }).ingestGrant({
+      title: 'Outcome grant',
+      provider: 'ollama',
+      body: '## Generated Application Summary\n\nSummary.\n\n## Reviewer Feedback\n\nOld\n\n## Outcome Notes\n\nOld notes\n\n## Extra\n\nKeep me.',
+    })
+
+    const updated = await new GrantIngestion({ adapter }).updateGrantFields(created.id, {
+      outcome: 'rejected',
+      reviewer_feedback: 'Reviewer 1: too risky.',
+      outcome_notes: 'Resubmit next round.',
+    })
+
+    expect(updated.frontmatter).toMatchObject({
+      outcome: 'rejected',
+      reviewer_feedback: 'Reviewer 1: too risky.',
+      human_edited: true,
+    })
+    expect(updated.frontmatter.last_human_review).toBeTruthy()
+    expect(updated.body).toContain('## Reviewer Feedback\n\nReviewer 1: too risky.')
+    expect(updated.body).toContain('## Outcome Notes\n\nResubmit next round.')
+    expect(updated.body).toContain('## Extra\n\nKeep me.')
+  })
+
+  it('attachRelatedDocument records related source docs without extracting when disabled', async () => {
+    const adapter = new MemoryAdapter()
+    const created = await new GrantIngestion({ adapter }).ingestGrant({
+      title: 'Attachment grant',
+      provider: 'ollama',
+      body: '## Generated Application Summary\n\nSummary.',
+    })
+    const library = {
+      documents: {
+        d_notice: {
+          id: 'd_notice',
+          filename: 'notice.txt',
+          metadata: { title: 'Outcome notice' },
+        },
+      },
+    }
+
+    const updated = await new GrantIngestion({ adapter }).attachRelatedDocument(created.id, 'd_notice', {
+      relation: 'outcome_notice',
+      extractBody: false,
+      library,
+    })
+
+    expect(updated.frontmatter.related_source_docs).toEqual([
+      expect.objectContaining({
+        scholarlib_doc_id: 'd_notice',
+        relation: 'outcome_notice',
+        title: 'Outcome notice',
+      }),
+    ])
+    expect(updated.body).not.toContain('Outcome Notes (from')
+  })
+
+  it('ingestDocument returns the existing grant on matching source_doc_id', async () => {
+    const adapter = new MemoryAdapter()
+    await adapter.uploadFile('sources/grant.md', new Blob(['Summary.']))
+    const document = {
+      id: 'd_dup',
+      filename: 'dup.pdf',
+      ai_chat_source_file: 'sources/grant.md',
+      metadata: { title: 'Duplicate grant' },
+    }
+    const first = await new GrantIngestion({ adapter }).ingestDocument(document)
+    const second = await new GrantIngestion({ adapter }).ingestDocument(document)
+
+    expect(second.alreadyIngested).toBe(true)
+    expect(second.id).toBe(first.id)
+    expect(second.page.id).toBe(first.id)
+  })
+
+  it('replaceOrAppendSection replaces existing headings and appends missing headings', () => {
+    const replaced = replaceOrAppendSection('Intro\n\n## Outcome Notes\n\nOld\n\n## Extra\n\nKeep', 2, 'Outcome Notes', 'New')
+    expect(replaced).toContain('## Outcome Notes\n\nNew')
+    expect(replaced).toContain('## Extra\n\nKeep')
+
+    const appended = replaceOrAppendSection('Intro', 2, 'Reviewer Feedback', 'Feedback')
+    expect(appended).toContain('Intro')
+    expect(appended).toContain('## Reviewer Feedback\n\nFeedback')
+  })
+
+  it('lint flags missing archive targets and unknown related source documents', async () => {
+    const adapter = new MemoryAdapter()
+    await PageStore.writePage(adapter, {
+      id: 'c_archived',
+      type: 'concept',
+      title: 'Archived Concept',
+      frontmatter: { type: 'concept', title: 'Archived Concept', archived: true, superseded_by: 'c_missing' },
+      body: 'Archived.',
+    })
+    await PageStore.writePage(adapter, {
+      id: 'g_related',
+      type: 'grant',
+      title: 'Related Grant',
+      frontmatter: {
+        type: 'grant',
+        title: 'Related Grant',
+        related_source_docs: [{ scholarlib_doc_id: 'd_missing', relation: 'outcome_notice', title: 'Missing' }],
+      },
+      body: 'Grant.',
+    })
+
+    const result = await new LintService({ adapter, options: { library: { documents: {} } } }).runAll({
+      rules: ['archived_target_missing', 'related_source_doc_unknown', 'orphan_pages'],
+    })
+
+    expect(result.findings.map((finding) => finding.rule)).toContain('archived_target_missing')
+    expect(result.findings.map((finding) => finding.rule)).toContain('related_source_doc_unknown')
+    expect(result.findings.find((finding) => finding.rule === 'orphan_pages' && finding.page_id === 'c_archived')).toBeUndefined()
+  })
+
+  it('wiki retrieval excludes archived pages by default', async () => {
+    const adapter = new MemoryAdapter()
+    await PageStore.writePage(adapter, {
+      id: 'c_live',
+      type: 'concept',
+      title: 'Live Battery Concept',
+      frontmatter: { type: 'concept', title: 'Live Battery Concept' },
+      body: 'battery live concept',
+    })
+    await PageStore.writePage(adapter, {
+      id: 'c_old',
+      type: 'concept',
+      title: 'Old Battery Concept',
+      frontmatter: { type: 'concept', title: 'Old Battery Concept', archived: true },
+      body: 'battery old concept',
+    })
+
+    const result = await new WikiRetrieval().retrieve('battery concept', { type: 'library' }, { adapter })
+    expect(result.pages.map((page) => page.id)).toContain('c_live')
+    expect(result.pages.map((page) => page.id)).not.toContain('c_old')
   })
 })
