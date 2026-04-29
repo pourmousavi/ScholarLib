@@ -7,15 +7,15 @@ description: How to use the LLM Wiki layer end-to-end — from your first paper 
 
 # ScholarLib Wiki — User Guide
 
-Practical walk-through of the LLM Wiki layer: what it is, where to click, what each surface does, and how to move from a fresh install to a knowledge graph that supports your real writing.
+Practical walk-through of the LLM Wiki layer: what it is, where to click, what each surface does, and how to move from a fresh install to a knowledge graph that supports real reading, writing, and grant tracking.
 
-> **Source of truth.** This guide describes the application as shipped through Phase 6+. The authoritative design lives in [`SCHOLARLIB_WIKI_DESIGN_V2_1.md`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_DESIGN_V2_1.md); the phase-by-phase build instructions live in `SCHOLARLIB_WIKI_PHASE_*.md` at the repository root. When this guide and the design disagree, the design wins — please open an issue so the guide can be corrected.
+> This guide describes the user-facing wiki features in the current ScholarLib app. Internal build prompts and design notes are not required to use the wiki.
 
 ---
 
 ## 1. What the wiki is (and is not)
 
-The wiki is a persistent, LLM-maintained markdown layer that sits above your PDFs in Box or Dropbox. The model does the bookkeeping you would otherwise abandon — cross-referencing claims across papers, keeping concept summaries current, flagging contradictions, tracking unanswered questions. Pages compound with use because answers from chat can be filed back into them.
+The wiki is a persistent, LLM-maintained markdown layer that sits above your PDFs in Box or Dropbox. The model does the bookkeeping you would otherwise abandon — cross-referencing claims across papers, keeping concept summaries current, flagging contradictions, tracking unanswered questions. Pages compound with use because ingested papers, grant updates, and saved chat candidates can be filed back into them.
 
 This is structurally different from RAG, which re-derives an answer from raw chunks per query and accumulates nothing. The wiki *accumulates* synthesis; RAG remains available for verification and extractive subqueries.
 
@@ -28,8 +28,9 @@ This is structurally different from RAG, which re-derives an answer from raw chu
 **It is not:**
 
 - A graph database. Relationships are stored as wikilinks in markdown.
-- A second app to maintain. The wiki updates only when you ingest papers or save chat answers.
+- A second app to maintain. The wiki updates only when you ingest papers, manage grant records, or save chat answers as candidates.
 - A replacement for chat. Chat now routes between wiki and RAG depending on the query.
+- A generic page editor. Paper, concept, method, dataset, position, question, person, and analysis pages are read-only inside the app. Grant pages have a structured form for grant-specific fields.
 
 **Page types you will see:**
 
@@ -58,7 +59,7 @@ The wiki layer was designed for five jobs in priority order:
 4. **Team supervision artefacts** — concept and position pages survive PhD turnover; a new student gets a curated entry point.
 5. **Teaching prep** — for ELEC ENG 4087/7087 and similar units, lecture material is grounded in your own work.
 
-Phase 1 is single-user. The data model accommodates a future team layer with no migration; team plumbing is intentionally not built.
+The current wiki is single-user. The data model leaves room for future team workflows, but team editing is not part of the current app.
 
 ---
 
@@ -90,7 +91,7 @@ Before the wiki can do anything useful:
 1. **Connect storage** (Box or Dropbox) via Settings → Storage. The wiki will refuse to operate in demo mode.
 2. **Configure at least one model provider.** The wiki defaults to Ollama for non-sensitive tasks; without it, you must enable a cloud provider in Settings (Claude, OpenAI, or Gemini). Sensitive content (grant pages) is Ollama-only by policy and is **never** sent to a cloud provider.
 3. **Optional but recommended:** install [Ollama](https://ollama.com) locally and pull a synthesis-grade model (e.g. `llama3.3:70b` or `qwen2.5:32b`) and an embedding model (`nomic-embed-text`). With local models, routine paper ingestion costs $0; verifier passes on high-impact claims fall back to a small cloud model.
-4. **Decide on themes.** Before bootstrapping (see §7), have a list of 5–8 research themes you want the wiki to cover. The wiki does not auto-cluster — themes are user-defined.
+4. **Decide on themes.** Before bootstrapping (see §8), have a list of 5–8 research themes you want the wiki to cover. The wiki does not auto-cluster — themes are user-defined.
 
 The wiki creates `_wiki/` lazily on first ingestion. Nothing to scaffold.
 
@@ -101,8 +102,8 @@ The wiki creates `_wiki/` lazily on first ingestion. Nothing to scaffold.
 This is the most common operation.
 
 1. Select a PDF in the document list.
-2. Click the **paper-ingest** button in the top action bar (the icon shows a folded page with a plus). For a grant-folder document, the same button shows **G** and routes to grant ingestion (see §9).
-3. Check the **metadata pre-flight** modal. Correct obvious title, year, DOI, author, funder, program, or submitted-year problems before the wiki page or proposal is created. This is where you catch joined strings such as `Round 182025`.
+2. Click the **paper-ingest** button in the top action bar (the icon shows a folded page with a plus). For a grant-folder document, the same button shows **G** and routes to grant ingestion (see §10).
+3. Check the **metadata pre-flight** modal. For papers, correct title, DOI, year, and authors. If the document should be treated as a grant, switch the type to Grant and correct title, funder, program, and submitted year. This is where you catch joined strings such as `Round 182025`.
 4. The pipeline runs in the background:
    - Reads PDF text via PDF.js.
    - Reads `pages.json` and `aliases.json` to find candidate concept pages this paper might touch.
@@ -110,19 +111,19 @@ This is the most common operation.
    - Generates a structured proposal: a paper page plus updates to listed concept/method/dataset pages, with claims and evidence locators (PDF page + char range + page-text hash).
    - Runs a **verifier pass** on every claim flagged high-impact: a frontier model is asked whether the quoted evidence supports the claim. Unsupported claims are kept in the proposal as `do_not_apply` so you can see why they were filtered.
    - Writes the proposal to `_wiki/_proposals/prop_<ulid>.json`.
-5. The proposal appears in the **Inbox** tab. The workspace does not auto-open — switch to it when you are ready to review.
+5. ScholarLib switches to the Wiki workspace. Open the **Inbox** tab if it is not already selected, then review the proposal.
 
-**Re-ingesting the same paper is idempotent** — the proposal builder produces the same shape from the same input, so nothing duplicates.
+Avoid repeatedly ingesting the same paper unless you intentionally want a fresh proposal after changing metadata or source files. Grant ingestion has a duplicate guard; paper ingestion is still proposal-based, so you should reject duplicate proposals in the Inbox.
 
 **If the paper is large** (over the local model's context window): the pipeline chunks the page text and preserves locators per page. If neither local nor cloud can handle it safely, ingestion fails with a clear error rather than silently truncating.
 
-**If you are in safety mode** (see §13): ingestion is blocked. Resolve the underlying issue first.
+**If you are in safety mode** (see §17): ingestion is blocked. Resolve the underlying issue first.
 
 ---
 
 ## 6. Workflow B — Review proposals in the Inbox
 
-The Inbox tab is the queue you work through. From the Phase 2 spec, the design target is **under 5 minutes per normal paper** (no high-risk pages).
+The Inbox tab is the queue you work through. The design target is **under 5 minutes per normal paper** when there are no high-risk changes.
 
 **Top of the inbox shows:**
 
@@ -164,13 +165,31 @@ The Inbox tab is the queue you work through. From the Phase 2 spec, the design t
 6. Writes a committed op file (`op_<ulid>.committed.json`).
 7. Moves the proposal to `_wiki/_proposals/_archived/`.
 
-If anything fails between steps 3 and 5, the system enters **safety mode** and the inbox surfaces a recovery action (see §13).
+If anything fails between steps 3 and 5, the system enters **safety mode** and the inbox surfaces a recovery action (see §17).
 
 **Stale-pages section** at the bottom of the Inbox lists pages older than 90 days without human review — these are candidates for a refresh ingestion.
 
 ---
 
-## 7. Workflow C — Bootstrap a corpus (Phase 3)
+## 7. Workflow C — Browse committed pages
+
+Use the **Pages** tab when you want to see what the wiki has already committed.
+
+The left column groups pages by type: paper, concept, method, dataset, position, position draft, grant, question, person, and analysis. Each group shows a count. Use the search box to filter by page title, handle, ID, or alias.
+
+The right column renders the selected page. ID wikilinks such as `[[c_...]]` become buttons that open the linked page inside the same browser. Broken wikilinks are shown as broken targets so you can distinguish navigation problems from normal text.
+
+Controls:
+
+- **View raw** shows the actual stored markdown.
+- **Open in grant form** appears only for grant pages and switches to the Grants tab.
+- **Show archived** includes pages marked `archived: true`; archived pages are hidden by default.
+
+The Pages tab is intentionally read-only. To change paper/concept/method/dataset/question/position content, ingest a source and review the proposal in the Inbox. To change grant outcome, feedback, notes, or related source documents, use the Grants tab.
+
+---
+
+## 8. Workflow D — Bootstrap a corpus
 
 This is how you go from "1 paper ingested" to "wiki rich enough for chat to be useful."
 
@@ -190,7 +209,7 @@ Open the **Bootstrap** tab to manage this plan in the app. The tab shows own-pap
 
 1. Add 25–30 own-papers to the plan, order them by importance to your work.
 2. Ingest them through the normal paper-ingest button. Each paper gets routed with **bootstrap-aware context**: the extraction prompt is augmented with whether the paper is yours, what theme it belongs to, what other papers in the same theme have already been ingested, and whether this is the first paper in the theme (`first_in_theme`), a subsequent paper (`subsequent_in_theme`), or an external anchor.
-3. After paper 15, the **Quality dashboard** surfaces a one-shot **Mid-bootstrap schema revision check** banner. This is the last chance to migrate the schema before Phase 5. Either run a guided revision or skip — once skipped, the option is closed for the rest of Phase 3.
+3. After paper 15, the **Quality** dashboard can surface a one-shot **Mid-bootstrap schema revision check** banner. This is the last chance to migrate the schema before broader chat use. Either run a guided revision or skip — once skipped, the option is closed for the rest of the bootstrap.
 4. Continue ingesting the remaining own-papers and the external anchors.
 
 **Pacing note from the design.** Phase 3 is the most demanding phase in terms of sustained attention. 35–45 papers × ~5 minutes review each is roughly 3–4 hours of focused review. **5 papers per evening over 8 evenings is sustainable; 15 papers in one weekend afternoon is not.** If a particular theme produces concept pages you find unhelpful when you actually use them, pause that theme and revisit — pushing through a broken theme accumulates noise that is hard to clean up later.
@@ -199,7 +218,7 @@ Open the **Bootstrap** tab to manage this plan in the app. The tab shows own-pap
 
 ---
 
-## 8. Workflow D — Read the Quality dashboard
+## 9. Workflow E — Read the Quality dashboard
 
 The Quality tab tracks five metrics derived from your ingestion checklists, each with a green/amber/red threshold. In Phase 1 mode the thresholds are loose (10-paper trial); in Phase 3 mode they tighten.
 
@@ -215,20 +234,20 @@ Each metric card shows the current value, the trend over the last 5 papers, the 
 
 When any threshold is crossed, ingestion **auto-pauses** and the dashboard prompts for a decision: continue with override (logged with justification), run a schema revision, or step back.
 
-**Phase 3 extensions** (visible when you set `phase="phase3"` in the dashboard props, or implicitly once the bootstrap plan exists):
+Bootstrap-related dashboard extensions include:
 
-- **Mid-bootstrap migration banner** at paper 15 (see §7).
+- **Mid-bootstrap migration banner** at paper 15 (see §8).
 - **Cost-projection warning** when projected total spend exceeds the Phase 3 upper bound.
 - **Bootstrap progress** — own-papers ingested / target, external anchors / target, statuses.
 - **Per-theme coverage table** — papers ingested, concept pages created, well-supported (≥3 papers) concept pages, per theme.
 - **Cross-paper coherence (top concepts)** — for the top 10 most-linked concept pages: supporting paper count, claim count, avg supporting papers, stddev claim count.
-- **Generate Phase 3 report** button — emits `_wiki/_phase3/PHASE_3_REPORT.md` with summary, per-theme structure, wiki state, quality metrics, cost projection, overrides, and a **Phase 5 readiness check** scoring each of the nine [DEC-19] gates as pass / trending / fail / pending.
+- **Generate Phase 3 report** button — emits `_wiki/_phase3/PHASE_3_REPORT.md` with summary, per-theme structure, wiki state, quality metrics, cost projection, overrides, and readiness checks for broader wiki-assisted chat use.
 
-The Phase 3 report is the input to deciding whether to proceed to Phase 4. The exit criterion is **at least 8 of 9 quality gates passing or trending**.
+The Phase 3 report is a checkpoint for deciding whether the wiki is mature enough to rely on for writing and chat.
 
 ---
 
-## 9. Workflow E — Mark a grant folder + ingest grants
+## 10. Workflow F — Mark a grant folder + ingest grants
 
 Grants are sensitive. They live in a private namespace (`_wiki/_private/grant/`) and are **Ollama-only by policy** — no cloud provider sees them.
 
@@ -252,35 +271,36 @@ To unmark a folder, right-click and choose **Unmark as grant folder**. Already-i
 
 ---
 
-## 10. Workflow F — Curate open questions
+## 11. Workflow G — Curate open questions
 
-During paper ingestion, the model can propose **open question candidates** (per [DEC-09]) — questions the paper raises but does not answer, things you might want to investigate. These are not full pages — they are records inside paper pages, surfaced for clustering.
+During paper ingestion, the model can propose **open question candidates** — questions the paper raises but does not answer, things you might want to investigate. These are not full pages; they are records inside paper pages, surfaced for clustering.
 
 The **Questions** tab shows clusters generated by `QuestionClusterer` from the candidates accumulated so far. For each cluster:
 
-- The candidate questions, with the source paper page link.
-- A **Promote to canonical question page** action that creates a `q_*` page.
+- The cluster label.
+- The number of candidate questions in the cluster.
+- A **Promote** action that creates a canonical `q_*` question page.
 
-This is a Phase 6+ feature. Only run it after enough papers are ingested (10+ recommended) for clustering to find structure.
+Only run question clustering after enough papers are ingested (10+ recommended) for clusters to have useful structure.
 
 ---
 
-## 11. Workflow G — Run a benchmark
+## 12. Workflow H — Run a benchmark
 
-The **Benchmark** tab runs the synthesis-question benchmark from [DEC-20]: a curated set of questions, answered by three paths (RAG-only, wiki-only, wiki+RAG), scored by you. The benchmark is the project's main empirical check on whether the wiki actually delivers.
+The **Benchmark** tab runs a curated set of synthesis questions through multiple retrieval routes so you can compare whether wiki context improves answers.
 
 To run:
 
-1. The tab loads the benchmark question set from `_wiki/_benchmark/`.
-2. For each question, the runner generates three answers with provenance metadata.
-3. You score each answer for accuracy and synthesis quality.
-4. Results are aggregated into a `_wiki/_benchmark/<date>.json` report.
+1. The tab loads questions from `_wiki/_phase5/benchmark_questions.json`.
+2. For each question, the runner generates blinded answers from current RAG, improved RAG, and wiki-assisted retrieval.
+3. You score each answer for usefulness, citation correctness, and writing utility.
+4. The benchmark service can write a Phase 5 report to `_wiki/_phase5/PHASE_5_BENCHMARK_REPORT.md` and update routing defaults in `_wiki/_system/chat_routing_defaults.json`.
 
-Phase 5's exit criterion is that the wiki-assisted path **wins or ties** on the synthesis subset, confirmed by 2 weeks of real use. If the benchmark runs against and the wiki loses, the routing default reverts to RAG and the Phase 6+ work is reconsidered.
+Use the benchmark as a calibration tool, not as a grade. If wiki-assisted answers do not help on synthesis questions, prefer RAG for that query class until more pages are ingested or the routing defaults are adjusted.
 
 ---
 
-## 12. Workflow H — Export to Obsidian
+## 13. Workflow I — Export to Obsidian
 
 The Obsidian export is a **read-only** mirror at `_wiki_export_obsidian/`. Obsidian (or Logseq) reads it; edits in Obsidian are discarded on the next regeneration.
 
@@ -301,29 +321,28 @@ The Obsidian export is opt-in. Do not enable the after-each-ingestion variant du
 
 ---
 
-## 13. Wiki-assisted chat (Phase 5)
+## 14. Wiki-assisted chat
 
-Once Phase 5 ships, the Chat panel routes between three paths:
+When the wiki is enabled, the Chat panel routes between three paths:
 
-- **Wiki-only** — assemble context from `_wiki/` pages relevant to the query (concept, method, position, paper pages).
+- **Wiki-only** — assemble context from `_wiki/` pages relevant to the query. Archived pages are excluded by default.
 - **RAG-only** — current ScholarLib behaviour: chunk-level retrieval over selected scope.
 - **Wiki + RAG** — wiki for synthesis, RAG for verification or extractive subqueries.
 
-The route is chosen by an **intent classifier** (`IntentClassifier`) plus a multi-signal scorer per [DEC-17]. You can override per message.
+The route is chosen by an **intent classifier** plus a multi-signal scorer. You can override per message.
 
-**UI changes** (Phase 5):
+Chat UI changes:
 
-- Two citation icon styles: PDF (📄) and wiki page (📝).
 - Provenance badge per response: "from wiki" / "from PDFs" / "from both".
-- **Save as candidate** affordance on every wiki-assisted answer. Saved candidates land in `_wiki/_inbox/chat-candidates/<date>-<slug>.json` and feed a future batch-promotion UI (Phase 7+).
+- **Save as candidate** affordance on assistant answers when the wiki feature flag is enabled. Saved candidates land in `_wiki/_inbox/chat-candidates/<date>-<slug>.json` and feed a future batch-promotion UI.
 
 The compounding mechanism is subtle. **Save-as-candidate is the only reason the wiki gets richer in steady state** (other than new ingestion). If you don't use it, the wiki freezes after the bootstrap and slowly becomes stale. If by week 2 of real use you have saved 3+ candidates per week and consult the wiki side-panel during writing, the project is succeeding.
 
-Existing chat scopes (single-doc, folder, library, tag, collection) are preserved — folder-scope semantics are bit-identical to pre-Phase-4 [A-12].
+Existing chat scopes (single-doc, folder, library, tag, collection) are preserved.
 
 ---
 
-## 14. Storage layout
+## 15. Storage layout
 
 Everything the wiki writes lives under your Box/Dropbox root.
 
@@ -385,7 +404,7 @@ Two top-level directories — `_wiki/` (canonical) and `_wiki_export_obsidian/` 
 
 ---
 
-## 15. Cost and quotas
+## 16. Cost and quotas
 
 With Ollama-default routing on a Mac that can run a synthesis-grade model:
 
@@ -412,7 +431,7 @@ The Inbox top bar shows the current month's spend against the monthly cap. The Q
 
 ---
 
-## 16. Safety mode and recovery
+## 17. Safety mode and recovery
 
 Safety mode is a **read-only state on detected wiki corruption**. Triggers include:
 
@@ -438,13 +457,13 @@ While in safety mode:
 
 After any recovery action, the wiki state is reset to `Normal` and ingestion resumes.
 
-A weekly lint pass writes findings to `_wiki/lint-reports/YYYY-MM-DD.md` and surfaces them in the Inbox. The lint rules are listed in [`SCHOLARLIB_WIKI_DESIGN_V2_1.md`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_DESIGN_V2_1.md) §6.8.
+A weekly lint pass writes findings to `_wiki/lint-reports/YYYY-MM-DD.md` and surfaces them in the Inbox. Current lint checks include stale pages, ingestion debt, orphan pages, alias collisions, broken wikilinks, contested claims, stale evidence locators, grant namespace leakage, unknown related source documents, and missing archive targets.
 
 ---
 
-## 17. Phase status
+## 18. Phase status
 
-The wiki is built in 8 phases. As of the latest commit:
+The wiki was built in phases. Current status:
 
 | Phase | Topic | Status |
 |---|---|---|
@@ -466,9 +485,9 @@ If you discover other gaps as you use the wiki, please open an issue.
 
 ---
 
-## 18. Phase notes — practical guidance from the build
+## 19. Phase notes — practical guidance from the build
 
-These are the "Notes for the user" sections from each phase prompt, distilled. They are the design author's advice on how to actually use each phase.
+These notes are practical advice for using the wiki without turning the bootstrap into busywork.
 
 **Phase 0B (first ingestion).** Inspect the proposal review surface critically. Does the risk tiering match your intuition? Are verifier rejections accurate? How long did the review actually take? Mock-based tests do not tell you whether the prompts produce sensible verifications on real claims.
 
@@ -482,11 +501,11 @@ These are the "Notes for the user" sections from each phase prompt, distilled. T
 
 **Phase 5 (wiki-assisted chat + benchmark).** Score the benchmark **honestly**. The system can handle a benchmark loss by defaulting to RAG; what it cannot handle is a benchmark won by advocacy that produces sustained dissatisfaction. If by week 2 of real use you have forgotten the wiki exists, that is the signal to step back and reconsider Phase 6+.
 
-**Phase 6+ (post-trust extensions).** These exist because of compounding value, not because they are necessary. The wiki is already useful at end of Phase 5. If life gets busy and Phase 6+ never ships, the project is still a success. **The grant pattern miner (Phase 8) is the single most valuable feature in this entire project for a researcher with ongoing grant volume and rejection history. If only one Phase 6+ feature ships, make it that.**
+**Phase 6+ (post-trust extensions).** These exist because of compounding value, not because they are necessary for daily reading. Use Obsidian export and the Pages browser for visibility; use the grant workflow only for genuinely grant-related material so the private namespace stays clean. **The grant pattern miner (Phase 8) remains the most valuable future feature for a researcher with ongoing grant volume and rejection history.**
 
 ---
 
-## 19. Glossary
+## 20. Glossary
 
 | Term | Meaning |
 |---|---|
@@ -518,18 +537,11 @@ These are the "Notes for the user" sections from each phase prompt, distilled. T
 
 ---
 
-## 20. Where to read more
-
-Source-of-truth documents at the repository root:
-
-- [`SCHOLARLIB_WIKI_DESIGN_V2_1.md`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_DESIGN_V2_1.md) — the design contract. §4 lists every architectural decision (`[DEC-NN]`) and amendment (`[A-NN]`). §5 is the storage layout. §6 is the schema spec. §7 is the ingestion pipeline. §8 is chat integration. §10 is the phase plan.
-- Per-phase build prompts: [`PHASE_0A`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_0A_PROMPT.md) · [`0B`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_0B_PROMPT.md) · [`1`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_1_PROMPT.md) · [`2`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_2_PROMPT.md) · [`3`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_3_PROMPT.md) · [`4`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_4_PROMPT.md) · [`5`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_5_PROMPT.md) · [`6+`](https://github.com/pourmousavi/ScholarLib/blob/main/SCHOLARLIB_WIKI_PHASE_6_PLUS_PROMPT.md). Each contains its own "Notes for the user" section and exit criteria.
-- [Cross-phase addendum](https://github.com/pourmousavi/ScholarLib/blob/main/scholarlib-wiki-phase-prompts-final-addendum.md) — corrections that apply to every phase prompt.
+## 21. Where to read more
 
 Project docs:
 
 - [`README.md`](https://github.com/pourmousavi/ScholarLib/blob/main/README.md) — top-level project overview.
-- [`CLAUDE.md`](https://github.com/pourmousavi/ScholarLib/blob/main/CLAUDE.md) — build guide for AI coding tools.
 - [`docs/ARCHITECTURE.md`](https://github.com/pourmousavi/ScholarLib/blob/main/docs/ARCHITECTURE.md) — overall ScholarLib architecture (the wiki sits on top of this).
 - [`docs/USER_SETUP.md`](https://github.com/pourmousavi/ScholarLib/blob/main/docs/USER_SETUP.md) — Box/Dropbox account setup, API keys.
 - [`docs/LIBRARY_SCHEMA.md`](https://github.com/pourmousavi/ScholarLib/blob/main/docs/LIBRARY_SCHEMA.md) — `library.json` schema (the wiki reads this, never writes it).
