@@ -23,6 +23,8 @@ export class SidecarService {
     for (const page of pages) {
       const row = {
         id: page.id,
+        type: page.frontmatter.type || 'paper',
+        handle: page.frontmatter.handle || null,
         title: page.frontmatter.title || page.id,
         aliases: page.frontmatter.aliases || [],
         tags: page.frontmatter.tags || [],
@@ -30,6 +32,15 @@ export class SidecarService {
         revision: page.storage.revision,
         hash: page.hash,
         updated_at: page.frontmatter.updated_at || page.storage.modified || null,
+        last_updated: page.frontmatter.last_updated || null,
+        last_human_review: page.frontmatter.last_human_review || null,
+        archived: page.frontmatter.archived === true,
+        outcome: page.frontmatter.outcome,
+        outcome_other: page.frontmatter.outcome_other,
+        funder: page.frontmatter.funder,
+        program: page.frontmatter.program,
+        submitted: page.frontmatter.submitted,
+        related_source_docs: page.frontmatter.related_source_docs || [],
       }
       pageRows.push(row)
 
@@ -72,6 +83,7 @@ export class SidecarService {
     await writeJSONWithRevision(adapter, WikiPaths.pagesSidecar, pagesSidecar)
     await writeJSONWithRevision(adapter, WikiPaths.aliasesSidecar, aliasesSidecar)
     await WikiStateService.save(adapter, { page_count: pageRows.length })
+    PageStore.clearCache(adapter)
 
     return {
       pages: pagesSidecar,

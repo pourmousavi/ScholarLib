@@ -7,15 +7,25 @@ import styles from '../Wiki.module.css'
 export default function QuestionInbox({ adapter }) {
   const [clusters, setClusters] = useState([])
   const [status, setStatus] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState(null)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       if (!adapter) return
-      const pages = await PageStore.listPages(adapter)
-      const clusterer = new QuestionClusterer()
-      const next = clusterer.cluster(clusterer.collectCandidates(pages))
-      if (!cancelled) setClusters(next)
+      setLoading(true)
+      setLoadError(null)
+      try {
+        const pages = await PageStore.listPagesByType(adapter, 'paper')
+        const clusterer = new QuestionClusterer()
+        const next = clusterer.cluster(clusterer.collectCandidates(pages))
+        if (!cancelled) setClusters(next)
+      } catch (error) {
+        if (!cancelled) setLoadError(error.message || 'Failed to load question candidates')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
     load()
     return () => { cancelled = true }
@@ -40,7 +50,11 @@ export default function QuestionInbox({ adapter }) {
         </div>
       </div>
       {status && <p className={styles.reason}>{status}</p>}
-      {clusters.length === 0 ? (
+      {loadError ? (
+        <div className={styles.empty}>{loadError}</div>
+      ) : loading && clusters.length === 0 ? (
+        <div className={styles.empty}>Loading question candidates...</div>
+      ) : clusters.length === 0 ? (
         <div className={styles.empty}>No question candidates found.</div>
       ) : (
         <div className={styles.proposalList}>

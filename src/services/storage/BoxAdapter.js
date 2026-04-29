@@ -5,6 +5,7 @@ const BOX_API_BASE = 'https://api.box.com/2.0'
 const BOX_UPLOAD_BASE = 'https://upload.box.com/api/2.0'
 const BOX_AUTH_URL = 'https://account.box.com/api/oauth2/authorize'
 const BOX_TOKEN_URL = 'https://api.box.com/oauth2/token'
+const BOX_CACHE_TTL_MS = 30_000
 
 // External configuration (for consumers like LitOrbit)
 let _boxConfig = null
@@ -61,6 +62,9 @@ function generateState() {
 export class BoxAdapter {
   constructor() {
     this.rootFolderId = localStorage.getItem('sv_box_root_id') || null
+    this.folderIdCache = new Map()
+    this.fileIdCache = new Map()
+    this.folderListCache = new Map()
     this.axiosInstance = axios.create({
       baseURL: BOX_API_BASE,
     })
@@ -121,6 +125,30 @@ export class BoxAdapter {
     localStorage.removeItem('sv_box_expiry')
     localStorage.removeItem('sv_box_root_id')
     this.rootFolderId = null
+    this._clearPathCaches()
+  }
+
+  _clearPathCaches() {
+    this.folderIdCache?.clear()
+    this.fileIdCache?.clear()
+    this.folderListCache?.clear()
+  }
+
+  _normalizePath(path) {
+    return String(path || '').replace(/^\/+/, '').replace(/\/+/g, '/')
+  }
+
+  _parentPath(path) {
+    const parts = this._normalizePath(path).split('/').filter(Boolean)
+    parts.pop()
+    return parts.join('/')
+  }
+
+  _invalidateFolderList(folderId) {
+    if (!folderId) return
+    for (const key of this.folderListCache.keys()) {
+      if (key.startsWith(`${folderId}:`)) this.folderListCache.delete(key)
+    }
   }
 
   async isConnected() {
@@ -248,6 +276,10 @@ export class BoxAdapter {
   }
 
   async _listAllFolderItems(folderId, fields = 'id,name,type') {
+    const cacheKey = `${folderId}:${fields}`
+    const cached = this.folderListCache.get(cacheKey)
+    if (cached && Date.now() - cached.timestamp < BOX_CACHE_TTL_MS) return cached.entries
+
     const all = []
     let offset = 0
     const limit = 1000
@@ -263,6 +295,7 @@ export class BoxAdapter {
         break
       }
     }
+    this.folderListCache.set(cacheKey, { entries: all, timestamp: Date.now() })
     return all
   }
 
@@ -302,12 +335,22 @@ export class BoxAdapter {
   async _getPathFolderId(path) {
     await this._ensureRootFolder()
 
-    if (!path || path === '/') return this.rootFolderId
+    const normalizedPath = this._normalizePath(path)
+    if (!normalizedPath || normalizedPath === '/') return this.rootFolderId
+    const cached = this.folderIdCache.get(normalizedPath)
+    if (cached) return cached
 
-    const parts = path.split('/').filter(Boolean)
+    const parts = normalizedPath.split('/').filter(Boolean)
     let currentId = this.rootFolderId
+    let currentPath = ''
 
     for (const part of parts) {
+      currentPath = currentPath ? `${currentPath}/${part}` : part
+      const cachedPart = this.folderIdCache.get(currentPath)
+      if (cachedPart) {
+        currentId = cachedPart
+        continue
+      }
       const entries = await this._listAllFolderItems(currentId)
 
       const folder = entries.find(
@@ -319,13 +362,18 @@ export class BoxAdapter {
       }
 
       currentId = folder.id
+      this.folderIdCache.set(currentPath, currentId)
     }
 
     return currentId
   }
 
   async _getFileId(path) {
-    const parts = path.split('/')
+    const normalizedPath = this._normalizePath(path)
+    const cached = this.fileIdCache.get(normalizedPath)
+    if (cached) return cached
+
+    const parts = normalizedPath.split('/')
     const fileName = parts.pop()
     const folderPath = parts.join('/')
 
@@ -341,6 +389,7 @@ export class BoxAdapter {
       throw new StorageError(STORAGE_ERRORS.NOT_FOUND, `File not found: ${path}`)
     }
 
+    this.fileIdCache.set(normalizedPath, file.id)
     return file.id
   }
 
@@ -356,7 +405,7 @@ export class BoxAdapter {
     const fileId = await this._getFileId(path)
     const [contentResponse, metadata] = await Promise.all([
       this.axiosInstance.get(`/files/${fileId}/content`, { responseType: 'text' }),
-      this.getMetadata(path),
+      this.getMetadataById(fileId),
     ])
     return {
       text: contentResponse.data,
@@ -437,7 +486,8 @@ export class BoxAdapter {
   }
 
   async uploadFile(path, file) {
-    const parts = path.split('/')
+    const normalizedPath = this._normalizePath(path)
+    const parts = normalizedPath.split('/')
     const fileName = parts.pop()
     const folderPath = parts.join('/')
 
@@ -466,12 +516,22 @@ export class BoxAdapter {
       }
     )
 
-    return response.data.entries[0].id
+    const created = response.data.entries[0]
+    this.fileIdCache.set(normalizedPath, created.id)
+    this._invalidateFolderList(folderId)
+    return created.id
   }
 
   async deleteFile(path) {
     const fileId = await this._getFileId(path)
     await this.axiosInstance.delete(`/files/${fileId}`)
+    this.fileIdCache.delete(this._normalizePath(path))
+    try {
+      const folderId = await this._getPathFolderId(this._parentPath(path))
+      this._invalidateFolderList(folderId)
+    } catch {
+      /* folder may already be gone */
+    }
   }
 
   async getMetadata(path) {
@@ -524,10 +584,17 @@ export class BoxAdapter {
   async createFolder(path) {
     await this._ensureRootFolder()
 
-    const parts = path.split('/').filter(Boolean)
+    const parts = this._normalizePath(path).split('/').filter(Boolean)
     let currentId = this.rootFolderId
+    let currentPath = ''
 
     for (const part of parts) {
+      currentPath = currentPath ? `${currentPath}/${part}` : part
+      const cached = this.folderIdCache.get(currentPath)
+      if (cached) {
+        currentId = cached
+        continue
+      }
       // Check if folder exists
       const entries = await this._listAllFolderItems(currentId)
 
@@ -539,12 +606,16 @@ export class BoxAdapter {
         currentId = existing.id
       } else {
         // Create folder
+        const parentId = currentId
         const createResponse = await this.axiosInstance.post('/folders', {
           name: part,
-          parent: { id: currentId },
+          parent: { id: parentId },
         })
         currentId = createResponse.data.id
+        this._invalidateFolderList(parentId)
+        this._invalidateFolderList(currentId)
       }
+      this.folderIdCache.set(currentPath, currentId)
     }
 
     return currentId

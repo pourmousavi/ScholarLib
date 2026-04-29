@@ -370,4 +370,65 @@ describe('Phase 6+ post-trust extensions', () => {
     expect(result.pages.map((page) => page.id)).toContain('c_live')
     expect(result.pages.map((page) => page.id)).not.toContain('c_old')
   })
+
+  it('loads page summaries from the sidecar without reading every markdown page', async () => {
+    const adapter = new MemoryAdapter()
+    await PageStore.writePage(adapter, {
+      id: 'p_fast',
+      type: 'paper',
+      title: 'Fast Paper',
+      body: 'paper body',
+    })
+    await new GrantIngestion({ adapter }).ingestGrant({
+      title: 'Fast Grant',
+      body: 'private',
+      provider: 'ollama',
+      funder: 'ARC',
+      outcome: 'won',
+    })
+    await SidecarService.regenerate(adapter)
+    PageStore.clearCache(adapter)
+
+    const reads = []
+    const originalRead = adapter.readTextWithMetadata.bind(adapter)
+    adapter.readTextWithMetadata = async (path) => {
+      reads.push(path)
+      return originalRead(path)
+    }
+
+    const summaries = await PageStore.listPageSummaries(adapter)
+    expect(summaries.map((page) => page.id)).toEqual(expect.arrayContaining(['p_fast']))
+    expect(summaries.some((page) => page.frontmatter.type === 'grant' && page.frontmatter.funder === 'ARC')).toBe(true)
+    expect(reads.filter((path) => String(path).endsWith('.md'))).toHaveLength(0)
+  })
+
+  it('loads grant pages from only the private grant folder', async () => {
+    const adapter = new MemoryAdapter()
+    await PageStore.writePage(adapter, {
+      id: 'p_skip',
+      type: 'paper',
+      title: 'Skip Paper',
+      body: 'paper body',
+    })
+    await new GrantIngestion({ adapter }).ingestGrant({
+      title: 'Only Grant',
+      body: 'private',
+      provider: 'ollama',
+      funder: 'ARC',
+      outcome: 'rejected',
+    })
+    PageStore.clearCache(adapter)
+
+    const markdownReads = []
+    const originalRead = adapter.readTextWithMetadata.bind(adapter)
+    adapter.readTextWithMetadata = async (path) => {
+      if (String(path).endsWith('.md')) markdownReads.push(path)
+      return originalRead(path)
+    }
+
+    const grants = await PageStore.listPagesByType(adapter, 'grant')
+    expect(grants).toHaveLength(1)
+    expect(grants[0].frontmatter.title).toBe('Only Grant')
+    expect(markdownReads.every((path) => String(path).includes('_wiki/_private/grant/'))).toBe(true)
+  })
 })

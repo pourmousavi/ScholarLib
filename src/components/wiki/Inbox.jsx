@@ -101,26 +101,45 @@ export default function Inbox() {
   const [selected, setSelected] = useState(null)
   const [refreshNonce, setRefreshNonce] = useState(0)
   const [filter, setFilter] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState(null)
   const proposalRefs = useRef({})
 
   const load = useCallback(async () => {
     if (!adapter || isDemoMode) return
-    const proposalStore = new ProposalStore(adapter)
-    const list = await proposalStore.listPending()
-    setProposals(list)
-    setStatus(await WikiService.getStatus(adapter))
-    try { setCost(await new CostEstimator({ adapter }).getRunningCost()) } catch { /* tolerate */ }
-    try { setReviewDebt(await new ReviewDebtCalculator({ adapter, proposalStore }).computeDebt()) } catch { /* tolerate */ }
-    try { setPendingOps(await OperationLogService.listPending(adapter)) } catch { setPendingOps([]) }
-    try { setIntegrityCheck((await WikiService.getStatus(adapter))?.state?.last_integrity_check || null) } catch { /* tolerate */ }
+    setLoading(true)
+    setLoadError(null)
     try {
-      const pages = await PageStore.listPages(adapter)
+      const proposalStore = new ProposalStore(adapter)
+      const [
+        list,
+        nextStatus,
+        nextCost,
+        nextReviewDebt,
+        nextPendingOps,
+        pages,
+      ] = await Promise.all([
+        proposalStore.listPending(),
+        WikiService.getStatus(adapter),
+        new CostEstimator({ adapter }).getRunningCost().catch(() => null),
+        new ReviewDebtCalculator({ adapter, proposalStore }).computeDebt().catch(() => null),
+        OperationLogService.listPending(adapter).catch(() => []),
+        PageStore.listPageSummaries(adapter).catch(() => []),
+      ])
+      setProposals(list)
+      setStatus(nextStatus)
+      setCost(nextCost)
+      setReviewDebt(nextReviewDebt)
+      setPendingOps(nextPendingOps)
+      setIntegrityCheck(nextStatus?.state?.last_integrity_check || null)
       setStalePages({
         knowledge: pages.filter((page) => page.frontmatter?.type !== 'position_draft' && isStalePage(page)),
         position: pages.filter((page) => isPositionStale(page)),
       })
-    } catch {
-      setStalePages({ knowledge: [], position: [] })
+    } catch (error) {
+      setLoadError(error.message || 'Failed to load wiki inbox')
+    } finally {
+      setLoading(false)
     }
   }, [adapter, isDemoMode])
 
@@ -251,16 +270,16 @@ export default function Inbox() {
               {safetyMode ? 'Safety mode' : 'Normal'}
             </span>
             <button type="button" className={styles.inboxStatChip} onClick={() => setFilter('proposals')}>
-              {summary?.count || 0} proposal{summary?.count === 1 ? '' : 's'}
+              {loading && proposals.length === 0 ? '...' : summary?.count || 0} proposal{summary?.count === 1 ? '' : 's'}
             </button>
             <button type="button" className={styles.inboxStatChip} onClick={() => setFilter('lint')}>
-              {lintFindings.length} lint
+              {loading && !status ? '...' : lintFindings.length} lint
             </button>
             <button type="button" className={styles.inboxStatChip} onClick={() => setFilter('stale')}>
-              {stalePages.knowledge.length + stalePages.position.length} stale
+              {loading && (stalePages.knowledge.length + stalePages.position.length) === 0 ? '...' : stalePages.knowledge.length + stalePages.position.length} stale
             </button>
             <button type="button" className={styles.inboxStatChip} onClick={() => setFilter('recovery')}>
-              {pendingOps.length} pending op{pendingOps.length === 1 ? '' : 's'}
+              {loading && pendingOps.length === 0 ? '...' : pendingOps.length} pending op{pendingOps.length === 1 ? '' : 's'}
             </button>
           </p>
           {cost && (
@@ -270,9 +289,14 @@ export default function Inbox() {
           )}
         </div>
         <div className={styles.inboxHeaderActions}>
-          <button type="button" className={styles.secondaryBtn} onClick={() => setRefreshNonce((n) => n + 1)}>Refresh</button>
+          <button type="button" className={styles.secondaryBtn} onClick={() => setRefreshNonce((n) => n + 1)} disabled={loading}>
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
       </header>
+
+      {loadError && <div className={styles.empty}>{loadError}</div>}
+      {loading && proposals.length === 0 && <div className={styles.empty}>Loading wiki inbox...</div>}
 
       {isPaused && (
         <div role="alert" className={styles.reviewDebtBanner}>

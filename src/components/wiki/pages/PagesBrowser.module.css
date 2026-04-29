@@ -133,6 +133,12 @@
   font-size: 13px;
 }
 
+.inlineStatus {
+  margin-top: var(--space-3);
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
 @media (max-width: 760px) {
   .browser {
     grid-template-columns: 1fr;

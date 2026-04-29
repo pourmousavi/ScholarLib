@@ -33,14 +33,17 @@ export default function PagesBrowser({ adapter }) {
   const [showArchived, setShowArchived] = useState(false)
   const [query, setQuery] = useState('')
   const [error, setError] = useState(null)
+  const [loadingPages, setLoadingPages] = useState(false)
+  const [loadingSelected, setLoadingSelected] = useState(false)
   const setActiveTab = useUIStore((s) => s.setWikiWorkspaceTab)
   const setSelectedGrantPageId = useUIStore((s) => s.setWikiSelectedGrantPageId)
 
   const loadPages = useCallback(async () => {
     if (!adapter) return
     setError(null)
+    setLoadingPages(true)
     try {
-      let nextPages = await PageStore.listPages(adapter)
+      let nextPages = await PageStore.listPageSummaries(adapter)
       let nextAliases = {}
       try {
         nextAliases = await adapter.readJSON(WikiPaths.aliasesSidecar)
@@ -53,6 +56,8 @@ export default function PagesBrowser({ adapter }) {
       setSelectedId((current) => current || nextPages.find((page) => !page.frontmatter?.archived)?.id || nextPages[0]?.id || null)
     } catch (err) {
       setError(err.message || 'Failed to load wiki pages')
+    } finally {
+      setLoadingPages(false)
     }
   }, [adapter])
 
@@ -68,11 +73,13 @@ export default function PagesBrowser({ adapter }) {
         setRawMarkdown('')
         return
       }
+      setLoadingSelected(true)
       try {
-        const page = await PageStore.readPage(adapter, selectedId)
-        const raw = page.path
-          ? (await adapter.readTextWithMetadata(page.path)).text
-          : stringifyWikiMarkdown(page.frontmatter, page.body)
+        const summary = pages.find((entry) => entry.id === selectedId)
+        const page = summary?.path
+          ? await PageStore.readPageByPath(adapter, summary.path)
+          : await PageStore.readPage(adapter, selectedId)
+        const raw = page.rawText || stringifyWikiMarkdown(page.frontmatter, page.body)
         if (!cancelled) {
           setSelectedPage(page)
           setRawMarkdown(raw)
@@ -80,13 +87,15 @@ export default function PagesBrowser({ adapter }) {
         }
       } catch (err) {
         if (!cancelled) setError(err.message || 'Failed to read page')
+      } finally {
+        if (!cancelled) setLoadingSelected(false)
       }
     }
     loadSelected()
     return () => {
       cancelled = true
     }
-  }, [adapter, selectedId])
+  }, [adapter, selectedId, pages])
 
   const aliasSearch = useMemo(() => aliasMapForSearch(aliases), [aliases])
   const pagesById = useMemo(() => {
@@ -159,6 +168,8 @@ export default function PagesBrowser({ adapter }) {
           />
           Show archived
         </label>
+        {loadingPages && pages.length === 0 && <div className={styles.empty}>Loading wiki index...</div>}
+        {loadingPages && pages.length > 0 && <div className={styles.inlineStatus}>Refreshing...</div>}
         {groups.map((group) => (
           <section key={group.type} className={styles.group}>
             <h3 className={styles.groupTitle}>{typeLabel(group.type)} ({group.pages.length})</h3>
@@ -177,7 +188,9 @@ export default function PagesBrowser({ adapter }) {
       </aside>
       <main className={styles.content}>
         {error && <div className={styles.empty}>{error}</div>}
-        {!error && !selectedPage && <div className={styles.empty}>No wiki page selected.</div>}
+        {!error && !selectedPage && (
+          <div className={styles.empty}>{loadingSelected ? 'Loading page...' : 'No wiki page selected.'}</div>
+        )}
         {selectedPage && (
           <>
             <div className={styles.toolbar}>

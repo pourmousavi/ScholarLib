@@ -17,6 +17,8 @@ export default function GrantPanel({ adapter }) {
   const [activeOutcome, setActiveOutcome] = useState('pending')
   const [showArchived, setShowArchived] = useState(false)
   const [ingestingDocId, setIngestingDocId] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState(null)
   const documents = useLibraryStore((s) => s.documents)
   const folders = useLibraryStore((s) => s.folders)
   const updateDocument = useLibraryStore((s) => s.updateDocument)
@@ -28,12 +30,19 @@ export default function GrantPanel({ adapter }) {
 
   const loadGrants = useCallback(async () => {
     if (!adapter) return []
-    const pages = await PageStore.listPages(adapter)
-    const next = pages
-      .filter(page => page.frontmatter?.type === 'grant')
-      .sort((a, b) => String(a.frontmatter?.title || a.id).localeCompare(String(b.frontmatter?.title || b.id)))
-    setGrants(next)
-    return next
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const next = (await PageStore.listPagesByType(adapter, 'grant'))
+        .sort((a, b) => String(a.frontmatter?.title || a.id).localeCompare(String(b.frontmatter?.title || b.id)))
+      setGrants(next)
+      return next
+    } catch (error) {
+      setLoadError(error.message || 'Failed to load grants')
+      return []
+    } finally {
+      setLoading(false)
+    }
   }, [adapter])
 
   useEffect(() => {
@@ -176,7 +185,7 @@ export default function GrantPanel({ adapter }) {
             className={`${styles.bucket} ${activeOutcome === outcome ? styles.active : ''}`}
             onClick={() => setActiveOutcome(outcome)}
           >
-            {outcome} · {counts[outcome] || 0}
+            {outcome} · {loading && grants.length === 0 ? '...' : counts[outcome] || 0}
           </button>
         ))}
         <label className={styles.archiveToggle}>
@@ -189,7 +198,11 @@ export default function GrantPanel({ adapter }) {
         </label>
       </div>
 
-      {visibleGrants.length === 0 ? (
+      {loadError ? (
+        <div className={wikiStyles.empty}>{loadError}</div>
+      ) : loading && grants.length === 0 ? (
+        <div className={wikiStyles.empty}>Loading grants...</div>
+      ) : visibleGrants.length === 0 ? (
         <div className={wikiStyles.empty}>No grant pages found.</div>
       ) : (
         <div className={styles.layout}>
