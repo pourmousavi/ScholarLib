@@ -7,9 +7,8 @@ import { useToast } from '../../hooks/useToast'
 import { needsEnrichment } from '../../utils/enrichment'
 import { enrichFromDOI } from '../../services/metadata/EnrichmentService'
 import { settingsService } from '../../services/settings/SettingsService'
-import { PaperExtractor, ProposalBuilder, WikiService } from '../../services/wiki'
-import { GrantIngestion } from '../../services/wiki/grants/GrantIngestion'
 import { isGrantDocument } from '../../services/wiki/grants/GrantLibraryClassifier'
+import { useWikiIngestion } from '../../hooks/useWikiIngestion'
 import ViewerSwitch from '../viewer/ViewerSwitch'
 import SplitViewPanel from './SplitViewPanel'
 import { NotesPanel } from '../notes'
@@ -22,13 +21,10 @@ import styles from './MainPanel.module.css'
 export default function MainPanel({ isMobile = false }) {
   const [pdfUrl, setPdfUrl] = useState(null)
   const [pdfError, setPdfError] = useState(null)
-  const [isWikiIngesting, setIsWikiIngesting] = useState(false)
-  const [metadataPreflight, setMetadataPreflight] = useState(null)
 
   const activePanel = useUIStore((s) => s.activePanel)
   const setActivePanel = useUIStore((s) => s.setActivePanel)
   const setShowModal = useUIStore((s) => s.setShowModal)
-  const setWikiWorkspaceTab = useUIStore((s) => s.setWikiWorkspaceTab)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const toggleDocList = useUIStore((s) => s.toggleDocList)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
@@ -46,6 +42,14 @@ export default function MainPanel({ isMobile = false }) {
   const adapter = useStorageStore((s) => s.adapter)
   const isConnected = useStorageStore((s) => s.isConnected)
   const isDemoMode = useStorageStore((s) => s.isDemoMode)
+
+  const {
+    isIngesting: isWikiIngesting,
+    preflight: metadataPreflight,
+    requestIngest: requestWikiIngest,
+    cancelPreflight: cancelWikiPreflight,
+    runPreflightIngest,
+  } = useWikiIngestion()
 
   const { showToast } = useToast()
   const attachInputRef = useRef(null)
@@ -222,99 +226,9 @@ export default function MainPanel({ isMobile = false }) {
     setShowModal('share')
   }
 
-  const handleIngestWikiPaper = async (doc = selectedDoc) => {
-    const docId = doc?.id || selectedDocId
-    if (!docId || !adapter || isDemoMode || isWikiIngesting) return
-    setIsWikiIngesting(true)
-    try {
-      const state = useLibraryStore.getState()
-      const library = {
-        version: '1.3',
-        folders: state.folders,
-        documents: state.documents,
-        tag_registry: state.tagRegistry,
-        collection_registry: state.collectionRegistry,
-        smart_collections: state.smartCollections,
-      }
-      await WikiService.regenerateSidecars(adapter)
-      const updatedLibrary = {
-        ...library,
-        documents: { ...library.documents, [docId]: doc },
-      }
-      const extraction = await new PaperExtractor().extractPaper(docId, updatedLibrary, adapter)
-      const proposalId = await new ProposalBuilder({ adapter }).buildProposal(extraction, updatedLibrary)
-      showToast({ message: `Wiki proposal created: ${proposalId}`, type: 'success' })
-      setActivePanel('wiki')
-    } catch (error) {
-      console.error('Wiki ingestion failed:', error)
-      showToast({ message: error.message || 'Wiki ingestion failed', type: 'error' })
-    } finally {
-      setIsWikiIngesting(false)
-    }
-  }
-
-  const handleIngestWikiGrant = async (doc = selectedDoc, duplicateConfirmed = false) => {
-    const docId = doc?.id || selectedDocId
-    if (!docId || !doc || !adapter || isDemoMode || isWikiIngesting) return
-    setIsWikiIngesting(true)
-    try {
-      const result = await new GrantIngestion({ adapter }).ingestDocument({
-        ...doc,
-        id: docId,
-        reference_type: 'grant',
-        user_data: {
-          ...doc.user_data,
-          wiki_type: 'grant'
-        }
-      }, { confirmDuplicate: duplicateConfirmed })
-      const page = result.page
-
-      updateDocument(docId, {
-        reference_type: 'grant',
-        user_data: {
-          ...doc.user_data,
-          wiki_type: 'grant'
-        },
-        wiki: {
-          ...doc.wiki,
-          grant_page_id: page.id,
-          grant_page_path: page.path,
-          grant_ingested_at: new Date().toISOString()
-        }
-      })
-      await useLibraryStore.getState().saveLibrary(adapter)
-      showToast({
-        message: result.alreadyIngested ? `Already ingested as '${page.frontmatter.title}'` : `Grant wiki page created: ${page.frontmatter.title}`,
-        type: result.alreadyIngested ? 'info' : 'success'
-      })
-      useUIStore.getState().setWikiSelectedGrantPageId(page.id)
-      setWikiWorkspaceTab('grants')
-      setActivePanel('wiki')
-    } catch (error) {
-      if (error.code === 'GRANT_POSSIBLE_DUPLICATE') {
-        const ok = window.confirm(error.message)
-        if (ok) return handleIngestWikiGrant(doc, true)
-      } else {
-        console.error('Grant ingestion failed:', error)
-        showToast({ message: error.message || 'Grant ingestion failed', type: 'error' })
-      }
-    } finally {
-      setIsWikiIngesting(false)
-    }
-  }
-
   const openWikiPreflight = () => {
-    if (!selectedDoc || !adapter || isDemoMode || isWikiIngesting) return
-    setMetadataPreflight({
-      document: { ...selectedDoc, id: selectedDocId },
-      defaultType: selectedDocIsGrant ? 'grant' : 'paper',
-    })
-  }
-
-  const runPreflightIngest = async (document, type) => {
-    setMetadataPreflight(null)
-    if (type === 'grant') await handleIngestWikiGrant(document)
-    else await handleIngestWikiPaper(document)
+    if (!selectedDoc) return
+    requestWikiIngest({ ...selectedDoc, id: selectedDocId })
   }
 
   return (
@@ -471,7 +385,7 @@ export default function MainPanel({ isMobile = false }) {
           adapter={adapter}
           defaultType={metadataPreflight.defaultType}
           onIngest={runPreflightIngest}
-          onCancel={() => setMetadataPreflight(null)}
+          onCancel={cancelWikiPreflight}
         />
       )}
         </>

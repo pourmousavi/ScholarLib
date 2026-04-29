@@ -83,6 +83,8 @@ export const useUIStore = create((set) => ({
   previousPanel: null,
   wikiWorkspaceTab: localStorage.getItem('sv_wiki_workspace_tab') || 'inbox',
   wikiSelectedGrantPageId: null,
+  wikiIngesting: false,
+  wikiPreflight: null, // { document, defaultType } | null — opens MetadataPreflightModal in MainPanel
   showModal: null,
   sidebarCollapsed: false,
   docListCollapsed: false,
@@ -121,6 +123,8 @@ export const useUIStore = create((set) => ({
     set({ wikiWorkspaceTab: tab })
   },
   setWikiSelectedGrantPageId: (pageId) => set({ wikiSelectedGrantPageId: pageId }),
+  setWikiIngesting: (busy) => set({ wikiIngesting: Boolean(busy) }),
+  setWikiPreflight: (preflight) => set({ wikiPreflight: preflight }),
   setShowModal: (modal) => set({ showModal: modal }),
 
   // Citation export actions

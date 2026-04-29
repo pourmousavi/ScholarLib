@@ -9,6 +9,8 @@ import { indexService } from '../../services/indexing/IndexService'
 import { settingsService } from '../../services/settings/SettingsService'
 import { collectionService } from '../../services/tags/CollectionService'
 import { AnnotationService } from '../../services/annotations'
+import { isGrantDocument } from '../../services/wiki/grants/GrantLibraryClassifier'
+import { useWikiIngestion } from '../../hooks/useWikiIngestion'
 import { StatusDot, Tag, ContextMenu, EditIcon, MoveIcon, DuplicateIcon, CheckIcon, CircleIcon, StarIcon, StarFilledIcon, TrashIcon, RefreshIcon, TagIcon, FolderIcon, ExportIcon, LinkIcon, DownloadIcon } from '../ui'
 import QuickTagModal from './QuickTagModal'
 import AddToCollectionModal from './AddToCollectionModal'
@@ -47,6 +49,10 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
   const setShowModal = useUIStore((s) => s.setShowModal)
   const setExportDocs = useUIStore((s) => s.setExportDocs)
   const closeDocListMobile = useUIStore((s) => s.closeDocListMobile)
+  const activePanel = useUIStore((s) => s.activePanel)
+  const setActivePanel = useUIStore((s) => s.setActivePanel)
+
+  const { requestIngest: requestWikiIngest, isIngesting: isWikiIngesting } = useWikiIngestion()
 
   const { showToast } = useToast()
 
@@ -100,11 +106,20 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
       toggleDocSelection(doc.id)
     } else {
       setSelectedDocId(doc.id)
+      // If the wiki workspace is open, switch back to the PDF panel so the
+      // user actually sees the document they just clicked.
+      if (activePanel === 'wiki') {
+        setActivePanel('pdf')
+      }
       // On mobile, auto-close doclist to show PDF
       if (window.innerWidth < 640) {
         closeDocListMobile()
       }
     }
+  }
+
+  const handleIngestIntoWiki = () => {
+    requestWikiIngest({ ...doc })
   }
 
   const handleContextMenu = (e) => {
@@ -407,6 +422,9 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
     : []
 
   const hasPdf = !!doc.box_path
+  const wikiEnabled = settingsService.getWikiEnabled()
+  const docIsGrant = isGrantDocument(doc, folders)
+  const canIngestIntoWiki = wikiEnabled && (hasPdf || docIsGrant) && !isDemoMode
 
   const contextMenuItems = [
     {
@@ -423,6 +441,12 @@ const DocCard = memo(function DocCard({ doc, selectionMode = false, isSelected: 
       icon: <RefreshIcon />,
       onClick: handleReplacePdf
     }]),
+    ...(canIngestIntoWiki ? [{
+      label: docIsGrant ? 'Ingest as grant into Wiki...' : 'Ingest into Wiki...',
+      icon: <ExportIcon />,
+      onClick: handleIngestIntoWiki,
+      disabled: isWikiIngesting,
+    }] : []),
     {
       label: 'Manage tags...',
       icon: <TagIcon />,
