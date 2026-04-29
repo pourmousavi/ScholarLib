@@ -79,7 +79,15 @@ export class ProposalApplier {
       sidecarStatus = { ok: true, pages: sidecars.pages.count }
     } catch (error) {
       sidecarStatus = { ok: false, message: error.message, code: error.code || null }
-      await WikiStateService.enterSafetyMode(this.adapter, `Sidecar regeneration failed for proposal ${proposalId}: ${error.message}`)
+      let reason = `Sidecar regeneration failed for proposal ${proposalId}: ${error.message}`
+      if (error.code === 'WIKI_ALIAS_COLLISION' && Array.isArray(error.conflicts) && error.conflicts.length) {
+        const detail = error.conflicts
+          .slice(0, 3)
+          .map((c) => `"${c.alias}" → ${(c.page_ids || []).join(' ↔ ')}`)
+          .join('; ')
+        reason += `. Conflicts: ${detail}${error.conflicts.length > 3 ? `; +${error.conflicts.length - 3} more` : ''}`
+      }
+      await WikiStateService.enterSafetyMode(this.adapter, reason)
     }
 
     await OperationLogService.commit(this.adapter, operation, {

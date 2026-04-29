@@ -74,4 +74,12 @@ export class WikiStateService {
       safety_reason: reason,
     })
   }
+
+  static async clearSafetyMode(adapter) {
+    return this.save(adapter, {
+      safety_mode: false,
+      safety_reason: null,
+      last_recovery_at: new Date().toISOString(),
+    })
+  }
 }

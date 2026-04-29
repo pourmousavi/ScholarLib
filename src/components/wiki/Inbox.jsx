@@ -14,6 +14,7 @@ import { PageStore } from '../../services/wiki/PageStore'
 import ProposalReview from './ProposalReview'
 import LintReportView from './lint/LintReportView'
 import RecoveryActions from './recovery/RecoveryActions'
+import AliasCollisionRecovery from './recovery/AliasCollisionRecovery'
 import styles from './Wiki.module.css'
 
 const STALE_REVIEW_DAYS = 90
@@ -369,6 +370,13 @@ export default function Inbox() {
         onAcceptOverwrite={safetyMode ? handleAcceptOverwrite : null}
         onRestoreLatest={pendingOps.length > 0 ? handleRestoreLatest : null}
       />
+
+      {safetyMode && (
+        <AliasCollisionRecovery
+          adapter={adapter}
+          onResolved={() => setRefreshNonce((n) => n + 1)}
+        />
+      )}
 
       <section className={styles.inboxSection} aria-label="Stale flags">
         <header className={styles.inboxSectionHeader}>
