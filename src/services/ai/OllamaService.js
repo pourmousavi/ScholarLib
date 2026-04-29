@@ -6,12 +6,14 @@
  *
  * IMPORTANT: Ollama must be started with CORS enabled.
  *
- * One-time fix on macOS (persists across reboots):
- *   bash scripts/setup-ollama-mac.sh
+ * Permanent fix on macOS (kills all Ollama processes, reinstalls the
+ * LaunchAgent, restarts Ollama with OLLAMA_ORIGINS set, and verifies the
+ * CORS header is actually returned with curl):
  *
- * Manual one-shot for the current login session:
- *   launchctl setenv OLLAMA_ORIGINS "https://alipourmousavi.com"
- *   then quit Ollama from the menu bar and reopen it.
+ *   bash scripts/fix-ollama-mac.sh
+ *
+ * If that script fails it dumps the diagnostic info you need to share so
+ * the failure can be investigated. Idempotent — safe to re-run.
  */
 class OllamaService {
   constructor() {
@@ -76,7 +78,7 @@ class OllamaService {
           this.lastError = 'Connection timeout - Ollama may not be running'
         } else if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
           // This usually means CORS blocked or network error
-          this.lastError = 'Cannot reach Ollama (CORS or not running). On macOS, run `bash scripts/setup-ollama-mac.sh` once to fix this permanently across reboots. If Ollama is not running, start it from the menu bar.'
+          this.lastError = 'Cannot reach Ollama (CORS or not running). On macOS, run `bash scripts/fix-ollama-mac.sh` — it kills every Ollama process, restarts with the right CORS env, and verifies the fix. If Ollama is not installed, install it from https://ollama.com first.'
         } else if (err.message?.includes('NetworkError')) {
           this.lastError = 'Network error - is Ollama running?'
         } else {
@@ -207,14 +209,14 @@ class OllamaService {
         const message = [
           `Cannot reach Ollama from ${origin}. This is a CORS or network problem.`,
           ``,
-          `One-time fix on macOS (persists across reboots):`,
-          `  bash scripts/setup-ollama-mac.sh`,
+          `Permanent fix on macOS:`,
+          `  bash scripts/fix-ollama-mac.sh`,
           ``,
-          `Quick fix for the current login session only:`,
-          `  launchctl setenv OLLAMA_ORIGINS "${origin}"`,
-          `  then fully quit Ollama from the menu bar and reopen it.`,
+          `That script kills every Ollama process (Ollama.app, brew service, or 'ollama serve' in a terminal),`,
+          `installs a LaunchAgent so OLLAMA_ORIGINS persists across reboots, restarts Ollama with the env var`,
+          `injected directly into the new process, and verifies the CORS header actually comes back via curl.`,
           ``,
-          `If Ollama is not running, start it from the menu bar or run \`ollama serve\` in a terminal.`,
+          `If it still fails, the script prints diagnostic info you can paste back for further help.`,
         ].join('\n')
         this.lastError = message
         throw { code: 'OLLAMA_CORS_OR_NETWORK', message }

@@ -106,27 +106,31 @@ Access to fetch at 'http://localhost:11434/api/tags' from origin
 
 it means Ollama is not whitelisting the app origin. Ollama only accepts cross-origin requests from origins listed in the `OLLAMA_ORIGINS` environment variable, and that variable is **not set by default**.
 
-**Fix it once and for all** by running the included setup script from the repository root:
+**Fix it once and for all** by running the included script from the repository root:
 
 ```bash
-bash scripts/setup-ollama-mac.sh
+bash scripts/fix-ollama-mac.sh
 ```
 
-What the script does:
+What the script does, in order:
 
-- Writes a LaunchAgent at `~/Library/LaunchAgents/com.scholarlib.ollama-cors.plist` that re-applies `OLLAMA_ORIGINS` at every login. This is what `launchctl setenv` alone does **not** do — `setenv` is session-scoped, which is why the manual hack stops working after a reboot.
-- Sets the env var in the current launchd session immediately, so you do not have to log out and back in.
-- Restarts the Ollama menu-bar app so the running process sees the new env var.
+1. **Reports the current state.** Prints whether `OLLAMA_ORIGINS` is set in launchd and what Ollama processes are running.
+2. **Installs a LaunchAgent** at `~/Library/LaunchAgents/com.scholarlib.ollama-cors.plist` that re-applies `OLLAMA_ORIGINS` at every login. This is the part that `launchctl setenv` alone does **not** do — `setenv` is session-scoped, which is why the manual hack stops working after a reboot.
+3. **Kills every Ollama process** — `Ollama.app`, Homebrew service, `ollama serve` running in a terminal. The previous version of this script only restarted `Ollama.app`, which silently does nothing if you started Ollama from a terminal. This version is aggressive on purpose.
+4. **Restarts Ollama with `OLLAMA_ORIGINS` injected directly into the new process's environment.** If `Ollama.app` is installed it is preferred (launchd injects the env at start time); otherwise the script runs `OLLAMA_ORIGINS="..." nohup ollama serve` in the background, which guarantees the new process sees the var regardless of launchd state.
+5. **Verifies CORS with curl** — `curl -H "Origin: https://alipourmousavi.com" http://localhost:11434/api/tags` and checks that the response includes `Access-Control-Allow-Origin: https://alipourmousavi.com`. PASS or FAIL is reported with the exact response headers.
+6. **On failure**, prints a diagnostic dump (launchctl env, running processes, Ollama version, response headers, OPTIONS preflight). Paste that dump back when asking for help so the failure can be diagnosed.
+
+The script is idempotent — re-run it any time. The older `setup-ollama-mac.sh` is now a thin shim that delegates to this one.
 
 **Verify** with:
 
 ```bash
 launchctl getenv OLLAMA_ORIGINS
+curl -i -H "Origin: https://alipourmousavi.com" http://localhost:11434/api/tags | head -20
 ```
 
-You should see `https://alipourmousavi.com,http://localhost:5173,...`. If you do, hard-refresh the app (⌘⇧R) and ingestion will work. If the variable is set but the CORS error still appears, fully quit Ollama from the menu bar (Quit, not just close the menu) and reopen it.
-
-The script is idempotent — re-running it just refreshes the LaunchAgent.
+The first should print `https://alipourmousavi.com,http://localhost:5173,...`. The second's response should include an `Access-Control-Allow-Origin: https://alipourmousavi.com` header. If both look good, hard-refresh the app (⌘⇧R) and ingestion will work.
 
 **Rollback** (if you ever want to remove this):
 
