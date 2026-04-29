@@ -1,0 +1,149 @@
+/* Typography for rendered wiki markdown bodies.
+ * Used by PageReader so canonical-page bodies do not pick up browser default
+ * h1/h2 sizes (which jump to ~32px / ~24px and dwarf every other heading in
+ * the wiki workspace). Sized to fit *inside* an already-titled panel: the
+ * page title is rendered separately by the parent, and these headings are
+ * section labels within that page. */
+
+.body {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.body > :first-child {
+  margin-top: 0;
+}
+
+.body > :last-child {
+  margin-bottom: 0;
+}
+
+.body h1 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--text-primary);
+}
+
+.body h2 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: var(--space-4) 0 var(--space-2);
+  color: var(--text-primary);
+}
+
+.body h3 {
+  font-size: 13px;
+  font-weight: 700;
+  margin: var(--space-3) 0 var(--space-1);
+  color: var(--text-primary);
+}
+
+.body h4,
+.body h5,
+.body h6 {
+  font-size: 12px;
+  font-weight: 700;
+  margin: var(--space-3) 0 var(--space-1);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.body p {
+  margin: var(--space-2) 0;
+  color: var(--text-secondary);
+}
+
+.body ul,
+.body ol {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-5);
+  color: var(--text-secondary);
+}
+
+.body li {
+  margin: var(--space-1) 0;
+}
+
+.body li > p {
+  margin: 0;
+}
+
+.body strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.body em {
+  font-style: italic;
+}
+
+.body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.body pre {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow: auto;
+}
+
+.body pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.body blockquote {
+  margin: var(--space-3) 0;
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--accent-border);
+  color: var(--text-tertiary);
+}
+
+.body hr {
+  margin: var(--space-4) 0;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.body a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--accent-border);
+}
+
+.body a:hover {
+  border-bottom-style: solid;
+}
+
+.body table {
+  margin: var(--space-3) 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.body th,
+.body td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+}
+
+.body th {
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
