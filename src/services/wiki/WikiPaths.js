@@ -5,6 +5,7 @@ const WIKI_PHASE5_ROOT = `${WIKI_ROOT}/_phase5`
 const WIKI_PHASE3_ROOT = `${WIKI_ROOT}/_phase3`
 const WIKI_BACKUPS_ROOT = `${WIKI_ROOT}/_backups`
 const WIKI_LINT_REPORTS_ROOT = `${WIKI_ROOT}/lint-reports`
+const WIKI_EXPORT_OBSIDIAN_ROOT = '_wiki_export_obsidian'
 
 function cleanSegment(value) {
   return String(value || '')
@@ -18,6 +19,7 @@ function cleanSegment(value) {
 export const WikiPaths = {
   root: WIKI_ROOT,
   pagesRoot: WIKI_ROOT,
+  obsidianExportRoot: WIKI_EXPORT_OBSIDIAN_ROOT,
   systemRoot: WIKI_SYSTEM_ROOT,
   schema: `${WIKI_ROOT}/WIKI_SCHEMA.md`,
   state: `${WIKI_SYSTEM_ROOT}/wiki_state.json`,
@@ -33,12 +35,17 @@ export const WikiPaths = {
   costRoot: `${WIKI_ROOT}/_cost`,
   costIndex: `${WIKI_SYSTEM_ROOT}/cost-index.json`,
   positionDraftsRoot: `${WIKI_ROOT}/position/_drafts`,
+  grantsRoot: `${WIKI_ROOT}/_private/grant`,
+  questionsRoot: `${WIKI_ROOT}/question`,
+  obsidianExportManifest: `${WIKI_EXPORT_OBSIDIAN_ROOT}/_scholarlib-export-manifest.json`,
   chatCandidatesRoot: `${WIKI_ROOT}/_inbox/chat-candidates`,
   archivedChatCandidatesRoot: `${WIKI_ROOT}/_inbox/_archived/chat-candidates`,
   chatRoutingDefaults: `${WIKI_SYSTEM_ROOT}/chat_routing_defaults.json`,
 
   typeRoot(type) {
     if (type === 'position_draft') return this.positionDraftsRoot
+    if (type === 'grant') return this.grantsRoot
+    if (type === 'question') return this.questionsRoot
     return `${WIKI_ROOT}/${cleanSegment(type || 'paper')}`
   },
 

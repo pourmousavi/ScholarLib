@@ -66,7 +66,7 @@ export class PageStore {
   }
 
   static async listPages(adapter) {
-    const roots = ['paper', 'concept', 'method', 'dataset', 'person', 'position/_drafts', 'position', 'analysis']
+    const roots = ['paper', 'concept', 'method', 'dataset', 'person', 'position/_drafts', 'position', 'analysis', 'question', '_private/grant']
     const entries = []
     for (const root of roots) {
       const folder = `${WikiPaths.root}/${root}`

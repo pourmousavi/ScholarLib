@@ -17,6 +17,7 @@ export const LINT_RULES = [
   'malformed_op_files',
   'pending_op_recovery_debt',
   'stale_evidence_locators',
+  'grant_namespace_leakage',
 ]
 
 const DEFAULT_OPTIONS = {
@@ -276,6 +277,22 @@ export async function lintStaleEvidenceLocators(snapshot) {
   return findings
 }
 
+export async function lintGrantNamespaceLeakage(snapshot) {
+  const findings = []
+  for (const page of snapshot.pages) {
+    const type = page.frontmatter?.type || 'paper'
+    const isGrant = type === 'grant' || page.path?.includes('/_private/grant/')
+    if (isGrant) continue
+    const body = String(page.body || '')
+    if (/reviewer_feedback|grant pattern|confidential grant|funder:\s|program:\s/i.test(body)) {
+      findings.push(finding('grant_namespace_leakage',
+        `Non-private page "${page.frontmatter.title || page.id}" appears to contain grant-derived prose.`,
+        { page_id: page.id, severity: 'high', details: { type } }))
+    }
+  }
+  return findings
+}
+
 export async function lintMalformedOpFiles(adapter) {
   const findings = []
   const files = await listFilesRecursive(adapter, WikiPaths.opsRoot)
@@ -372,6 +389,7 @@ export class LintService {
     if (rules.includes('alias_collisions')) findings.push(...await lintAliasCollisions(snapshot))
     if (rules.includes('contested_claims')) findings.push(...await lintContestedClaims(snapshot))
     if (rules.includes('stale_evidence_locators')) findings.push(...await lintStaleEvidenceLocators(snapshot))
+    if (rules.includes('grant_namespace_leakage')) findings.push(...await lintGrantNamespaceLeakage(snapshot))
     if (rules.includes('malformed_op_files')) findings.push(...await lintMalformedOpFiles(this.adapter))
     if (rules.includes('pending_op_recovery_debt')) findings.push(...await lintPendingOpRecoveryDebt(this.adapter, this.options, now))
 

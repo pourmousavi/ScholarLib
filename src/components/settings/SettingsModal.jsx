@@ -5,7 +5,7 @@ import { useStorageStore } from '../../store/storageStore'
 import { useLibraryStore } from '../../store/libraryStore'
 import { useIndexStore } from '../../store/indexStore'
 import { settingsService } from '../../services/settings/SettingsService'
-import { WikiService } from '../../services/wiki'
+import { WikiService, ObsidianExporter } from '../../services/wiki'
 import { indexService } from '../../services/indexing/IndexService'
 import { ollamaService } from '../../services/ai/OllamaService'
 import { webllmService } from '../../services/ai/WebLLMService'
@@ -2258,6 +2258,13 @@ export default function SettingsModal({ onClose }) {
             onClick={() => runWikiAction('recovery', () => WikiService.recover(adapter))}
           >
             Recover Operations
+          </button>
+          <button
+            className={styles.secondaryBtn}
+            disabled={!!wikiActionLoading || !enabled}
+            onClick={() => runWikiAction('obsidian-export', () => new ObsidianExporter({ adapter }).export())}
+          >
+            Export to Obsidian
           </button>
         </div>
 
