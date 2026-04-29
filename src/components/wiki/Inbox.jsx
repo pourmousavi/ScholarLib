@@ -192,18 +192,32 @@ export default function Inbox() {
   const isPaused = reviewDebt?.paused === true
 
   const handleApplyFix = async (finding) => {
-    if (finding.code === 'PENDING_OP_ORPHAN') {
-      await WikiService.recover(adapter)
-    } else if (finding.code === 'PAGE_MISSING_FROM_SIDECAR' || finding.code === 'PAGE_REVISION_MISMATCH' || finding.code === 'SIDECAR_PAGE_NOT_FOUND') {
-      await WikiService.regenerateSidecars(adapter)
+    try {
+      if (finding.code === 'PENDING_OP_ORPHAN') {
+        await WikiService.recover(adapter)
+      } else if (finding.code === 'PAGE_MISSING_FROM_SIDECAR' || finding.code === 'PAGE_REVISION_MISMATCH' || finding.code === 'SIDECAR_PAGE_NOT_FOUND') {
+        await WikiService.regenerateSidecars(adapter)
+      }
+      const fresh = await IntegrityService.check(adapter)
+      setIntegrityCheck(fresh)
+    } catch (error) {
+      console.error('Wiki apply-fix failed:', error)
+      window.alert?.(`Apply fix failed: ${error?.message || error}`)
     }
     setRefreshNonce((n) => n + 1)
   }
 
   const handleApplyAllFixes = async (findings) => {
-    if (findings.some((entry) => entry.code === 'PENDING_OP_ORPHAN')) await WikiService.recover(adapter)
-    if (findings.some((entry) => entry.code?.startsWith('PAGE_') || entry.code?.startsWith('SIDECAR_'))) {
-      await WikiService.regenerateSidecars(adapter)
+    try {
+      if (findings.some((entry) => entry.code === 'PENDING_OP_ORPHAN')) await WikiService.recover(adapter)
+      if (findings.some((entry) => entry.code?.startsWith('PAGE_') || entry.code?.startsWith('SIDECAR_'))) {
+        await WikiService.regenerateSidecars(adapter)
+      }
+      const fresh = await IntegrityService.check(adapter)
+      setIntegrityCheck(fresh)
+    } catch (error) {
+      console.error('Wiki apply-all-fixes failed:', error)
+      window.alert?.(`Apply all fixes failed: ${error?.message || error}`)
     }
     setRefreshNonce((n) => n + 1)
   }

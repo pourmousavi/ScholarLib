@@ -10,6 +10,8 @@ import { getUningestedGrantDocuments, isGrantDocument } from '../grants/GrantLib
 import { QuestionClusterer } from '../questions/QuestionClusterer'
 import { QuestionPromoter } from '../questions/QuestionPromoter'
 import { LintService } from '../lint/LintService'
+import { IntegrityService } from '../IntegrityService'
+import { SidecarService } from '../SidecarService'
 
 async function seedPages(adapter) {
   await PageStore.writePage(adapter, {
@@ -139,5 +141,41 @@ describe('Phase 6+ post-trust extensions', () => {
     expect(question.path).toContain('_wiki/question')
     expect(question.frontmatter.type).toBe('question')
     expect(question.body).toContain('Source Candidates')
+  })
+
+  it('regenerating sidecars clears PAGE_MISSING_FROM_SIDECAR for grant pages on next integrity check', async () => {
+    const adapter = new MemoryAdapter()
+    await new GrantIngestion({ adapter }).ingestGrant({
+      title: 'Stale-sidecar grant',
+      body: 'private',
+      provider: 'ollama',
+      funder: 'ARC',
+    })
+    await new GrantIngestion({ adapter }).ingestGrant({
+      title: 'Second grant',
+      body: 'private',
+      provider: 'ollama',
+      funder: 'ARC',
+    })
+    await adapter.writeJSON(WikiPaths.pagesSidecar, {
+      version: '0A',
+      generated_at: new Date().toISOString(),
+      count: 0,
+      pages: [],
+      hash: 'sha256:stale',
+    })
+
+    const stale = await IntegrityService.check(adapter)
+    const staleGrantWarnings = stale.issues.filter(
+      (issue) => issue.code === 'PAGE_MISSING_FROM_SIDECAR' && issue.page_id?.startsWith('g_')
+    )
+    expect(staleGrantWarnings).toHaveLength(2)
+
+    await SidecarService.regenerate(adapter)
+    const fresh = await IntegrityService.check(adapter)
+    const remainingGrantWarnings = fresh.issues.filter(
+      (issue) => issue.code === 'PAGE_MISSING_FROM_SIDECAR' && issue.page_id?.startsWith('g_')
+    )
+    expect(remainingGrantWarnings).toHaveLength(0)
   })
 })
